@@ -1,0 +1,175 @@
+---
+title: Volt AI
+description: Multi-provider AI assistant integrated across the entire platform.
+---
+
+## Overview
+
+Volt AI is the built-in AI assistant that works across the entire VOLT platform. It supports **13 AI providers**, giving your team full flexibility to use the models and services that best fit your needs. Each team configures its own providers and API keys — there is no shared or centralized AI service.
+
+Volt AI is not limited to a standalone chat interface. It is deeply integrated into other modules like the [LaTeX editor](/docs/modules/latex), where it can edit documents, compile projects, generate figures, fix errors, and more.
+
+## Supported Providers
+
+| Provider | Description |
+|---|---|
+| **OpenAI** | GPT-4o, GPT-4, GPT-3.5, and other OpenAI models |
+| **Anthropic** | Claude 4, Claude 3.5, and other Anthropic models |
+| **Google** | Gemini Pro, Gemini Flash, and other Google AI models |
+| **Groq** | Ultra-fast inference for open-source models |
+| **xAI** | Grok models from xAI |
+| **Mistral** | Mistral Large, Medium, Small, and open-source models |
+| **Cohere** | Command R+, Command R, and other Cohere models |
+| **DeepSeek** | DeepSeek reasoning and coding models |
+| **DeepInfra** | Hosted open-source models with fast inference |
+| **Cerebras** | High-speed inference for open-source models |
+| **Together AI** | Open-source model hosting and fine-tuning |
+| **Fireworks** | Fast inference for open-source models |
+| **Ollama** | Self-hosted local models running on your own hardware |
+
+## Setting Up a Provider
+
+To start using Volt AI, you need to add at least one AI provider to your team. Go to the **Volt AI** section from the sidebar and you will see the provider management panel.
+
+![AI Providers](/assets/modules/team/ai-integration/providers.png)
+
+Click the **Add Provider** button. You will be prompted to enter a name for the provider and your API key.
+
+![Add Provider](/assets/modules/team/ai-integration/add-provider.png)
+
+<Callout type="info">
+API keys are encrypted before being stored. Each team manages its own keys — VOLT does not share keys across teams.
+</Callout>
+
+### Getting an API Key
+
+Each provider has its own developer console where you can generate API keys. For example, here is the xAI console:
+
+![xAI API Key](/assets/modules/team/ai-integration/xai-create-api-key.png)
+
+### Selecting Models
+
+After adding a provider, you can select which models to enable. Only enabled models will be available in the chat interface and AI-powered tools.
+
+![Model Selection](/assets/modules/team/ai-integration/xai-models.png)
+
+## Chat Interface
+
+The chat interface supports real-time streaming responses, so you see the AI's reply as it is being generated. Conversations are saved per team and can be accessed by any team member.
+
+![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-1.png)
+
+Volt AI can interact with every module on the platform — from managing containers and trajectories to editing LaTeX documents and running analyses. It acts as a unified interface to your entire workspace.
+
+![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-2.png)
+
+## Available Tools
+
+Volt AI has access to **71 tools** organized across 8 categories. These tools allow it to read, create, update, and delete resources across the platform on your behalf.
+
+<Callout type="info">
+Some tools require your explicit approval before execution (e.g., deleting resources, creating containers). Volt AI will ask for confirmation before proceeding.
+</Callout>
+
+### LaTeX Documents (11 tools)
+
+| Tool | Description |
+|---|---|
+| `compile_latex_document` | Compile a LaTeX document and return the compilation log |
+| `create_latex_file` | Create a new file in a LaTeX document |
+| `edit_latex_file` | Edit an existing LaTeX file's content |
+| `fix_latex_errors` | Compile, parse errors from the log, and return structured error context |
+| `generate_bibtex_entry` | Generate a BibTeX bibliography entry |
+| `generate_latex_figure` | Generate a LaTeX figure environment block |
+| `generate_latex_table` | Generate LaTeX table code from a description or structured data |
+| `list_latex_assets` | List all assets (images, PDFs) in a LaTeX document |
+| `list_latex_documents` | List all LaTeX documents in the current team |
+| `list_latex_files` | List all files in a LaTeX document |
+| `read_latex_file` | Read the content of a specific LaTeX file |
+
+### Trajectories & Analysis (11 tools)
+
+| Tool | Description |
+|---|---|
+| `list_trajectories` | List all trajectories with status, frame count, and dates |
+| `get_trajectory_by_id` | Get detailed information about a specific trajectory |
+| `count_trajectories` | Count trajectories available for the team |
+| `update_trajectory` | Update a trajectory |
+| `delete_trajectory` | Delete a trajectory |
+| `create_analysis` | Create a new analysis |
+| `get_analysis_by_id` | Get detailed information about a specific analysis |
+| `list_analyses_by_trajectory` | List analyses for a specific trajectory |
+| `delete_analysis` | Delete an analysis |
+| `run_analysis` | Execute a plugin analysis on a trajectory |
+| `get_team_metrics` | Get trajectory and analysis metrics for the team |
+
+### Plugin Analysis (8 tools)
+
+| Tool | Description |
+|---|---|
+| `list_plugins` | List plugins available in the team |
+| `get_plugin_by_id` | Get detailed information about a specific plugin |
+| `update_plugin` | Update a plugin |
+| `delete_plugin` | Delete a plugin |
+| `list_analysis_exposures` | List all files (msgpack, charts, GLB models) for an analysis |
+| `get_analysis_listing_data` | Read tabular plugin analysis results for a specific exposure |
+| `get_analysis_listing_summary` | Get a statistical summary of numeric columns from plugin data |
+| `get_analysis_chart` | Retrieve a pre-generated chart image from object storage |
+| `read_exposure_data` | Read raw exposure data (msgpack) from object storage |
+
+### Containers (9 tools)
+
+| Tool | Description |
+|---|---|
+| `list_containers` | List all Docker containers in the team |
+| `get_container_by_id` | Get detailed information about a specific container |
+| `create_container` | Create a new Docker container |
+| `update_container` | Update a Docker container |
+| `delete_container` | Delete a Docker container |
+| `get_container_processes` | List running processes in a container |
+| `get_container_stats` | Get resource usage stats for a container |
+| `list_container_files` | List files in a container directory |
+| `read_container_file` | Read a file from a container |
+
+### Team Management (13 tools)
+
+| Tool | Description |
+|---|---|
+| `list_team_members` | List all members with their roles |
+| `update_team_member` | Update a team member's role |
+| `remove_team_member` | Remove a team member |
+| `list_team_roles` | List all roles in the team |
+| `create_team_role` | Create a new role |
+| `update_team_role` | Update a team role |
+| `delete_team_role` | Delete a team role |
+| `send_team_invitation` | Send a team invitation |
+| `list_pending_invitations` | List pending team invitations |
+| `delete_team_invitation` | Cancel a pending invitation |
+| `list_secret_keys` | List API secret keys for the team |
+| `create_secret_key` | Create a new API secret key |
+| `delete_secret_key` | Permanently delete an API secret key |
+| `revoke_secret_key` | Revoke an API secret key |
+
+### SSH Connections (4 tools)
+
+| Tool | Description |
+|---|---|
+| `list_ssh_connections` | List all SSH connections configured for the team |
+| `create_ssh_connection` | Create a new SSH connection |
+| `update_ssh_connection` | Update an SSH connection |
+| `delete_ssh_connection` | Delete an SSH connection |
+
+### AI Conversations (3 tools)
+
+| Tool | Description |
+|---|---|
+| `list_conversations` | List all AI conversations for the current user |
+| `update_conversation` | Update an AI conversation title |
+| `delete_conversation` | Delete an AI conversation |
+
+### Scripting & Simulation (2 tools)
+
+| Tool | Description |
+|---|---|
+| `list_scripting_notebooks` | List all Jupyter scripting notebooks in the team |
+| `list_simulation_cells` | List all simulation cells in the team |

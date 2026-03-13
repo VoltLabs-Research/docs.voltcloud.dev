@@ -1,0 +1,64 @@
+---
+title: Clusters
+description: Connect, monitor, and manage the infrastructure that powers your team.
+---
+
+## Overview
+
+Clusters are the backbone of VOLT. Each cluster is a machine — your personal computer, a spare server, or a dedicated host — that runs the services your team needs to store data and execute analyses.
+
+When you connect a cluster, VOLT automatically deploys **four services** on it:
+
+| Service | Purpose |
+|---|---|
+| **MongoDB** | Stores simulation listings, sub-listings, metadata, and all structured data |
+| **MinIO** | Block storage for 3D models, `.msgpack` files, and other binary assets |
+| **Redis** | Caching and real-time data (used for sessions, queues, etc.) |
+| **Daemon** | The agent that communicates with the VOLT server and orchestrates operations |
+
+<Callout type="info">
+VOLT itself does not store your data. Everything lives on your team's clusters. The VOLT server acts as a proxy — when a user requests data through the UI, it forwards the request to the appropriate cluster daemon. This design makes the platform horizontally scalable: if you need more resources or storage, simply add another cluster.
+</Callout>
+
+## Cluster Listing
+
+The main view shows all clusters connected to your team, with real-time status badges indicating their current state.
+
+![Cluster Listing](/assets/modules/clusters/cluster-listing.png)
+
+Possible cluster statuses:
+
+| Status | Meaning |
+|---|---|
+| **Connected** | Cluster is online and all services are healthy |
+| **Waiting for Connection** | Enrollment token generated, waiting for the daemon to connect |
+| **Disconnected** | Cluster was previously connected but is currently unreachable |
+| **Updating** | Cluster services are being updated |
+| **Deleting** | Cluster is being removed |
+
+## Monitoring Dashboard
+
+Each cluster has a monitoring dashboard that provides real-time visibility into resource usage and service health.
+
+![Cluster Monitoring](/assets/modules/clusters/cluster-monitor.png)
+
+The dashboard includes:
+
+- **CPU Usage**: Current processor utilization across all cores.
+- **RAM Usage**: Memory consumption relative to total available memory.
+- **Disk Usage**: Storage consumption on the cluster's file system.
+- **Response Time**: Latency of the daemon's heartbeat and API responses.
+- **Database Performance**: Query metrics for MongoDB and Redis.
+
+## Redis Explorer
+
+The Redis Explorer lets you browse the key-value store running on your cluster. You can inspect keys, view their values, and understand what data is being cached or queued.
+
+![Redis Explorer](/assets/modules/clusters/cluster-redis-explorer.png)
+
+## Additional Features
+
+- **Remote Terminal**: Open an SSH-based terminal session to your cluster directly from the browser.
+- **File Explorer**: Browse the cluster's file system and manage files.
+- **Service Discovery**: VOLT automatically detects and tracks the health of all four services.
+- **Encrypted Credentials**: All cluster credentials and enrollment tokens are encrypted at rest.

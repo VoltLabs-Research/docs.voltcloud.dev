@@ -1,0 +1,56 @@
+---
+title: Containers
+description: Deploy and manage Docker containers with resource controls and terminal access.
+---
+
+## Overview
+
+The Containers module lets you deploy and manage Docker containers directly from VOLT. Each container runs on one of your team's clusters and can be configured with custom resource limits, port mappings, and environment variables.
+
+Containers are useful for running custom tools, services, or development environments alongside your simulations — all managed from the same platform.
+
+## Container Listing
+
+The main view shows all containers for your team, with real-time status indicators. A green indicator means the container is running.
+
+![Container Listing](/assets/modules/containers/container-listing.png)
+
+## Creating a Container
+
+Container creation follows a multi-step wizard:
+
+### Step 1: Configuration
+
+Specify the container settings:
+
+- **Name**: A descriptive name for the container.
+- **Image**: The Docker image to use (e.g., `ubuntu:latest`, `python:3.12`).
+- **CPU Limit**: Maximum CPU cores allocated to the container.
+- **Memory Limit**: Maximum RAM allocated to the container.
+- **Port Mappings**: Map container ports to host ports for network access.
+- **Environment Variables**: Set key-value pairs available inside the container.
+
+![Create Container](/assets/modules/containers/create-container.png)
+
+### Step 2: Review
+
+Before deploying, you get a summary of the full configuration to review.
+
+![Review Configuration](/assets/modules/containers/review-config.png)
+
+After confirming, the container is created and started on the selected cluster.
+
+## Container Features
+
+Once a container is running, you can:
+
+- **Terminal Access**: Open a WebSocket-based terminal directly in the browser. No SSH setup required.
+- **File Explorer**: Browse, upload, and download files inside the container.
+- **Resource Monitoring**: Track CPU and memory usage in real time.
+- **Port Management**: View and modify exposed ports.
+- **Environment Variables**: Update environment variables without rebuilding.
+- **Remote Desktop**: Connect to containers with a graphical environment via XRDP.
+
+<Callout type="info">
+Containers run on your team's clusters, so resource availability depends on the hardware you have connected.
+</Callout>

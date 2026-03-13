@@ -1,0 +1,48 @@
+---
+title: Whiteboards
+description: Collaborative drawing canvas for diagrams, brainstorming, and visual documentation.
+---
+
+## Overview
+
+Whiteboards provide a collaborative drawing canvas where your team can create diagrams, sketch architectures, brainstorm ideas, and document workflows visually. Think of it as an Excalidraw-style infinite canvas built into VOLT.
+
+Changes are synchronized in real time via WebSocket, so multiple team members can draw on the same board simultaneously.
+
+## Whiteboard Listing
+
+The main view displays all whiteboards in your team as a grid with thumbnail previews, making it easy to find and open the one you need.
+
+![Whiteboard Listing](/assets/modules/whiteboards/whiteboard-listing.png)
+
+## Canvas
+
+The canvas provides a full set of drawing tools accessible from the toolbar:
+
+- **Shapes**: Rectangles, ellipses, diamonds, and lines.
+- **Text**: Add text labels and annotations.
+- **Arrows**: Connect elements with directional arrows.
+- **Freehand Drawing**: Sketch freely with a pencil tool.
+- **Background Colors**: Customize the canvas background.
+
+![Whiteboard Example](/assets/modules/whiteboards/whiteboard-example-1.png)
+
+You can use whiteboards for anything — from quick sketches to detailed architecture diagrams.
+
+![Architecture Diagram](/assets/modules/whiteboards/whiteboard-example-2.png)
+
+![System Design](/assets/modules/whiteboards/whiteboard-example-3.png)
+
+![Collaborative Drawing](/assets/modules/whiteboards/whiteboard-example-4.png)
+
+## Real-Time Collaboration
+
+Whiteboards support real-time collaboration with:
+
+- **Live Cursors**: See where other team members are working on the canvas.
+- **Presence Indicators**: Know who is currently viewing the board (e.g., "1 online").
+- **Delta Updates**: Only changes are transmitted, keeping the experience fast even on large boards.
+
+## Storage
+
+Whiteboard canvas state is saved to your team's cluster storage (MinIO). VOLT also generates thumbnail previews that appear in the listing view.

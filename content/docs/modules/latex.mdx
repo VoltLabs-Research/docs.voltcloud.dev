@@ -1,0 +1,60 @@
+---
+title: LaTeX
+description: Collaborative LaTeX editor with real-time compilation and AI assistance.
+---
+
+## Overview
+
+The LaTeX module is a full-featured collaborative editor built into VOLT. It provides a three-panel layout — file tree, code editor, and live PDF preview — so you can write, compile, and review your documents without leaving the platform.
+
+Projects support multiple files, folder organization, and real-time collaboration. The integrated Volt AI panel can help you write, edit, and fix your LaTeX documents directly from the editor.
+
+## Creating a Project
+
+To start a new LaTeX project, click the **Create Project** button. You will be prompted to enter a project name.
+
+![Create Project](/assets/modules/latex/latex-start-project.png)
+
+Each project has its own file tree, entrypoint configuration, and compilation settings. You can also import existing projects from a `.zip` file.
+
+## Editor Layout
+
+The editor uses a three-panel layout:
+
+1. **File Tree** (left): Browse and manage your project files. Create, rename, move, and delete files and folders.
+2. **Code Editor** (center): Write your LaTeX code with syntax highlighting and autocompletion.
+3. **PDF Preview** (right): See the compiled output in real time. The preview updates automatically after each compilation.
+
+![Editor Overview](/assets/modules/latex/latex-editor-overview.png)
+
+## File Organization
+
+You can organize your project files into folders. The file tree supports drag-and-drop as well as a **Move to Folder** dialog for quick file management.
+
+![Folder Organization](/assets/modules/latex/latex-folder.png)
+
+![Move to Folder](/assets/modules/latex/latex-move-to-custom-folder.png)
+
+## Volt AI Integration
+
+The Volt AI panel is accessible directly from the editor. It provides 10 specialized tools for LaTeX:
+
+- **Edit document**: Modify existing content based on natural language instructions.
+- **Compile project**: Trigger compilation and get feedback on errors.
+- **Generate figures**: Create TikZ or PGFPlots figures from descriptions.
+- **Generate tables**: Build LaTeX tables from data or descriptions.
+- **Fix errors**: Automatically diagnose and fix compilation errors.
+- **Write content**: Generate new sections, paragraphs, or entire documents.
+
+![Volt AI Panel](/assets/modules/latex/latex-volt-ai.png)
+
+## Collaboration
+
+LaTeX projects support real-time collaboration. Multiple team members can edit the same project simultaneously, with changes synchronized via WebSocket.
+
+## Import and Export
+
+| Action | Formats |
+|---|---|
+| **Import** | `.zip` archive containing `.tex` files and assets |
+| **Export** | Individual `.tex` files or full project as `.zip` |
