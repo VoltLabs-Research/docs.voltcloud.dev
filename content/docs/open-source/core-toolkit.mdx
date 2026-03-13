@@ -1,0 +1,136 @@
+---
+title: CoreToolkit
+description: Core C++ library powering VOLT's atomistic simulation analysis. Provides math primitives, spatial data structures, neighbor search, simulation cell handling, and the plugin build system.
+---
+
+## Overview
+
+**CoreToolkit** is the foundational C++23 static library that every VOLT analysis plugin links against. It provides the math primitives, spatial data structures, neighbor-search algorithms, LAMMPS parsing, simulation cell handling, and CLI scaffolding that the [Foundational Algorithms](/docs/open-source#foundational-algorithms) rely on.
+
+| | |
+|---|---|
+| **Language** | C++23 |
+| **Build system** | CMake ≥ 3.20 + Conan 2 |
+| **Package type** | Static library (`libcoretoolkit.a`) |
+| **License** | MIT |
+| **Links** | [GitHub](https://github.com/VoltLabs-Research/CoreToolkit) |
+
+## Modules
+
+CoreToolkit is organized into six modules under the `include/volt/` namespace:
+
+### `volt/math`
+
+Linear algebra and geometry primitives optimized for atomistic simulation.
+
+| Header | Description |
+|---|---|
+| `vector2.h` / `vector3.h` / `vector4.h` | 2D, 3D, and 4D vector types |
+| `point2.h` / `point3.h` | 2D and 3D point types |
+| `matrix3.h` / `matrix4.h` | 3×3 and 4×4 matrix types |
+| `quaternion.h` | Quaternion for rotation representation |
+| `rotation.h` / `scaling.h` | Rotation and scaling transformations |
+| `affine_transformation.h` | General affine transformation |
+| `affine_decomposition.h` | Decomposition of affine transforms |
+| `symmetric_tensor.h` | Symmetric tensor (e.g. strain tensors) |
+| `box3.h` | 3D axis-aligned bounding box |
+| `plane.h` | Plane representation |
+| `ray.h` | Ray for geometric queries |
+| `lin_alg.h` | Linear algebra utilities |
+
+### `volt/core`
+
+Core data model for atomistic simulations.
+
+| Header | Description |
+|---|---|
+| `simulation_cell.h` | Simulation cell (box vectors, periodicity) |
+| `frame_adapter.h` | Adapter for reading simulation frames |
+| `lammps_parser.h` | High-performance LAMMPS dump parser |
+| `particle_property.h` | Per-particle property storage |
+| `property_base.h` | Type-erased property base class |
+| `analysis_result.h` | Standard result type for analysis plugins |
+| `volt.h` | Precompiled header aggregating all core includes |
+
+### `volt/analysis`
+
+Spatial query algorithms used by analysis plugins.
+
+| Header | Description |
+|---|---|
+| `cutoff_neighbor_finder.h` | Distance-cutoff neighbor search (cell-list based) |
+| `nearest_neighbor_finder.h` | k-nearest neighbor search (KD-tree based) |
+
+### `volt/structures`
+
+Higher-level crystallographic data structures.
+
+| Header | Description |
+|---|---|
+| `cluster.h` | Cluster representation for defect analysis |
+| `lattice_vectors.h` | Crystal lattice vector utilities |
+
+### `volt/utilities`
+
+General-purpose infrastructure.
+
+| Header | Description |
+|---|---|
+| `memory_pool.h` | Thread-safe arena-style memory pool |
+| `bounded_priority_queue.h` | Fixed-capacity priority queue for k-NN search |
+| `json_utils.h` | JSON serialization helpers (nlohmann/json) |
+| `concurrence/` | TBB-based parallel utilities |
+
+### `volt/cli`
+
+CLI scaffolding for plugin executables.
+
+| Header | Description |
+|---|---|
+| `common.h` | Argument parsing, I/O paths, and JSON output helpers shared by all plugin binaries |
+
+## Dependencies
+
+CoreToolkit manages its dependencies via [Conan 2](https://conan.io/):
+
+| Dependency | Version | Purpose |
+|---|---|---|
+| Boost | 1.88.0 | Header-only utilities |
+| oneTBB | 2021.12.0 | Parallel algorithms & concurrency |
+| spdlog | 1.14.1 | Structured logging |
+| nlohmann_json | 3.11.3 | JSON I/O |
+
+Additionally, three vendored libraries are compiled as static dependencies:
+
+| Library | Purpose |
+|---|---|
+| **PTM** | Polyhedral Template Matching for crystal structure identification |
+| **MWM_CSP** | Minimum-weight matching for centrosymmetry parameter calculation |
+| **Geogram** | Delaunay tessellation (PSM subset) |
+
+## Build Flags
+
+Release builds use HPC-tuned compiler flags:
+
+```
+-O3 -march=native -fno-math-errno -fno-trapping-math -ffp-contract=fast
+```
+
+<Callout type="info">
+CoreToolkit deliberately avoids `-ffast-math` globally to preserve strict IEEE compliance on geometry-critical code paths.
+</Callout>
+
+## CI / GitHub Actions
+
+CoreToolkit exposes a **reusable workflow** at `.github/workflows/build-plugin-binary.yml` that any plugin repository can call to:
+
+1. Build the plugin against a fresh CoreToolkit checkout (on Linux, macOS, and Windows).
+2. Package the resulting binary into a `.tar.gz` archive with SHA-256 checksum and metadata.
+3. Publish the bundle to **GHCR** as an OCI artifact.
+
+Package naming follows:
+
+```
+ghcr.io/voltlabs-research/<plugin-lowercase>-binary:sha-<commit>-<os>-<arch>
+ghcr.io/voltlabs-research/<plugin-lowercase>-binary:<tag>-<os>-<arch>
+```

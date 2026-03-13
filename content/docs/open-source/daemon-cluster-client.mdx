@@ -1,0 +1,282 @@
+---
+title: DaemonClusterClient
+description: TypeScript WebSocket client for cluster daemon communication with the VOLT server.
+---
+
+## Overview
+
+`@voltstack/daemon-cluster-client` is the TypeScript client that cluster daemons use to communicate with the VOLT server over WebSocket (socket.io). It handles enrollment, heartbeat, bidirectional command dispatch, and real-time messaging.
+
+This package is used internally by the VOLT cluster daemon. If you are building a custom daemon or integrating cluster-level services, this is the client you need.
+
+## Installation
+
+```bash
+npm install @voltstack/daemon-cluster-client
+```
+
+**Peer dependency:** `socket.io-client >= 4.0.0`
+
+## Quick Start
+
+```typescript
+import { ClusterDaemonClient } from '@voltstack/daemon-cluster-client';
+
+const client = new ClusterDaemonClient({
+  serverUrl: 'https://api.voltcloud.dev',
+  controlSocketUrl: 'wss://api.voltcloud.dev/control',
+  credentials: {
+    teamClusterId: 'cluster-abc123',
+    daemonPassword: 'password',
+  },
+});
+
+await client.connect();
+
+client.registerHandler('execute-plugin', async (payload) => {
+  // Handle inbound command from server
+  return { success: true };
+});
+```
+
+## Constructor
+
+```typescript
+class ClusterDaemonClient {
+  constructor(options: ClusterDaemonClientOptions)
+}
+```
+
+### Options
+
+```typescript
+interface ClusterDaemonClientOptions {
+  // Base URL of the VOLT server
+  serverUrl: string;
+  // socket.io control namespace URL
+  controlSocketUrl: string;
+  // Authentication credentials
+  credentials: DaemonCredentials;
+  // Optional: enrollment configuration
+  enrollment?: EnrollmentOptions;
+  // Optional: heartbeat configuration
+  heartbeat?: HeartbeatOptions;
+  // Optional: socket.io options
+  socket?: SocketOptions;
+  // Optional: default command timeout in ms (default: 30000)
+  commandTimeout?: number;
+}
+
+interface DaemonCredentials {
+  teamClusterId: string;
+  daemonPassword: string;
+  // Used during first-time enrollment
+  enrollmentToken?: string;
+}
+
+interface HeartbeatOptions {
+  // Interval in ms (default: 30000)
+  interval?: number;
+}
+```
+
+## Connection Lifecycle
+
+```
+┌─────────────┐     ┌──────────────┐     ┌───────────────┐
+│  Enrollment  │ ──► │ Socket.io    │ ──► │  Heartbeat    │
+│  (HTTP POST) │     │  Connect     │     │  Loop Start   │
+└─────────────┘     └──────────────┘     └───────────────┘
+```
+
+### `connect(): Promise<void>`
+
+Performs the full connection sequence:
+
+1. **Enrollment** (if `enrollmentToken` is provided): Registers the daemon with the VOLT server via HTTP. The server may rotate the daemon password.
+2. **Socket connection**: Establishes a socket.io connection to the control namespace and completes registration.
+3. **Heartbeat**: Starts a periodic heartbeat loop that sends `runtime.heartbeat` commands.
+
+```typescript
+await client.connect();
+```
+
+### `disconnect(): void`
+
+Gracefully disconnects the socket and stops the heartbeat loop.
+
+```typescript
+client.disconnect();
+```
+
+### `isReady(): boolean`
+
+Returns `true` if the socket is connected and registration is complete.
+
+```typescript
+if (client.isReady()) {
+  await client.sendCommand('status');
+}
+```
+
+## Sending Commands
+
+### `sendCommand<T>(command, payload?, timeout?): Promise<T | undefined>`
+
+Sends a request to the VOLT server and waits for a response. Uses a UUID-keyed request/response pattern with timeout.
+
+```typescript
+// Send a command and wait for response
+const result = await client.sendCommand('get-container-stats', {
+  containerId: 'container-123',
+});
+
+// With custom timeout (ms)
+const result = await client.sendCommand('long-operation', payload, 60000);
+```
+
+**Throws `DaemonClientError` with codes:**
+
+| Code | Meaning |
+|---|---|
+| `SOCKET_NOT_READY` | Socket is not connected or registration incomplete |
+| `COMMAND_TIMEOUT` | Server did not respond within the timeout |
+| `COMMAND_REJECTED` | Server explicitly rejected the command |
+
+### `emit(message): void`
+
+Sends a fire-and-forget message on the control socket. Used for notifications that do not require a response.
+
+```typescript
+client.emit({
+  type: 'exposure-snapshot',
+  data: { analysisId, timestep, status: 'complete' },
+});
+```
+
+## Handling Inbound Commands
+
+The VOLT server can send commands to the daemon (e.g., "run this plugin", "list container files"). Register handlers to respond to these commands.
+
+### `registerHandler(command, handler): this`
+
+Registers a handler for a specific inbound command. Handlers survive reconnections.
+
+```typescript
+client.registerHandler('execute-plugin', async (payload) => {
+  const result = await runPlugin(payload.pluginId, payload.params);
+  return result;
+});
+
+client.registerHandler('list-files', async (payload) => {
+  return fs.readdirSync(payload.path);
+});
+```
+
+### `unregisterHandler(command): this`
+
+Removes a previously registered handler.
+
+```typescript
+client.unregisterHandler('execute-plugin');
+```
+
+### `onMessage(callback): this`
+
+Subscribes to all inbound non-command messages (e.g., session input, tunnel events, exposure snapshots).
+
+```typescript
+client.onMessage((message) => {
+  console.log(message.type, message.data);
+});
+```
+
+## Event Listeners
+
+### `onConnected(callback): this`
+
+Fires when the socket connection is established and registration is complete.
+
+```typescript
+client.onConnected(() => {
+  console.log('Daemon connected and registered');
+});
+```
+
+### `onDisconnected(callback): this`
+
+Fires when the socket disconnects.
+
+```typescript
+client.onDisconnected((reason) => {
+  console.log('Disconnected:', reason);
+});
+```
+
+### `onError(callback): this`
+
+Fires on client errors (heartbeat failures, handler errors, socket errors).
+
+```typescript
+client.onError((err) => {
+  console.error(err.code, err.message);
+});
+```
+
+## Credential Accessors
+
+### `getTeamClusterId(): string`
+
+Returns the current team cluster ID.
+
+### `getDaemonPassword(): string`
+
+Returns the current daemon password. This may differ from the initial value if the password was rotated during enrollment.
+
+## Error Handling
+
+```typescript
+import { DaemonClientError } from '@voltstack/daemon-cluster-client';
+
+try {
+  await client.sendCommand('some-command');
+} catch (err) {
+  if (err instanceof DaemonClientError) {
+    switch (err.code) {
+      case 'COMMAND_TIMEOUT':
+        // Handle timeout
+        break;
+      case 'SOCKET_NOT_READY':
+        // Handle not connected
+        break;
+      case 'COMMAND_REJECTED':
+        // Handle rejection
+        break;
+    }
+  }
+}
+```
+
+### Error Codes
+
+| Code | Description |
+|---|---|
+| `EnrollmentFailed` | HTTP enrollment request failed |
+| `SocketConnectionFailed` | Could not establish socket.io connection |
+| `SocketRegistrationFailed` | Socket connected but registration was rejected |
+| `CommandTimeout` | Server did not respond within the timeout |
+| `CommandRejected` | Server explicitly rejected the command |
+| `SocketNotReady` | Attempted to send before connection was ready |
+| `HandlerError` | An inbound command handler threw an error |
+| `EmitFailed` | Fire-and-forget emit failed |
+
+## Architecture
+
+The client orchestrates four internal components:
+
+| Component | Responsibility |
+|---|---|
+| **EnrollmentClient** | HTTP-based daemon registration and password rotation |
+| **ControlSocketManager** | socket.io connection, command send/receive, registration |
+| **HeartbeatManager** | Periodic `runtime.heartbeat` commands to keep the connection alive |
+| **ReverseChannelBridge** | Inbound command dispatch and non-command message routing |

@@ -1,0 +1,16 @@
+{
+  "title": "Open Source Ecosystem",
+  "pages": [
+    "index",
+    "ecosystem-setup",
+    "core-toolkit",
+    "---VoltSDK---",
+    "volt-client",
+    "daemon-cluster-client",
+    "python-client",
+    "---Other tools---",
+    "spatial-assembler",
+    "headless-rasterizer",
+    "lammps-io"
+  ]
+}

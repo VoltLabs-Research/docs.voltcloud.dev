@@ -1,0 +1,208 @@
+---
+title: LammpsIO
+description: Native Node.js addon for high-performance LAMMPS file parsing and statistics.
+---
+
+## Overview
+
+`@voltstack/lammps-io` is a C++ native Node.js addon that parses LAMMPS data files and dump files at high speed. It extracts atom positions, types, IDs, simulation box bounds, and column headers, returning everything as typed arrays for zero-copy performance.
+
+| | |
+|---|---|
+| **Package** | `@voltstack/lammps-io` |
+| **Language** | C++17 with Node.js NAPI bindings |
+| **Platform** | Linux x64 |
+| **Links** | [GitHub](https://github.com/VoltLabs-Research/LammpsIO) · [npm](https://www.npmjs.com/package/@voltstack/lammps-io) |
+
+## Installation
+
+```bash
+npm install @voltstack/lammps-io
+```
+
+## Modules
+
+The package exports three native modules:
+
+```javascript
+const { dataParser, dumpParser, statsParser } = require('@voltstack/lammps-io');
+```
+
+| Module | Purpose |
+|---|---|
+| `dataParser` | Parses LAMMPS data files (static structures) |
+| `dumpParser` | Parses LAMMPS dump files (trajectory snapshots) |
+| `statsParser` | Computes statistics from dump files and typed arrays |
+
+---
+
+## Data Parser
+
+### `dataParser.parseData(filepath, options?)`
+
+Parses a LAMMPS data file and returns atom positions, types, and metadata.
+
+```typescript
+function parseData(
+  filepath: string,
+  options?: { includeIds?: boolean }
+): ParseResult
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `filepath` | `string` | Path to the LAMMPS data file |
+| `options.includeIds` | `boolean` | Include atom IDs in the output (default: `false`) |
+
+**Returns:**
+
+```typescript
+interface ParseResult {
+  // [x1, y1, z1, x2, y2, z2, ...]
+  positions: Float32Array;
+  // Atom type per particle
+  types: Uint16Array;
+  // Only present if includeIds is true
+  ids?: Uint32Array;
+  metadata: {
+    timestep: number;
+    natoms: number;
+    boxBounds: {
+      xlo: number; xhi: number;
+      ylo: number; yhi: number;
+      zlo: number; zhi: number;
+    };
+    headers: string[];
+  };
+  min: [number, number, number];
+  max: [number, number, number];
+}
+```
+
+---
+
+## Dump Parser
+
+### `dumpParser.parseDump(filepath, options?)`
+
+Parses a LAMMPS dump file (single timestep snapshot) and returns atom data with full header information.
+
+```typescript
+function parseDump(
+  filepath: string,
+  options?: { includeIds?: boolean }
+): ParseResult
+```
+
+Parameters and return type are identical to `parseData`, except:
+
+- `metadata.timestep` reflects the actual timestep from the dump file.
+- `metadata.headers` contains the column names from the `ITEM: ATOMS` line (e.g., `["id", "type", "x", "y", "z", "vx", "vy", "vz"]`).
+
+<Callout type="info">
+For files with more than 50,000 atoms, the dump parser automatically uses multi-threaded parsing with hardware concurrency detection.
+</Callout>
+
+---
+
+## Stats Parser
+
+### `statsParser.getStatsForProperty(filepath, propertyIndex)`
+
+Computes the min and max values for a specific column in a LAMMPS dump file.
+
+```typescript
+function getStatsForProperty(
+  filepath: string,
+  propertyIndex: number
+): { min: number; max: number }
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `filepath` | `string` | Path to the LAMMPS dump file |
+| `propertyIndex` | `number` | Zero-based column index |
+
+### `statsParser.getMinMaxFromTypedArray(typedArray)`
+
+Computes the min and max values from a typed array.
+
+```typescript
+function getMinMaxFromTypedArray(
+  typedArray: Float32Array | Float64Array | Int32Array | Uint32Array
+): { min: number; max: number }
+```
+
+### `statsParser.computeMagnitudes(vectorArray)`
+
+Computes the magnitude (`√(x² + y² + z²)`) of each vector in an array.
+
+```typescript
+function computeMagnitudes(
+  vectorArray: Float32Array[] | Float64Array[] | number[][]
+): Float32Array
+```
+
+### `statsParser.getUniqueValuesForProperty(filepath, propertyIndex, maxValues?)`
+
+Returns the sorted unique values for a specific column in a dump file.
+
+```typescript
+function getUniqueValuesForProperty(
+  filepath: string,
+  propertyIndex: number,
+  maxValues?: number
+): number[]
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `filepath` | `string` | — | Path to the LAMMPS dump file |
+| `propertyIndex` | `number` | — | Zero-based column index |
+| `maxValues` | `number` | `100` | Maximum number of unique values to return (0 = unlimited) |
+
+---
+
+## Performance
+
+- **Memory-mapped I/O** (`mmap`) for large file reads without copying into memory.
+- **Multi-threaded parsing** for dump files with > 50K atoms.
+- **Fast number parsing** via the `fast_float` library.
+- **Zero-copy typed arrays** — Data is allocated directly on the V8 heap.
+- **Compiled with** `-O3 -ffast-math -std=c++17`.
+
+## LAMMPS File Formats
+
+### Data File
+
+```
+N atoms
+M atom types
+
+xlo xhi
+ylo yhi
+zlo zhi
+
+Atoms
+
+1 1 0.0 0.0 0.0
+2 1 1.5 0.0 0.0
+...
+```
+
+### Dump File
+
+```
+ITEM: TIMESTEP
+1000
+ITEM: NUMBER OF ATOMS
+5000
+ITEM: BOX BOUNDS pp pp pp
+0.0 50.0
+0.0 50.0
+0.0 50.0
+ITEM: ATOMS id type x y z
+1 1 0.0 0.0 0.0
+2 1 1.5 0.0 0.0
+...
+```

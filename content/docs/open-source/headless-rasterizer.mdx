@@ -1,0 +1,97 @@
+---
+title: HeadlessRasterizer
+description: Native Node.js addon for headless GLB to PNG rasterization.
+---
+
+## Overview
+
+`@voltstack/headless-rasterizer` is a C++ native Node.js addon that renders GLB (glTF Binary) 3D models to PNG images without a GPU or display server. It uses software rasterization with depth buffering, making it ideal for server-side thumbnail generation and batch rendering.
+
+| | |
+|---|---|
+| **Package** | `@voltstack/headless-rasterizer` |
+| **Language** | C++17 with Node.js NAPI bindings |
+| **Platform** | Linux x64 |
+| **Links** | [GitHub](https://github.com/VoltLabs-Research/HeadlessRasterizer) · [npm](https://www.npmjs.com/package/@voltstack/headless-rasterizer) |
+
+## Installation
+
+```bash
+npm install @voltstack/headless-rasterizer
+```
+
+## API
+
+### `rasterize(glbPath, pngPath, width, height, azDeg, elDeg, options?)`
+
+Renders a GLB file to a PNG image using software rasterization.
+
+```typescript
+function rasterize(
+  glbPath: string,
+  pngPath: string,
+  width: number,
+  height: number,
+  azDeg: number,
+  elDeg: number,
+  options?: RasterizeOptions
+): boolean
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `glbPath` | `string` | Path to the input GLB file |
+| `pngPath` | `string` | Path for the output PNG file |
+| `width` | `number` | Image width in pixels |
+| `height` | `number` | Image height in pixels |
+| `azDeg` | `number` | Camera azimuth angle in degrees (horizontal rotation) |
+| `elDeg` | `number` | Camera elevation angle in degrees (vertical pitch) |
+| `options` | `RasterizeOptions` | Optional rendering settings |
+
+```typescript
+interface RasterizeOptions {
+  // Vertical field of view in degrees (default: 60)
+  fov?: number;
+  // Camera distance multiplier (default: 1.0)
+  distScale?: number;
+  // If true, Z-axis points up; otherwise Y-axis (default: true)
+  zUp?: boolean;
+}
+```
+
+**Returns:** `boolean` — `true` if the render succeeded.
+
+## Example
+
+```javascript
+const { rasterize } = require('@voltstack/headless-rasterizer');
+
+rasterize(
+  'model.glb',
+  'thumbnail.png',
+  512, 512,
+  45, 30,
+  { fov: 60, distScale: 1.2, zUp: true }
+);
+```
+
+## Supported Input
+
+- **Triangle meshes** with optional vertex colors (RGB or RGBA).
+- **Point clouds** with adaptive circular splat rendering based on point density.
+- **Index formats**: 16-bit and 32-bit indices.
+
+## Rendering Pipeline
+
+1. **GLB parsing** — Reads the JSON chunk and binary buffer, extracts vertex positions, colors, and indices.
+2. **Bounds computation** — Multi-threaded bounding box calculation.
+3. **Camera setup** — Automatic framing based on model bounds with configurable azimuth, elevation, FOV, and distance.
+4. **Rasterization** — Triangle rasterization with back-face culling and Z-buffer, or circular splat rendering for point clouds.
+5. **Output** — RGBA PNG encoding via STB.
+
+## Performance
+
+- **Memory-mapped file I/O** for zero-copy GLB reading.
+- **Multi-threaded bounds computation**.
+- **32-byte aligned memory** for cache efficiency.
+- **Compiled with** `-O3 -ffast-math -pthread`.

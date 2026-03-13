@@ -1,0 +1,248 @@
+---
+title: VoltClient (Node.js)
+description: TypeScript HTTP client for the VOLT REST API.
+---
+
+## Overview
+
+`@voltstack/voltclient` is the official TypeScript HTTP client for the VOLT REST API. It supports both browser and Node.js environments, provides typed response unwrapping, in-flight GET deduplication, RBAC team scoping, and paginated responses.
+
+## Installation
+
+```bash
+npm install @voltstack/voltclient
+```
+
+## Quick Start
+
+```typescript
+import { createVoltClient, secretKey } from '@voltstack/voltclient';
+
+const volt = createVoltClient({
+  baseUrl: 'https://api.voltcloud.dev',
+  credentials: secretKey('your-secret-key'),
+});
+
+// Scope requests to a specific team
+const team = volt.withTeam('team-id');
+
+// List trajectories
+const trajectories = await team.getUnwrapped('/trajectory');
+```
+
+## Factory Function
+
+### `createVoltClient(options)`
+
+Creates a new `VoltClient` instance with the specified configuration.
+
+```typescript
+interface CreateVoltClientOptions {
+  baseUrl: string;
+  credentials: CredentialProvider;
+  // Optional: 'fetch' (default) or 'axios'
+  adapter?: 'fetch' | 'axios';
+}
+```
+
+## Authentication Presets
+
+| Preset | Description |
+|---|---|
+| `staticToken(token)` | Fixed Bearer token |
+| `secretKey(key)` | API secret key as Bearer token |
+| `dynamicToken(fn)` | Async function that returns a token on each request |
+
+```typescript
+import { staticToken, secretKey, dynamicToken } from '@voltstack/voltclient';
+
+// Static token
+const creds = staticToken('eyJhbGciOi...');
+
+// Secret key
+const creds = secretKey('sk-...');
+
+// Dynamic token (e.g., from a refresh flow)
+const creds = dynamicToken(async () => {
+  const { token } = await refreshToken();
+  return token;
+});
+```
+
+## HTTP Adapters
+
+The client ships with two HTTP adapters:
+
+| Adapter | Dependency | Environment |
+|---|---|---|
+| `FetchHttpClient` | None (native `fetch`) | Browser, Node.js 18+ |
+| `AxiosHttpClient` | `axios >= 1.0.0` | Browser, Node.js |
+
+```typescript
+import { VoltClient, FetchHttpClient, AxiosHttpClient } from '@voltstack/voltclient';
+
+// Using fetch (default)
+const http = new FetchHttpClient({ credentials: secretKey('sk-...') });
+
+// Using axios
+const http = new AxiosHttpClient({ credentials: secretKey('sk-...') });
+```
+
+## Constructor
+
+```typescript
+class VoltClient {
+  constructor(
+    http: HttpClient,
+    basePath: string,
+    opts?: VoltClientOptions
+  )
+}
+```
+
+In most cases, use `createVoltClient()` instead of calling the constructor directly.
+
+## Methods
+
+### Team Scoping
+
+#### `withTeam(teamId: string): VoltClient`
+
+Returns a new client instance scoped to a team. All subsequent requests will include the team ID in the URL path for RBAC resolution.
+
+```typescript
+const teamClient = volt.withTeam('abc123');
+```
+
+#### `withBasePath(basePath: string, opts?: VoltClientOptions): VoltClient`
+
+Returns a new client scoped to a sub-path, reusing the same HTTP adapter.
+
+```typescript
+const trajectoryClient = volt.withBasePath('/trajectory');
+```
+
+### Basic Requests
+
+#### `get<T>(path, query?): Promise<T>`
+
+Performs a GET request. Identical concurrent requests are deduplicated — the same promise is shared.
+
+```typescript
+const data = await volt.get('/trajectory', { page: 1, limit: 10 });
+```
+
+#### `post<T>(path, body?): Promise<T>`
+
+```typescript
+const analysis = await volt.post('/analysis', { trajectoryId, pluginId });
+```
+
+#### `patch<T>(path, body?): Promise<T>`
+
+```typescript
+await volt.patch('/trajectory/abc123', { name: 'Updated Name' });
+```
+
+#### `delete<T>(path, query?): Promise<T>`
+
+```typescript
+await volt.delete('/trajectory/abc123');
+```
+
+### Envelope Unwrappers
+
+The VOLT API wraps responses in a `{ status, data }` envelope. These methods automatically extract the inner data.
+
+#### `getUnwrapped<T>(path, query?): Promise<T>`
+
+```typescript
+// Instead of: const { data } = await volt.get('/trajectory');
+const trajectories = await volt.getUnwrapped('/trajectory');
+```
+
+#### `postUnwrapped<T>(path, body?): Promise<T>`
+
+#### `patchUnwrapped<T>(path, body?): Promise<T>`
+
+#### `deleteUnwrapped<T>(path, query?): Promise<T>`
+
+### Field Extractors
+
+Extract a specific field from the unwrapped response.
+
+#### `getField<T, K>(path, field, query?): Promise<T[K]>`
+
+```typescript
+const count = await volt.getField('/trajectory/count', 'count');
+```
+
+#### `postField<T, K>(path, field, body?): Promise<T[K]>`
+
+#### `patchField<T, K>(path, field, body?): Promise<T[K]>`
+
+### Pagination
+
+#### `getPaginated<T>(path, params?): Promise<PaginatedResponse<T>>`
+
+Returns a normalized paginated response.
+
+```typescript
+interface PaginatedResponse<T> {
+  data: T[];
+  totalResults: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+```
+
+```typescript
+const page = await volt.getPaginated('/trajectory', { page: 1, limit: 20 });
+console.log(page.data, page.totalPages);
+```
+
+### File Downloads
+
+#### `exportFile(path, params?): Promise<Blob>`
+
+Downloads a file as a `Blob`.
+
+```typescript
+const blob = await volt.exportFile('/analysis/abc123/export');
+```
+
+## Service DSL
+
+The SDK includes a declarative DSL for defining typed API services.
+
+```typescript
+import { createService, get, post, patch, del, paginated } from '@voltstack/voltclient';
+
+const TrajectoryService = createService((volt) => ({
+  list: paginated<Trajectory>('/trajectory'),
+  getById: get<Trajectory>((id: string) => `/trajectory/${id}`),
+  create: post<Trajectory>('/trajectory'),
+  update: patch<Trajectory>((id: string) => `/trajectory/${id}`),
+  remove: del<void>((id: string) => `/trajectory/${id}`),
+}));
+
+// Usage
+const service = TrajectoryService(volt);
+const trajectories = await service.list({ page: 1 });
+const trajectory = await service.getById('abc123');
+```
+
+## Error Handling
+
+```typescript
+import { ApiError } from '@voltstack/voltclient';
+
+try {
+  await volt.get('/trajectory/invalid');
+} catch (err) {
+  if (err instanceof ApiError) {
+    console.error(err.status, err.message);
+  }
+}
+```

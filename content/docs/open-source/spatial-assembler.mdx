@@ -1,0 +1,169 @@
+---
+title: SpatialAssembler
+description: Native Node.js addon for high-performance GLB assembly from point clouds and meshes.
+---
+
+## Overview
+
+`@voltstack/spatial-assembler` is a C++ native Node.js addon that generates GLB (glTF Binary) 3D models from point clouds, indexed meshes, and typed atomic data. It is the core geometry engine behind VOLT's 3D visualization pipeline.
+
+| | |
+|---|---|
+| **Package** | `@voltstack/spatial-assembler` |
+| **Language** | C++17 with Node.js NAPI bindings |
+| **Platform** | Linux x64 |
+| **Links** | [GitHub](https://github.com/VoltLabs-Research/SpatialAssembler) · [npm](https://www.npmjs.com/package/@voltstack/spatial-assembler) |
+
+## Installation
+
+```bash
+npm install @voltstack/spatial-assembler
+```
+
+## API
+
+### `generateGLB(positions, types)`
+
+Generates a GLB buffer from a point cloud with type-based coloring (8 predefined colors).
+
+```typescript
+function generateGLB(
+  positions: Float32Array,
+  types: Uint32Array
+): Buffer
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `positions` | `Float32Array` | Vertex positions as `[x1, y1, z1, x2, y2, z2, ...]` |
+| `types` | `Uint32Array` | Atom type index per vertex (0–7) |
+
+**Returns:** `Buffer` — GLB binary data.
+
+### `generateGLBToFile(positions, types, filePath)`
+
+Same as `generateGLB`, but writes the result directly to disk.
+
+```typescript
+function generateGLBToFile(
+  positions: Float32Array,
+  types: Uint32Array,
+  filePath: string
+): boolean
+```
+
+**Returns:** `boolean` — `true` on success.
+
+### `generatePointCloudGLB(positions, colors)`
+
+Generates a GLB from a point cloud with explicit RGBA colors.
+
+```typescript
+function generatePointCloudGLB(
+  positions: Float32Array,
+  colors: Float32Array
+): Buffer
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `positions` | `Float32Array` | Vertex positions as `[x, y, z, ...]` |
+| `colors` | `Float32Array` | RGBA colors per vertex as `[r, g, b, a, ...]` |
+
+**Returns:** `Buffer` — GLB binary data.
+
+### `generateMeshGLB(positions, normals, indices, hasColors, colors, bounds, material)`
+
+Generates a GLB from an indexed triangle mesh with normals and PBR material properties.
+
+```typescript
+function generateMeshGLB(
+  positions: Float32Array,
+  normals: Float32Array,
+  indices: Uint32Array | Uint16Array,
+  hasColors: boolean,
+  colors: Float32Array,
+  bounds: Bounds,
+  material: Material
+): Buffer
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `positions` | `Float32Array` | Vertex positions |
+| `normals` | `Float32Array` | Vertex normals |
+| `indices` | `Uint32Array \| Uint16Array` | Triangle indices |
+| `hasColors` | `boolean` | Whether to include vertex colors |
+| `colors` | `Float32Array` | RGBA colors (used if `hasColors` is true) |
+| `bounds` | `Bounds` | Bounding box `{ minX, minY, minZ, maxX, maxY, maxZ }` |
+| `material` | `Material` | PBR material properties |
+
+```typescript
+interface Bounds {
+  minX: number; minY: number; minZ: number;
+  maxX: number; maxY: number; maxZ: number;
+}
+
+interface Material {
+  baseColor: [number, number, number, number];
+  metallic: number;
+  roughness: number;
+  emissive: [number, number, number];
+  doubleSided: boolean;
+}
+```
+
+**Returns:** `Buffer` — GLB binary data.
+
+### `applyPropertyColors(colorIndices, colorValues)`
+
+Maps scalar property values to a gradient color palette (Viridis, Plasma, Blue-Red, or Grayscale with a 1024-entry LUT).
+
+```typescript
+function applyPropertyColors(
+  colorIndices: Uint32Array,
+  colorValues: Float32Array
+): Float32Array
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `colorIndices` | `Uint32Array` | Index into the color map per vertex |
+| `colorValues` | `Float32Array` | RGB values for gradient interpolation |
+
+**Returns:** `Float32Array` — RGBA colors per vertex.
+
+### `taubinSmooth(positions, indices, lambda, mu, iterations)`
+
+Applies Taubin smoothing (bilateral mesh filtering) to a triangle mesh. Modifies positions in place.
+
+```typescript
+function taubinSmooth(
+  positions: Float32Array,
+  indices: Uint32Array | Uint16Array,
+  lambda: number,
+  mu: number,
+  iterations: number
+): boolean
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `positions` | `Float32Array` | Mesh vertex positions (modified in place) |
+| `indices` | `Uint32Array \| Uint16Array` | Triangle indices |
+| `lambda` | `number` | Positive smoothing factor |
+| `mu` | `number` | Negative smoothing factor (shrinkage compensation) |
+| `iterations` | `number` | Number of smoothing passes |
+
+**Returns:** `boolean` — `true` on success.
+
+## Performance
+
+SpatialAssembler is optimized for large atomic datasets:
+
+- **AVX2/BMI2 SIMD** — Runtime CPU feature detection with vectorized operations.
+- **Lock-free parallel radix sort** — Per-thread histograms eliminate atomic operations.
+- **Morton encoding** — Z-order curve for spatial coherence.
+- **32-byte aligned memory** — Cache-friendly data layout.
+- **Multi-threaded** — Automatic hardware concurrency detection.
+- **Compiled with** `-O3 -ffast-math -pthread`.

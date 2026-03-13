@@ -1,0 +1,119 @@
+---
+title: Ecosystem Setup
+description: Clone the entire VOLT Labs ecosystem and build all plugins with a single command using the CoreToolkit install script.
+---
+
+## Overview
+
+CoreToolkit ships an **install script** (`scripts/install.sh`) that automates the entire process of cloning every repository in the VOLT Labs ecosystem and building all analysis plugins as statically-linked binaries inside Docker.
+
+With a single command you get:
+
+- Every VOLT Labs repository cloned and organized into `tools/`, `plugins/`, and `app/` directories.
+- All [Foundational Algorithm](/docs/open-source#foundational-algorithms) plugins compiled and ready to use.
+
+## Quick Start
+
+```bash
+curl -sSL https://raw.githubusercontent.com/voltlabs-research/CoreToolkit/main/scripts/install.sh | bash
+```
+
+This will create a `voltlabs-ecosystem/` directory in your current working directory with the full ecosystem.
+
+## Requirements
+
+The script runs on **Ubuntu / Debian** (or Debian-based distros) and will automatically install missing system packages via `apt`. You need:
+
+| Requirement | Minimum version |
+|---|---|
+| Ubuntu / Debian | Any supported release |
+| CMake | ≥ 3.20 |
+| C++ compiler | C++23 capable (GCC or Clang) |
+| Conan | ≥ 2.0 |
+| Docker | Installed and running |
+| Python 3 | With `pip` |
+
+<Callout type="info">
+If `cmake`, `conan`, or a C++23 compiler are not found, the script will attempt to install them automatically.
+</Callout>
+
+## What the Script Does
+
+The install script performs the following steps in order:
+
+### 1. System Verification
+
+- Verifies you're on a supported OS (Ubuntu/Debian).
+- Checks and installs base packages: `build-essential`, `cmake`, `git`, `python3`, `python3-pip`, `pkg-config`, `ca-certificates`.
+- Validates CMake ≥ 3.20 and a C++23-capable compiler.
+- Installs Conan 2 via pip if not already available.
+- Ensures Docker is installed.
+
+### 2. Clone All Repositories
+
+The script clones every VOLT Labs repository into a structured workspace:
+
+```
+voltlabs-ecosystem/
+├── tools/
+│   ├── CoreToolkit/
+│   ├── VoltSDK/
+│   ├── SpatialAssembler/
+│   ├── HeadlessRasterizer/
+│   └── LammpsIO/
+├── plugins/
+│   ├── StructureIdentification/
+│   ├── AtomicStrain/
+│   ├── CentroSymmetryParameter/
+│   ├── ClusterAnalysis/
+│   ├── CoordinationAnalysis/
+│   ├── DisplacementsAnalysis/
+│   ├── ElasticStrain/
+│   ├── GrainSegmentation/
+│   └── OpenDXA/
+└── app/
+    ├── Volt/
+    └── ClusterDaemon/
+```
+
+Existing directories are skipped, so you can safely re-run the script to pick up new repositories.
+
+### 3. Build All Plugins
+
+For each plugin in the `plugins/` directory, the script runs a **Docker-based build** using `Dockerfile.build` from CoreToolkit:
+
+1. A `gcc:14-bookworm` container installs CMake, Conan, and system dependencies.
+2. CoreToolkit is exported as a Conan package inside the container.
+3. Each plugin is compiled against CoreToolkit with Release optimizations (`-O3`, `-march=native`, statically linked `libstdc++` and `libgcc`).
+4. The resulting binaries are extracted to the output directory.
+
+## Configuration
+
+You can customize the script behavior with environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `GITHUB_ORG` | `https://github.com/voltlabs-research` | Base URL for cloning repositories |
+| `WORK_DIR` | `./voltlabs-ecosystem` | Root directory for the ecosystem workspace |
+| `BUILD_OUTPUT_DIR` | `./scripts/out` (or second argument) | Where compiled plugin binaries are placed |
+
+```bash
+WORK_DIR=~/my-volt BUILD_OUTPUT_DIR=~/my-volt/bin \
+  curl -sSL https://raw.githubusercontent.com/voltlabs-research/CoreToolkit/main/scripts/install.sh | bash
+```
+
+### Rebuild Without Cache
+
+Pass `--no-cache` to force Docker to rebuild from scratch:
+
+```bash
+./voltlabs-ecosystem/tools/CoreToolkit/scripts/install.sh --no-cache
+```
+
+## Build Output
+
+After a successful run, the compiled plugin binaries are placed in the output directory (default: `scripts/out/`). Each plugin produces a standalone executable that reads a LAMMPS dump frame from stdin (or a file path), runs its analysis, and writes JSON results to stdout.
+
+<Callout type="warn">
+The Docker-based build currently compiles only the **plugin** repositories (the Foundational Algorithms). The tools (`VoltSDK`, `SpatialAssembler`, etc.) and the app (`Volt`, `ClusterDaemon`) are cloned but not built by this script.
+</Callout>
