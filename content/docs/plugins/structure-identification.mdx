@@ -1,0 +1,60 @@
+---
+title: Structure Identification
+description: Crystal structure identification algorithms for atomistic simulations.
+---
+
+## Overview
+
+Structure Identification classifies atoms by their local structural environment to detect **BCC**, **FCC**, **HCP**, **diamond cubic**, and other crystal structures. It helps identify phase boundaries, defects, and amorphous regions in simulation data.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `mode` | `string` | `CNA` | Identification algorithm to use. Options: `CNA`, `PTM`, `DIAMOND`. |
+| `rmsd` | `float` | `0.1` | RMSD threshold for PTM classification (only applies when using PTM). |
+
+## Output
+
+### `{outputBase}_structure_identification.msgpack`
+
+```ts
+type Vec3 = [float, float, float];
+
+// [x, y, z, w]
+type Quaternion = [float, float, float, float];
+
+// CNA / DIAMOND mode
+interface PerAtomProperties {
+    id: int;
+    structure_type: int;
+    structure_name: string;
+    pos: Vec3;
+}
+
+// PTM mode
+interface PTMPerAtomProperties {
+    id: int;
+    structure_type: int;
+    pos: Vec3;
+    correspondence: int;
+    orientation: Quaternion;
+}
+
+interface StructureIdentificationOutput {
+    main_listing: {
+        total_atoms: int;
+        analysis_method: string;
+        // For each detected structure type, a pair of keys is added dynamically:
+        //   `{type}_count`: int
+        //   `{type}_percentage`: float
+        [key: `${string}_count`]: int;
+        [key: `${string}_percentage`]: float;
+        total_identified: int;
+        total_unidentified: int;
+        identification_rate: float;
+        unique_structure_types: int;
+    };
+    "per-atom-properties": PerAtomProperties[] | PTMPerAtomProperties[];
+}
+```

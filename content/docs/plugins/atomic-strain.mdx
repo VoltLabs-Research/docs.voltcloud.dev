@@ -1,0 +1,56 @@
+---
+title: Atomic Strain
+description: Compute per-atom strain tensors from atomic configurations.
+---
+
+## Overview
+
+Atomic Strain computes per-atom strain tensors from atomic configurations. It calculates Green-Lagrangian strain, von Mises strain, and principal strains for deformation analysis in atomistic simulations.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `cutoff` | `float` | `3.0` | Cutoff radius for neighbor search. |
+| `reference` | `file` | — | Reference LAMMPS dump file. If omitted, the current frame is used (≈ zero strain). |
+| `eliminateCellDeformation` | `bool` | `false` | Eliminate cell deformation. |
+| `assumeUnwrapped` | `bool` | `false` | Assume unwrapped coordinates. |
+| `calcDeformationGradient` | `bool` | `true` | Compute deformation gradient F. |
+| `calcStrainTensors` | `bool` | `true` | Compute strain tensors. |
+| `calcD2min` | `bool` | `true` | Compute D²min (nonaffine displacement). |
+
+## Output
+
+### `{outputBase}_atomic_strain.msgpack`
+
+```ts
+// Voigt order: [xx, yy, zz, xy, xz, yz]
+type StrainTensor = [float, float, float, float, float, float];
+
+// Row-major 3×3: [xx, yx, zx, xy, yy, zy, xz, yz, zz]
+type DeformationGradient = [float, float, float, float, float, float, float, float, float];
+
+interface PerAtomProperties {
+    id: int;
+    shear_strain: float;
+    volumetric_strain: float;
+    // when calcStrainTensors = true
+    strain_tensor?: StrainTensor;
+    // when calcDeformationGradient = true
+    deformation_gradient?: DeformationGradient;
+    // null when calcD2min = false
+    D2min: float | null;
+    invalid: boolean;
+}
+
+interface AtomicStrainOutput {
+    main_listing: {
+        cutoff: float;
+        num_invalid_particles: int;
+        average_shear_strain: float;
+        average_volumetric_strain: float;
+        max_shear_strain: float;
+    };
+    "per-atom-properties": PerAtomProperties[];
+}
+```

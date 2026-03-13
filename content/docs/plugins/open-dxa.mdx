@@ -1,0 +1,243 @@
+---
+title: OpenDXA
+description: A modified Dislocation Extraction Algorithm (DXA) supporting multiple structure identification methods.
+---
+
+## Overview
+
+OpenDXA is VOLT's implementation of the Dislocation Extraction Algorithm. It supports multiple structure identification methods including **PTM**, **CNA**, and **Diamond structure analysis**. It identifies dislocation lines, computes Burgers vectors, and extracts dislocation networks from atomistic simulation data.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `crystalStructure` | `string` | `BCC` | Reference crystal structure. Options: `BCC`, `FCC`, `HCP`, `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. |
+| `identificationMode` | `string` | `CNA` | Structure identification mode. Options: `CNA`, `PTM`, `DIAMOND`. |
+| `rmsd` | `float` | `0.1` | RMSD threshold for PTM classification. |
+| `maxTrialCircuitSize` | `int` | `14` | Maximum Burgers circuit size. |
+| `circuitStretchability` | `int` | `9` | Circuit stretchability factor. |
+| `lineSmoothingLevel` | `float` | `1.0` | Dislocation line smoothing level. |
+| `linePointInterval` | `float` | `2.5` | Point interval on dislocation lines. |
+| `onlyPerfectDislocations` | `bool` | `false` | Detect only perfect dislocations. |
+| `markCoreAtoms` | `bool` | `false` | Mark dislocation core atoms. |
+
+## Output
+
+```ts
+type Vec3 = [float, float, float];
+type Mat3x3 = [Vec3, Vec3, Vec3];
+
+// [x, y, z, w]
+type Quaternion = [float, float, float, float];
+```
+
+### `{outputBase}_dislocations.msgpack`
+
+```ts
+interface DislocationSegment {
+    segment_id: int;
+    points: Vec3[];
+    length: float;
+    num_points: int;
+    burgers_vector: Vec3;
+    magnitude: float;
+    fractional: string;
+}
+
+interface JunctionInformation {
+    total_junctions: int;
+    junction_arm_distribution: Record<int, int>;
+}
+
+interface CircuitInformation {
+    total_circuits: int;
+    dangling_circuits: int;
+    blocked_circuits: int;
+    average_edge_count: float;
+    edge_count_range: {
+        min: int;
+        max: int;
+    };
+}
+
+interface NetworkStatistics {
+    total_network_length: float;
+    segment_count: int;
+    junction_count: int;
+    dangling_segments: int;
+    average_segment_length: float;
+    density: float;
+    total_segments_including_degenerate: int;
+}
+
+interface DislocationsOutput {
+    main_listing: {
+        dislocations: int;
+        total_points: int;
+        average_segment_length: float;
+        max_segment_length: float;
+        min_segment_length: float;
+        total_length: float;
+    };
+    sub_listings: {
+        dislocation_segments: DislocationSegment[];
+        junction_information: JunctionInformation;
+        circuit_information: CircuitInformation;
+        network_statistics: NetworkStatistics;
+    };
+}
+```
+
+### `{outputBase}_defect_mesh.msgpack`
+
+```ts
+interface MeshPoint {
+    index: int;
+    position: Vec3;
+}
+
+interface MeshFacet {
+    vertices: [int, int, int];
+}
+
+interface MeshOutput {
+    main_listing: {
+        total_nodes: int;
+        total_facets: int;
+    };
+    sub_listings: {
+        points: MeshPoint[];
+        facets: MeshFacet[];
+    };
+    topology?: {
+        euler_characteristic: int;
+        is_completely_good: boolean;
+        is_completely_bad: boolean;
+    };
+}
+```
+
+### `{outputBase}_interface_mesh.msgpack`
+
+Same schema as `MeshOutput`.
+
+### `{outputBase}_simulation_cell.msgpack`
+
+```ts
+interface LatticeVector {
+    x: float;
+    y: float;
+    z: float;
+}
+
+interface SimulationCellOutput {
+    matrix: Mat3x3;
+    volume: float;
+    is_2d: boolean;
+    lattice_vectors: {
+        a: LatticeVector;
+        b: LatticeVector;
+        c: LatticeVector;
+    };
+    lattice_parameters: {
+        a_length: float;
+        b_length: float;
+        c_length: float;
+    };
+    periodic_boundary_conditions: {
+        x: boolean;
+        y: boolean;
+        z: boolean;
+    };
+    angles: {
+        alpha: float;
+        beta: float;
+        gamma: float;
+    };
+    reciprocal_lattice: {
+        matrix: Mat3x3;
+        volume: float;
+    };
+    dimensionality: {
+        is_2d: boolean;
+        effective_dimensions: 2 | 3;
+    };
+}
+```
+
+### `{outputBase}_ptm_data.msgpack`
+
+Only exported when `identificationMode` is `PTM`.
+
+```ts
+interface PTMPerAtomProperties {
+    id: int;
+    correspondences: int;
+    structure_type?: int;
+    orientation: Quaternion;
+}
+
+interface PTMDataOutput {
+    main_listing: {
+        total_atoms: int;
+        include_structure_type: boolean;
+    };
+    "per-atom-properties": PTMPerAtomProperties[];
+}
+```
+
+### `{outputBase}_atoms.msgpack`
+
+Atoms grouped by their identified structure type name (e.g. `"FCC"`, `"BCC"`, `"Other"`).
+
+```ts
+interface Atom {
+    id: int;
+    pos: Vec3;
+}
+
+interface AtomsOutput {
+    export: {
+        AtomisticExporter: Record<string, Atom[]>;
+    };
+}
+```
+
+### `{outputBase}_structure_analysis_stats.msgpack`
+
+```ts
+interface StructureAnalysisStatsOutput {
+    main_listing: {
+        total_atoms: int;
+        analysis_method: string;
+        // For each detected structure type, a pair of keys is added dynamically:
+        //   `{type}_count`: int
+        //   `{type}_percentage`: float
+        [key: `${string}_count`]: int;
+        [key: `${string}_percentage`]: float;
+        total_identified: int;
+        total_unidentified: int;
+        identification_rate: float;
+        unique_structure_types: int;
+    };
+}
+```
+
+### `{outputBase}_core_atoms.msgpack`
+
+Only exported when `markCoreAtoms` is enabled.
+
+```ts
+interface CoreAtom {
+    id: int;
+    pos: Vec3;
+}
+
+interface CoreAtomsOutput {
+    export: {
+        AtomisticExporter: {
+            Core: CoreAtom[];
+        };
+    };
+}
+```

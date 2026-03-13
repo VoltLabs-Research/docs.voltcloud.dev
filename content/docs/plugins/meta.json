@@ -1,0 +1,15 @@
+{
+  "title": "Plugins",
+  "pages": [
+    "index",
+    "open-dxa",
+    "grain-segmentation",
+    "elastic-strain",
+    "displacements-analysis",
+    "coordination-analysis",
+    "centrosymmetry-parameter",
+    "atomic-strain",
+    "structure-identification",
+    "cluster-analysis"
+  ]
+}

@@ -1,0 +1,41 @@
+---
+title: Centrosymmetry Parameter
+description: Calculate the centrosymmetry parameter (CSP) to detect point defects, surfaces, and dislocation cores.
+---
+
+## Overview
+
+Centrosymmetry Parameter calculates the CSP for each atom to detect point defects, surfaces, and dislocation cores. It is a widely used measure for visualizing crystal defects in atomistic simulations.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `numNeighbors` | `int` | `12` | Number of nearest neighbors to consider (even integer, ≤ 32). E.g., 12 for FCC, 8 for BCC. |
+| `mode` | `string` | `conventional` | CSP calculation mode. Options: `conventional`, `matching`. |
+
+## Output
+
+### `{outputBase}_centrosymmetry.msgpack`
+
+```ts
+interface PerAtomProperties {
+    id: int;
+    csp: float;
+}
+
+interface CentrosymmetryOutput {
+    main_listing: {
+        total_atoms: int;
+        histogram_bins: int;
+        histogram_bin_size: float;
+        max_csp: float;
+        histogram_counts: int[];
+        histogram_interval: {
+            start: float;
+            end: float;
+        };
+    };
+    "per-atom-properties": PerAtomProperties[];
+}
+```

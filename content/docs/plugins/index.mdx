@@ -1,0 +1,151 @@
+---
+title: Overview
+description: Overview of VOLT's plugin ecosystem for atomistic simulation analysis.
+---
+
+## Overview
+
+When you create a new team in VOLT and connect a cluster, a default set of plugins is automatically deployed to that cluster — ready to use out of the box.
+
+This set of plugins implements the [Foundational Algorithms](/docs/open-source-ecosystem#foundational-algorithms) from the VOLT open-source ecosystem.
+
+## What is a Plugin
+
+In VOLT, a plugin is a **collection of nodes** that together form a workflow. When you run an analysis — for example, a Dislocation Analysis — the cluster begins executing that workflow.
+
+Here is the workflow for the Dislocation Analysis plugin:
+
+![Dislocation Analysis workflow](/assets/plugins/plugin-example-workflow.png)
+
+## Node Types
+
+### Modifier Node
+
+Defines the plugin metadata: name, version, description, author details, and UI-related settings.
+
+### Arguments Node
+
+Defines the list of arguments the binary expects to receive. For instance, the arguments for Dislocation Analysis are documented in the [OpenDXA](/docs/plugins/open-dxa) plugin page.
+
+Each argument has the following configuration:
+
+- **Argument Key** — The CLI flag the binary expects (e.g. `crystalStructure`). When the plugin runs, `--` is automatically prepended, resulting in `--crystalStructure`.
+- **Label** — A human-readable name displayed in the UI. For example, the key `crystalStructure` would have the label `Crystal Structure`.
+- **Type** — Determines the input control rendered in the UI:
+
+| Type | Description | Example |
+|---|---|---|
+| **Number** | A numeric input. Supports optional `min`, `max`, and `step` constraints. For instance, the `rmsd` field can use a step of `0.01` so the user can increment from `0.10` to `0.11` with arrow keys. | `cutoff`, `rmsd` |
+| **Boolean** | A checkbox. When checked, the flag is sent as `--flag true`; otherwise it is omitted. | `markCoreAtoms` |
+| **Select** | A dropdown with a predefined set of options. Each option has a **key** (the value sent to the binary) and a **label** (what the user sees). | `identificationMode` with options: PTM → *Polyhedral Template Matching*, CNA → *Common Neighbor Analysis*, DIAMOND → *Diamond Structures Identifier* |
+| **String** | A free-form text input. | — |
+| **Frame** | A frame picker from the current trajectory. The binary receives the file path to the selected frame's dump. | `reference` in Atomic Strain |
+
+- **Default Value** — A preset value so the user doesn't have to configure everything manually. For example, `identificationMode` defaults to `PTM` in Dislocation Analysis.
+- **Value** — If set, the argument becomes **hidden from the user** and always uses this fixed value. Useful for parameters you don't want the user to modify (e.g. a hardcoded thread count).
+
+### Context Node
+
+Defines a data source to iterate over. Currently available sources:
+
+- **Trajectory Dumps** — Iterates over every dump file available in the trajectory.
+
+### ForEach Node
+
+Iterates over the array provided by a Context Node. In a typical plugin workflow, this iterates over `{{ context-node-id.trajectory_dumps }}`. When you run an analysis, it executes on every frame in the trajectory (unless you deselect the "All" option in "Selected Frames" in the UI).
+
+### Entrypoint Node
+
+Contains the binary that runs on each iteration. You upload the compiled executable and define an argument template that is evaluated per iteration. For the Foundational Algorithms, the typical template is:
+
+```
+{{ forEach-node-id.currentValue.path }} {{ forEach-node-id.currentValue.outputPath }} {{ arguments-node-id.as_str }}
+```
+
+Where:
+
+- `currentValue.path` — The file path of the dump for the current frame.
+- `currentValue.outputPath` — A dedicated output directory created for each iteration. This prevents result files from overwriting each other across frames.
+- `as_str` — The argument list with the values the user selected in the UI. For example, if the user configured:
+
+```
+Crystal Structure: FCC
+Identification Mode: PTM
+RMSD: 0.10
+Mark Core Atoms: false
+```
+
+Then `as_str` resolves to:
+
+```
+--crystalStructure FCC --identificationMode PTM --rmsd 0.10 --markCoreAtoms false
+```
+
+### Exposure Node
+
+Represents an output file produced by the binary. This is why the Entrypoint Node in the example image has multiple outgoing connections — one per exposed file.
+
+Each Exposure Node has:
+
+- **Exposure Name** — The label shown in the UI when displaying results (e.g. `Dislocations`).
+- **Results File** — The file name exported by the binary (e.g. `dislocations.msgpack`).
+
+<Callout type="warn">
+Exported files must follow the output format described below. If the file does not conform to this structure, VOLT will not be able to parse it, generate 3D models, or display it in the UI.
+</Callout>
+
+## Why This Design
+
+The node-based architecture means you can connect as many plugins as you want. You can add new algorithms to analyze your simulations simply by connecting and configuring nodes — just like building workflows in N8N.
+
+This is what defines VOLT: *"I can run any algorithm on any simulation — just give me the steps and the executable."* You always work with the state of the art without depending on any specific VOLT version, because you can always import new plugins.
+
+## Export Node
+
+The Export Node takes an Exposure Node's output file and generates 3D models for visualization in the UI. Currently supported exporters:
+
+| Exporter | Description |
+|---|---|
+| **Dislocation Exporter** | Builds a 3D model of dislocation lines. |
+| **Mesh Exporter** | Exports a mesh surface. |
+| **Atomistic Exporter** | Exports an atom point cloud. |
+| **Chart Exporter** | *Coming soon.* |
+
+The 3D model construction for the Dislocation, Mesh, and Atomistic exporters is handled by [SpatialAssembler](/docs/open-source-ecosystem) — a tool developed by VOLT Labs.
+
+## Output File Format
+
+Every file exported by a plugin must be in **MessagePack** (`.msgpack`) format. The underlying JSON structure must follow this schema:
+
+```json
+{
+    "main_listing": {
+        ...
+    },
+    "sub_listings": {
+        "sublisting-name": {
+            ...
+        }
+    },
+    "per-atom-properties": {
+        ...
+    }
+}
+```
+
+The specific contents of each section vary per plugin and are documented in each plugin's page.
+
+## Storage and Data Flow
+
+After a plugin finishes execution, the exported `.msgpack` files and any generated 3D models are uploaded to block storage. VOLT itself does not store any of this data — everything lives on the team's clusters.
+
+Each cluster has **4 services** deployed, including:
+
+- **MongoDB** — Stores `main_listing` and `sub_listings` data for fast querying.
+- **MinIO** — Acts as the block storage server where `.msgpack` files and 3D models are uploaded.
+
+When a user requests results through the UI, the VOLT server forwards the request to the cluster daemon of the team that owns the data. The daemon retrieves the files from MinIO and the listings from MongoDB, then sends them back.
+
+<Callout type="info">
+This architecture is what makes VOLT scalable. Since all data lives on the team's clusters, if you run out of storage or compute resources, you simply connect another cluster.
+</Callout>

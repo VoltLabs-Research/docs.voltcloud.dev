@@ -1,0 +1,39 @@
+---
+title: Displacements Analysis
+description: Calculate atomic displacement vectors between reference and deformed configurations.
+---
+
+## Overview
+
+Displacements Analysis calculates atomic displacement vectors between reference and deformed configurations. It tracks atom movements, identifies displaced atoms, and computes displacement field statistics.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `reference` | `file` | — | Reference LAMMPS dump file. If omitted, the current frame is used (≈ zero displacement). |
+| `mic` | `bool` | `true` | Use minimum image convention. |
+| `affineMapping` | `string` | `noMapping` | Affine mapping mode. Options: `noMapping`, `toReferenceCell`, `toCurrentCell`. |
+
+## Output
+
+### `{outputBase}_displacements.msgpack`
+
+```ts
+type Vec3 = [float, float, float];
+
+interface PerAtomProperties {
+    id: int;
+    displacement: Vec3;
+    magnitude: float;
+}
+
+interface DisplacementsOutput {
+    main_listing: {
+        average_displacement_magnitude: float;
+        max_displacement_magnitude: float;
+        min_displacement_magnitude: float;
+    };
+    "per-atom-properties": PerAtomProperties[];
+}
+```

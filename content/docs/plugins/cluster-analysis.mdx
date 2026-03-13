@@ -1,0 +1,60 @@
+---
+title: Cluster Analysis
+description: Group particles into clusters based on distance cutoff or bond topology.
+---
+
+## Overview
+
+Cluster Analysis groups particles into clusters based on distance cutoff or bond topology. It identifies connected components, computes cluster sizes, centers of mass, and gyration radii — useful for studying nucleation, void formation, and phase separation.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `cutoff` | `float` | `3.2` | Cutoff radius for neighbor search to define connectivity between atoms. |
+| `sortBySize` | `bool` | `true` | Sort clusters by size in descending order. |
+| `unwrap` | `bool` | `false` | Unwrap particle coordinates inside clusters. |
+| `centersOfMass` | `bool` | `false` | Compute cluster centers of mass (uniform weights). |
+| `radiusOfGyration` | `bool` | `false` | Compute radii and tensors of gyration (uniform weights). |
+
+## Output
+
+### `{outputBase}_cluster_analysis.msgpack`
+
+```ts
+type Vec3 = [float, float, float];
+
+// Voigt order symmetric tensor
+type GyrationTensor = [float, float, float, float, float, float];
+
+interface Cluster {
+    cluster_id: int;
+    size: int;
+    // when centersOfMass = true
+    center?: Vec3;
+    // when radiusOfGyration = true
+    radius_of_gyration?: float;
+    // when radiusOfGyration = true
+    gyration_tensor?: GyrationTensor;
+}
+
+interface PerAtomProperties {
+    id: int;
+    cluster: int;
+    // when unwrap = true
+    pos_unwrapped?: Vec3;
+}
+
+interface ClusterAnalysisOutput {
+    main_listing: {
+        total_atoms: int;
+        clusters: int;
+        largest_cluster_size: int;
+        has_zero_weight_cluster: boolean;
+    };
+    sub_listings: {
+        clusters: Cluster[];
+    };
+    "per-atom-properties": PerAtomProperties[];
+}
+```

@@ -1,0 +1,47 @@
+---
+title: Grain Segmentation
+description: Detect and segment grain boundaries in polycrystalline materials.
+---
+
+## Overview
+
+Grain Segmentation identifies individual grains in polycrystalline materials. It detects grain boundaries, computes grain orientations, and extracts grain-level statistics from atomistic simulation data.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `rmsd` | `float` | `0.1` | RMSD threshold for PTM structure identification. |
+| `minGrainAtomCount` | `int` | `100` | Minimum number of atoms required to consider a cluster as a grain. |
+| `adoptOrphanAtoms` | `bool` | `true` | Adopt orphan atoms into the nearest grain. |
+| `handleCoherentInterfaces` | `bool` | `true` | Handle coherent interfaces between grains. |
+| `outputBonds` | `bool` | `false` | Output neighbor bonds. |
+
+## Output
+
+### `{outputBase}_grains.msgpack`
+
+```ts
+type Vec3 = [float, float, float];
+
+// [x, y, z, w]
+type Quaternion = [float, float, float, float];
+
+interface Grain {
+    id: int;
+    size: int;
+    orientation: Quaternion;
+    // center of mass
+    pos: Vec3;
+}
+
+interface GrainSegmentationOutput {
+    main_listing: {
+        total_grains: int;
+        merging_threshold: float;
+    };
+    sub_listings: {
+        grains: Grain[];
+    };
+}
+```

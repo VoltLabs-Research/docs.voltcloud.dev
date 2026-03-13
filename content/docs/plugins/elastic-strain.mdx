@@ -1,0 +1,49 @@
+---
+title: Elastic Strain
+description: Compute elastic strain tensors by mapping local atomic environments to reference crystal structures.
+---
+
+## Overview
+
+Elastic Strain computes elastic strain tensors by mapping local atomic environments to reference crystal structures. It separates elastic from plastic deformation and calculates per-atom strain measures useful for analyzing deformation mechanisms.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `latticeConstant` | `float` | — | Lattice constant a₀. **Required.** |
+| `crystalStructure` | `string` | `BCC` | Reference crystal structure type. Options: `FCC`, `BCC`, `HCP`, `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. |
+| `caRatio` | `float` | `1.0` | c/a ratio for HCP and hexagonal crystals. |
+| `pushForward` | `bool` | `false` | Push strain to spatial frame (Euler–Almansi strain). |
+| `calcDeformationGradient` | `bool` | `true` | Compute deformation gradient F. |
+| `calcStrainTensors` | `bool` | `true` | Compute strain tensors. |
+| `identificationMode` | `string` | `PTM` | Structure identification mode. Options: `CNA`, `PTM`. |
+| `rmsd` | `float` | `0.10` | RMSD cutoff for PTM classification. |
+
+## Output
+
+### `{outputBase}_elastic_strain.msgpack`
+
+```ts
+// Voigt order: [xx, yy, zz, xy, xz, yz]
+type StrainTensor = [float, float, float, float, float, float];
+
+// Row-major 3×3
+type DeformationGradient = [float, float, float, float, float, float, float, float, float];
+
+interface PerAtomProperties {
+    id: int;
+    volumetric_strain: float;
+    // when calcStrainTensors = true
+    strain_tensor?: StrainTensor;
+    // when calcDeformationGradient = true
+    deformation_gradient?: DeformationGradient;
+}
+
+interface ElasticStrainOutput {
+    main_listing: {
+        average_volumetric_strain: float;
+    };
+    "per-atom-properties": PerAtomProperties[];
+}
+```
