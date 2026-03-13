@@ -1,13 +1,75 @@
 ---
-title: Hello World
-description: Your first document
+title: Getting Started
+description: Learn how to set up and start using VOLT!
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+## Creating your VoltID
 
-## What is Next?
+Go to [app.voltcloud.dev/auth/sign-in](https://app.voltcloud.dev/auth/sign-in) to get started.
+You can sign in using your **Google**, **GitHub**, or **Microsoft** account.
+If you prefer not to use any of those options, you can enter your email address and continue. If an account already exists with that email, you'll be asked for your password — otherwise, you'll be prompted to fill in your details to create a new account.
+
+![Sign in page](/assets/getting-started/sign-in.png)
+
+## Onboarding
+
+### Team Creation
+
+After creating your account, the first step is to create a team. This is required because each team has its own:
+
+- Uploaded simulations.
+- Clusters to store simulations and run analyses.
+- And more...
+
+In other words, you can think of a team as a **workspace**.
+
+![Team creation](/assets/getting-started/onboarding-team-creation.png)
+
+You can rename your team later, and you can create additional teams at any time.
+
+### Connecting a Cluster
+
+A cluster can be your personal computer, a spare machine, or a dedicated server.
+Each team must have at least one cluster. Clusters are used to store data and run analyses — all of your team's information will live there.
+You can also share the same cluster across multiple teams.
+
+![Connect a cluster](/assets/getting-started/onboarding-connect-cluster.png)
+
+After selecting your cluster type, assign it a name:
+
+![Cluster name](/assets/getting-started/onboarding-cluster-name.png)
+
+Finally, you'll need to run the provided command in your terminal. If you selected **server**, run the command via SSH on your server. If you're using your **personal computer**, simply open a terminal and run it there.
+
+![Cluster command](/assets/getting-started/onboarding-cluster-command.png)
+
+<Callout type="warn">
+On Windows, make sure to open the terminal with **administrator privileges**. The command will install Docker — if the installation fails, try [installing Docker manually](https://docs.docker.com/get-started/get-docker/).
+</Callout>
+
+![Running the cluster command](/assets/getting-started/onboarding-cluster-command-run.png)
+
+Once the command finishes, you're all set to start using VOLT! 🚀
+
+![Cluster connected](/assets/getting-started/onboarding-cluster-connected.png)
+
+## Optional: Downloading VOLT
+
+You can use VOLT directly from your preferred web browser. However, you can also download it and use it as a desktop application. There is no difference in functionality or performance — some people simply find it more comfortable to work from a dedicated app rather than the browser.
+
+To download the latest version of VOLT:
+
+| Platform | Download |
+|---|---|
+| **macOS** | [VoltClient-Latest.dmg](https://repo.voltcloud.dev/releases/darwin/VoltClient-Latest.exe) |
+| **Windows** | [VoltClient-Latest.exe](https://repo.voltcloud.dev/releases/windows/VoltClient-Latest.exe) |
+| **Linux (Debian-based)** | [VoltClient-Latest.deb](https://repo.voltcloud.dev/releases/linux/debian/VoltClient-Latest.deb) |
+| **Linux (AppImage)** | [VoltClient-Latest.AppImage](https://repo.voltcloud.dev/releases/linux/VoltClient-Latest.AppImage) |
+
+## What's Next?
 
 <Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card title="Configuration" href="/docs/configuration" />
+  <Card title="CLI Reference" href="/docs/cli-reference" />
+  <Card title="Examples" href="/docs/examples" />
 </Cards>
