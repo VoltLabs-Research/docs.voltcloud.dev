@@ -1,6 +1,182 @@
 ---
 title: VoltClient (Python)
-description: Python client for the VOLT REST API.
+description: Python client for the VOLT REST API with analysis download, MessagePack conversion, and GLB visualization.
 ---
 
-Coming soon.
+## Overview
+
+`voltsdk` is the official Python client for the VOLT REST API. It provides methods for listing and downloading analysis results, converting MessagePack output to pandas DataFrames, and visualizing GLB models.
+
+| | |
+|---|---|
+| **Package** | `voltsdk` |
+| **Python** | 3.8+ |
+| **Links** | [GitHub](https://github.com/VoltLabs-Research/VoltSDK) · [PyPI](https://pypi.org/project/voltsdk/) |
+
+## Installation
+
+```bash
+pip install voltsdk
+```
+
+For GLB visualization support (VTK terminal viewer or k3d in Jupyter):
+
+```bash
+pip install "voltsdk[visualization]"
+```
+
+## Quick Start
+
+```python
+from voltsdk import VoltClient
+
+client = VoltClient(
+    secret_key="vsk_your_secret_key",
+    base_url="https://api.voltcloud.dev"
+)
+
+# List analyses for a trajectory
+analyses = client.list_analyses("trajectory-id")
+
+# Download results
+client.download_analysis_artifacts("analysis-id")
+```
+
+## Authentication
+
+The Python client uses **secret keys** (prefixed with `vsk_`). You can generate a secret key from your VOLT team settings.
+
+```python
+client = VoltClient(
+    secret_key="vsk_abc123...",
+    base_url="https://api.voltcloud.dev",
+    timeout=30  # seconds (default: 30)
+)
+```
+
+## API Reference
+
+### Analysis Methods
+
+#### `list_analyses(trajectory_id, page=1, limit=1000)`
+
+Lists all analyses for a given trajectory.
+
+```python
+analyses = client.list_analyses("trajectory-id", page=1, limit=50)
+for analysis in analyses:
+    print(analysis["_id"], analysis["status"])
+```
+
+#### `find_analysis_by_id(analysis_id)`
+
+Gets a single analysis by ID.
+
+```python
+analysis = client.find_analysis_by_id("analysis-id")
+print(analysis["pluginName"], analysis["status"])
+```
+
+#### `list_analysis_results(analysis_id, page=1, limit=1000)`
+
+Lists the result entries for a completed analysis.
+
+```python
+results = client.list_analysis_results("analysis-id")
+```
+
+### Download Methods
+
+#### `download_analysis_artifacts(analysis_id, unzip=True)`
+
+Downloads all artifacts from an analysis. If `unzip=True` (default), automatically extracts ZIP archives.
+
+```python
+# Downloads and extracts to current directory
+client.download_analysis_artifacts("analysis-id")
+
+# Keep as ZIP
+client.download_analysis_artifacts("analysis-id", unzip=False)
+```
+
+#### `download_plugin_results_file(analysis_id, unzip=True)`
+
+Alias for `download_analysis_artifacts`.
+
+#### `download_frame_glb(analysis_id, timestep)`
+
+Downloads a GLB 3D model for a specific frame of an analysis.
+
+```python
+client.download_frame_glb("analysis-id", timestep=1000)
+```
+
+#### `download_plugin_exported_glb(analysis_id, exposure_id, timestep)`
+
+Downloads a GLB model exported by a plugin exposure (e.g., dislocation lines, grain boundaries).
+
+```python
+client.download_plugin_exported_glb(
+    "analysis-id",
+    "exposure-id",
+    timestep=1000
+)
+```
+
+## Utility Functions
+
+### `msgpack_as_df(file_path, iterable_key=None)`
+
+Converts a MessagePack file (output from a VOLT plugin) to a pandas DataFrame. Automatically merges chunked messages.
+
+```python
+from voltsdk import msgpack_as_df
+
+df = msgpack_as_df("results/output.msgpack")
+print(df.head())
+print(df.columns.tolist())
+```
+
+If the MessagePack contains nested data, use `iterable_key` to specify which key to flatten:
+
+```python
+df = msgpack_as_df("results/output.msgpack", iterable_key="atoms")
+```
+
+### `view_glb(file_path)`
+
+Renders a GLB 3D model. Uses **VTK** in a terminal or **k3d** in a Jupyter notebook.
+
+```python
+from voltsdk import view_glb
+
+view_glb("results/frame_1000.glb")
+```
+
+<Callout type="info">
+Requires the visualization extras: `pip install "voltsdk[visualization]"`
+</Callout>
+
+## Example Workflow
+
+```python
+from voltsdk import VoltClient, msgpack_as_df
+
+client = VoltClient(
+    secret_key="vsk_your_key",
+    base_url="https://api.voltcloud.dev"
+)
+
+# 1. List analyses for a trajectory
+analyses = client.list_analyses("my-trajectory-id")
+analysis_id = analyses[0]["_id"]
+
+# 2. Download results
+client.download_analysis_artifacts(analysis_id)
+
+# 3. Convert to DataFrame for analysis
+df = msgpack_as_df("output.msgpack")
+print(f"Atoms: {len(df)}")
+print(f"Columns: {df.columns.tolist()}")
+print(df.describe())
+```

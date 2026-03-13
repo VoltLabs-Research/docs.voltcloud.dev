@@ -1,0 +1,146 @@
+---
+title: Architecture
+description: High-level overview of how all VOLT ecosystem components connect.
+---
+
+## System Overview
+
+VOLT is a modular platform for high-performance molecular dynamics simulation analysis. The ecosystem is split into three layers: the **web platform**, the **compute layer**, and the **shared libraries**.
+
+```mermaid
+graph TB
+    subgraph Platform["VOLT Platform"]
+        Client["Client\n(React + Three.js)"]
+        Server["Server\n(Express + Socket.IO)"]
+        MongoDB[(MongoDB)]
+        Redis[(Redis)]
+        MinIO[(MinIO)]
+        Client <-->|"HTTPS + WSS"| Server
+        Server <--> MongoDB
+        Server <--> Redis
+        Server <--> MinIO
+    end
+
+    subgraph Compute["Compute Layer"]
+        Daemon["ClusterDaemon"]
+        Worker["Analysis Worker"]
+        Workflow["Workflow Engine"]
+        Docker["Docker Runtime\n(Containers + Jupyter)"]
+        Plugins["Plugin Binaries\nOpenDXA · AtomicStrain\nGrainSegmentation · ..."]
+        Daemon --> Worker
+        Daemon --> Workflow
+        Daemon --> Docker
+        Worker --> Plugins
+    end
+
+    subgraph Libraries["Shared Libraries"]
+        CoreToolkit["CoreToolkit\n(C++ math + analysis)"]
+        LammpsIO["LammpsIO\n(trajectory parsing)"]
+        SpatialAssembler["SpatialAssembler\n(GLB assembly)"]
+        HeadlessRasterizer["HeadlessRasterizer\n(GLB → PNG)"]
+        VoltSDK["VoltSDK\n(REST + WS clients)"]
+    end
+
+    Server <-->|"WebSocket\n(socket.io)"| Daemon
+    Daemon <--> MinIO
+    Daemon <--> MongoDB
+    Daemon <--> Redis
+    Plugins -.->|"links against"| CoreToolkit
+    Daemon -.->|"native addon"| LammpsIO
+    Daemon -.->|"native addon"| SpatialAssembler
+    Daemon -.->|"native addon"| HeadlessRasterizer
+```
+
+## Components
+
+### VOLT Platform (Web Application)
+
+The main application, consisting of a **React** client and an **Express** server.
+
+| Component | Technology | Purpose |
+|---|---|---|
+| **Client** | React 18, Three.js, Material-UI, Monaco Editor | UI, 3D visualization, code editing |
+| **Server** | Express 5, Socket.IO, Passport.js | REST API, WebSocket gateway, OAuth |
+| **MongoDB** | Mongoose ODM | Users, teams, simulations, analyses |
+| **Redis** | ioredis + BullMQ | Job queues, caching, pub/sub |
+| **MinIO** | S3-compatible | File storage (dumps, models, plugins, avatars) |
+
+The server acts as the **control plane**: it authenticates users, manages teams, and dispatches analysis jobs to cluster daemons via WebSocket.
+
+### ClusterDaemon (Compute Node)
+
+A Node.js service that runs on each compute node (a user's PC or a dedicated server). It connects to the VOLT server over **socket.io** and executes commands on behalf of the platform.
+
+**Responsibilities:**
+- Receive and execute analysis jobs (plugin binaries).
+- Manage Docker containers and Jupyter notebook sessions.
+- Parse and rasterize LAMMPS trajectories using native C++ addons.
+- Report metrics (CPU, memory, disk) back to the platform.
+- Handle SSH-based file imports.
+
+The daemon uses the **reverse channel pattern** — it doesn't expose any HTTP endpoints. Instead, the VOLT server sends commands through the WebSocket, and the daemon responds.
+
+### Plugin Binaries (Foundational Algorithms)
+
+Standalone C++ executables compiled against **CoreToolkit**. Each plugin reads a LAMMPS dump frame, runs a specific analysis algorithm, and writes results in MessagePack format.
+
+There are currently **9 plugins**: OpenDXA, AtomicStrain, ElasticStrain, GrainSegmentation, StructureIdentification, ClusterAnalysis, CoordinationAnalysis, CentrosymmetryParameter, and DisplacementsAnalysis.
+
+See [Plugin Development](/docs/plugin-development) for how to build your own.
+
+### Shared Libraries
+
+| Library | Type | Used by |
+|---|---|---|
+| **CoreToolkit** | C++ static library | All plugin binaries |
+| **LammpsIO** | Node.js native addon | ClusterDaemon (trajectory parsing) |
+| **SpatialAssembler** | Node.js native addon | ClusterDaemon (GLB generation) |
+| **HeadlessRasterizer** | Node.js native addon | ClusterDaemon (thumbnail rendering) |
+| **VoltSDK** | TypeScript + Python | External integrations, scripting |
+
+### VoltSDK (Client Libraries)
+
+Two client libraries for programmatic access to the VOLT API:
+
+- **`@voltstack/voltclient`** (Node.js/Browser) — Typed HTTP client with auth presets, pagination, and a declarative service DSL.
+- **`@voltstack/daemon-cluster-client`** (Node.js) — WebSocket client used by ClusterDaemon to communicate with the VOLT server.
+- **`voltsdk`** (Python) — REST client for downloading analysis results, converting MessagePack to DataFrames, and viewing GLB models.
+
+## Data Flow: Analysis Execution
+
+Here's how a simulation analysis flows through the system:
+
+```mermaid
+sequenceDiagram
+    participant U as User (Client)
+    participant S as VOLT Server
+    participant D as ClusterDaemon
+    participant M as MinIO
+    participant P as Plugin Binary
+
+    U->>S: Upload LAMMPS trajectory
+    S->>M: Store trajectory file
+    U->>S: Run Analysis (select plugin)
+    S->>D: analysis.dispatch (WebSocket)
+    D->>D: Queue job (BullMQ)
+    D->>M: Download trajectory frame
+    D->>P: Execute plugin binary
+    P->>P: Read frame → run algorithm
+    P-->>D: Write MessagePack results
+    D->>M: Upload results
+    D->>S: Report completion (WebSocket)
+    S->>U: Notify via WebSocket
+    U->>M: Load results in 3D viewer
+```
+
+## Networking
+
+| Connection | Protocol | Direction |
+|---|---|---|
+| Client ↔ Server | HTTPS + WSS | Bidirectional |
+| Server → ClusterDaemon | WSS (socket.io) | Server initiates commands |
+| ClusterDaemon → Server | WSS (socket.io) | Daemon sends heartbeats, results |
+| ClusterDaemon → MinIO | HTTP(S) | Upload/download artifacts |
+| ClusterDaemon → MongoDB | TCP | Store analysis metadata |
+| ClusterDaemon → Redis | TCP | Job queues, caching |
+| ClusterDaemon → Docker | Unix socket | Container management |

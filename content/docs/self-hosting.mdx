@@ -1,0 +1,278 @@
+---
+title: Self-Hosting
+description: Deploy VOLT on your own infrastructure.
+---
+
+## Overview
+
+VOLT can be self-hosted on any Linux server. The platform consists of two Node.js applications (server and client) plus three external services (MongoDB, Redis, MinIO).
+
+<Callout type="info">
+Self-hosting gives you full control over your data and infrastructure. All simulations, analyses, and files stay on your servers.
+</Callout>
+
+## Requirements
+
+| Component | Minimum | Recommended |
+|---|---|---|
+| **OS** | Ubuntu 20.04+ / Debian 11+ | Ubuntu 22.04 LTS |
+| **Node.js** | 18.x | 22.x |
+| **RAM** | 4 GB | 8 GB+ |
+| **Disk** | 20 GB | Depends on simulation data |
+| **Docker** | 20.x+ | Latest stable |
+
+### External Services
+
+| Service | Purpose | Default Port |
+|---|---|---|
+| **MongoDB** | Database for users, teams, simulations, analyses | 27017 |
+| **Redis** | Job queues (BullMQ), caching, pub/sub | 6379 |
+| **MinIO** | S3-compatible object storage for files | 9000 |
+| **Guacamole** *(optional)* | Remote desktop for containers via XRDP | 4822 |
+
+## Quick Start
+
+### 1. Start External Services
+
+You can run MongoDB, Redis, and MinIO using Docker:
+
+```bash
+# MongoDB
+docker run -d --name volt-mongo \
+  -p 27017:27017 \
+  -e MONGO_INITDB_ROOT_USERNAME=volt \
+  -e MONGO_INITDB_ROOT_PASSWORD=changeme \
+  -v volt-mongo-data:/data/db \
+  mongo:7
+
+# Redis
+docker run -d --name volt-redis \
+  -p 6379:6379 \
+  redis:7 --requirepass changeme
+
+# MinIO
+docker run -d --name volt-minio \
+  -p 9000:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=voltadmin \
+  -e MINIO_ROOT_PASSWORD=changeme \
+  -v volt-minio-data:/data \
+  minio/minio server /data --console-address ":9001"
+```
+
+### 2. Clone the Repository
+
+```bash
+git clone https://github.com/VoltLabs-Research/Volt.git
+cd Volt
+```
+
+### 3. Configure the Server
+
+```bash
+cp server/.env.example server/.env
+```
+
+Edit `server/.env` with your service credentials:
+
+```properties
+NODE_ENV=production
+
+# Redis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=changeme
+REDIS_PORT=6379
+REDIS_DB=0
+
+# MinIO
+MINIO_ENDPOINT=127.0.0.1
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+MINIO_ACCESS_KEY=voltadmin
+MINIO_SECRET_KEY=changeme
+
+# Server
+SERVER_ENDPOINT=https://your-domain.com
+SERVER_PORT=8000
+SERVER_HOSTNAME=your-domain.com
+SERVER_SCHEMA=https
+
+# Client
+CLIENT_HOST=https://your-domain.com
+
+# MongoDB
+MONGO_URI=mongodb://volt:changeme@127.0.0.1:27017
+MONGO_AUTH_SOURCE=admin
+PRODUCTION_DATABASE=voltcloud@production
+
+# Security (generate unique values!)
+SECRET_KEY=your-random-secret-key
+SSH_ENCRYPTION_KEY=your-random-encryption-key
+JWT_EXPIRATION_DAYS=7d
+```
+
+### 4. Configure the Client
+
+```bash
+cp client/.env.example client/.env
+```
+
+```properties
+VITE_API_URL=https://your-domain.com
+VITE_ENV=production
+```
+
+### 5. Install and Build
+
+```bash
+# Server
+cd server
+npm install
+npm run build
+
+# Client
+cd ../client
+npm install
+npm run build
+```
+
+### 6. Start the Server
+
+```bash
+cd server
+npm run start
+```
+
+The server listens on port **8000** by default and binds to `0.0.0.0`.
+
+### 7. Serve the Client
+
+The client build outputs static files. Serve them with **nginx** or any static file server.
+
+## Reverse Proxy (nginx)
+
+You need a reverse proxy to serve the client, proxy the API, and handle WebSocket connections.
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate     /etc/ssl/certs/your-domain.crt;
+    ssl_certificate_key /etc/ssl/private/your-domain.key;
+
+    # Client (static files)
+    location / {
+        root /path/to/Volt/client/dist;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # API proxy
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # File uploads
+        client_max_body_size 0;
+    }
+
+    # WebSocket proxy
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+## Environment Variables
+
+### Server
+
+#### Required
+
+| Variable | Description |
+|---|---|
+| `MONGO_URI` | MongoDB connection string |
+| `MONGO_AUTH_SOURCE` | MongoDB auth database (usually `admin`) |
+| `PRODUCTION_DATABASE` | Database name for production |
+| `REDIS_HOST` | Redis hostname |
+| `REDIS_PORT` | Redis port |
+| `REDIS_PASSWORD` | Redis password |
+| `MINIO_ENDPOINT` | MinIO hostname |
+| `MINIO_PORT` | MinIO API port |
+| `MINIO_ACCESS_KEY` | MinIO access key |
+| `MINIO_SECRET_KEY` | MinIO secret key |
+| `SERVER_ENDPOINT` | Full public URL of the server |
+| `SERVER_PORT` | Port the server listens on |
+| `SERVER_HOSTNAME` | Public hostname |
+| `CLIENT_HOST` | Full public URL of the client |
+| `SECRET_KEY` | Secret for signing tokens |
+| `JWT_EXPIRATION_DAYS` | JWT token TTL (e.g. `7d`) |
+| `SSH_ENCRYPTION_KEY` | Key for encrypting stored SSH credentials |
+
+#### Optional
+
+| Variable | Default | Description |
+|---|---|---|
+| `NODE_ENV` | `development` | Environment mode |
+| `LOG_LEVEL` | `info` | Logging verbosity |
+| `MINIO_USE_SSL` | `false` | Use TLS for MinIO |
+| `SERVER_SCHEMA` | `http` | URL scheme (`http` or `https`) |
+| `SMTP_HOST` | — | SMTP server for email notifications |
+| `SMTP_PORT` | — | SMTP port |
+| `SMTP_AUTH_USER` | — | SMTP username |
+| `SMTP_AUTH_PASSWORD` | — | SMTP password |
+| `GUACD_HOST` | `127.0.0.1` | Guacamole daemon host |
+| `GUACD_PORT` | `4822` | Guacamole daemon port |
+
+#### OAuth (Optional)
+
+| Variable | Description |
+|---|---|
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app credentials |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth app credentials |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth app credentials |
+| `GITHUB_CALLBACK_URL` | Default: `/api/auth/github/callback` |
+| `GOOGLE_CALLBACK_URL` | Default: `/api/auth/google/callback` |
+| `MICROSOFT_CALLBACK_URL` | Default: `/api/auth/microsoft/callback` |
+
+### Client
+
+| Variable | Description |
+|---|---|
+| `VITE_API_URL` | Full public URL of the VOLT server |
+| `VITE_ENV` | `production` or `development` |
+
+## MinIO Buckets
+
+The server automatically creates the following buckets on startup:
+
+| Bucket | Access | Content |
+|---|---|---|
+| `volt-models` | Private | 3D models and GLB files |
+| `volt-rasterizer` | Private | Rendered thumbnails |
+| `volt-plugins` | Private | Plugin binaries |
+| `volt-dumps` | Private | LAMMPS trajectory files |
+| `volt-whiteboards` | Private | Whiteboard data |
+| `volt-avatars` | Public | User avatar images |
+| `volt-chat` | Public | Chat attachments |
+| `volt-latex-assets` | Public | LaTeX document assets |
+
+## Ports Summary
+
+| Port | Service |
+|---|---|
+| **8000** | VOLT API Server |
+| **5173** | Vite dev server (development only) |
+| **27017** | MongoDB |
+| **6379** | Redis |
+| **9000** | MinIO API |
+| **9001** | MinIO Console |
+| **4822** | Guacamole daemon (optional) |
+| **23000–23999** | TCP relay for XRDP sessions (optional) |

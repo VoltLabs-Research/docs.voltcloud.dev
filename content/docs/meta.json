@@ -2,9 +2,13 @@
   "title": "Documentation",
   "pages": [
     "index",
+    "architecture",
     "modules",
     "---Resources---",
     "plugins",
-    "open-source"
+    "open-source",
+    "---Guides---",
+    "self-hosting",
+    "plugin-development"
   ]
 }

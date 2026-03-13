@@ -1,0 +1,244 @@
+---
+title: Plugin Development
+description: Build custom analysis plugins for VOLT using CoreToolkit.
+---
+
+## Overview
+
+VOLT plugins are standalone C++ executables that link against **CoreToolkit**. Each plugin reads a LAMMPS dump frame, performs an analysis algorithm, and outputs results in MessagePack format. Once compiled, a plugin can be installed on any ClusterDaemon.
+
+## Prerequisites
+
+| Requirement | Version |
+|---|---|
+| C++ compiler | C++23 capable (GCC 14+ or Clang 17+) |
+| CMake | ≥ 3.20 |
+| Conan | ≥ 2.0 |
+
+If you don't have these, the [Ecosystem Setup](/docs/open-source/ecosystem-setup) script can install them for you.
+
+## Project Structure
+
+A typical plugin has this layout:
+
+```
+MyPlugin/
+├── CMakeLists.txt
+├── conanfile.py
+├── src/
+│   └── main.cpp
+└── .github/
+    └── workflows/
+        └── publish-plugin-binary.yml
+```
+
+## Step 1: CMakeLists.txt
+
+```cmake
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+project(myplugin VERSION 1.0.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type")
+
+find_package(coretoolkit REQUIRED)
+find_package(Threads REQUIRED)
+
+add_executable(${PROJECT_NAME} src/main.cpp)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    coretoolkit::coretoolkit
+    Threads::Threads
+)
+
+target_compile_options(${PROJECT_NAME} PRIVATE
+    $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU,Clang,AppleClang>>:
+        -O3 -march=native
+    >
+)
+
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+```
+
+## Step 2: conanfile.py
+
+```python
+from conan import ConanFile
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+
+
+class MyPluginConan(ConanFile):
+    name = "myplugin"
+    version = "1.0.0"
+    settings = "os", "arch", "compiler", "build_type"
+    requires = ("coretoolkit/1.0.0",)
+
+    def layout(self):
+        cmake_layout(self)
+
+    def generate(self):
+        CMakeToolchain(self).generate()
+        CMakeDeps(self).generate()
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+```
+
+## Step 3: Plugin Source Code
+
+Here's a minimal plugin that computes per-atom coordination numbers:
+
+```cpp
+#include <volt/core/volt.h>
+#include <volt/core/lammps_parser.h>
+#include <volt/core/frame_adapter.h>
+#include <volt/core/simulation_cell.h>
+#include <volt/core/particle_property.h>
+#include <volt/core/analysis_result.h>
+#include <volt/analysis/cutoff_neighbor_finder.h>
+#include <volt/cli/common.h>
+
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
+
+int main(int argc, char* argv[])
+{
+    // Parse CLI arguments (handles --input, --output, --params)
+    auto args = volt::cli::parse(argc, argv);
+
+    // Read the LAMMPS dump frame
+    auto frame = volt::core::LammpsParser::parse(args.inputPath);
+
+    // Read parameters from JSON
+    double cutoff = args.params.value("cutoff", 3.0);
+
+    // Build neighbor list
+    volt::analysis::CutoffNeighborFinder finder(
+        frame.positions(),
+        frame.simulationCell(),
+        cutoff
+    );
+
+    // Compute coordination for each atom
+    std::vector<int> coordination(frame.atomCount());
+    for (size_t i = 0; i < frame.atomCount(); ++i) {
+        coordination[i] = finder.neighborCount(i);
+    }
+
+    // Build the result
+    volt::core::AnalysisResult result;
+    result.addProperty("Coordination", coordination);
+
+    // Write MessagePack output
+    result.write(args.outputPath);
+
+    return 0;
+}
+```
+
+## Step 4: Build Locally
+
+First, make sure CoreToolkit is exported as a Conan package:
+
+```bash
+# Clone CoreToolkit if you haven't already
+git clone https://github.com/VoltLabs-Research/CoreToolkit.git
+conan export CoreToolkit
+
+# Build your plugin
+cd MyPlugin
+conan install . --build=missing --output-folder=build -o "hwloc/*:shared=True"
+cmake -S . -B build/build/Release \
+    -DCMAKE_TOOLCHAIN_FILE=build/build/Release/generators/conan_toolchain.cmake \
+    -DCMAKE_BUILD_TYPE=Release
+cmake --build build/build/Release -j$(nproc)
+```
+
+The resulting binary will be at `build/build/Release/myplugin`.
+
+## Step 5: CI with GitHub Actions
+
+CoreToolkit provides a reusable workflow that builds your plugin on Linux, macOS, and Windows, then publishes the binary to GHCR as an OCI artifact.
+
+Create `.github/workflows/publish-plugin-binary.yml`:
+
+```yaml
+name: Publish Plugin Binary
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  build:
+    uses: VoltLabs-Research/CoreToolkit/.github/workflows/build-plugin-binary.yml@main
+    with:
+      plugin_name: MyPlugin
+    permissions:
+      contents: read
+      packages: write
+```
+
+After a push, your binary will be available at:
+
+```
+ghcr.io/your-org/myplugin-binary:sha-<commit>-linux-x64
+```
+
+## CoreToolkit API Quick Reference
+
+### Parsing
+
+| Class | Header | Purpose |
+|---|---|---|
+| `LammpsParser` | `volt/core/lammps_parser.h` | Parse LAMMPS dump files |
+| `FrameAdapter` | `volt/core/frame_adapter.h` | Access frame data (positions, types, cell) |
+| `SimulationCell` | `volt/core/simulation_cell.h` | Box vectors, periodicity, coordinate wrapping |
+
+### Neighbor Search
+
+| Class | Header | Purpose |
+|---|---|---|
+| `CutoffNeighborFinder` | `volt/analysis/cutoff_neighbor_finder.h` | Find neighbors within a distance cutoff |
+| `NearestNeighborFinder` | `volt/analysis/nearest_neighbor_finder.h` | Find k-nearest neighbors |
+
+### Math
+
+| Class | Header |
+|---|---|
+| `Vector3` | `volt/math/vector3.h` |
+| `Matrix3` | `volt/math/matrix3.h` |
+| `Quaternion` | `volt/math/quaternion.h` |
+| `SymmetricTensor` | `volt/math/symmetric_tensor.h` |
+| `AffineTransformation` | `volt/math/affine_transformation.h` |
+
+### Output
+
+| Class | Header | Purpose |
+|---|---|---|
+| `AnalysisResult` | `volt/core/analysis_result.h` | Build and serialize analysis results |
+| `ParticleProperty` | `volt/core/particle_property.h` | Per-atom typed property storage |
+
+### CLI
+
+| Function | Header | Purpose |
+|---|---|---|
+| `volt::cli::parse()` | `volt/cli/common.h` | Parse `--input`, `--output`, `--params` arguments |
+
+## Plugin I/O Contract
+
+### Input
+
+The plugin receives:
+- **`--input`**: Path to a LAMMPS dump file (single timestep).
+- **`--output`**: Path where the MessagePack result should be written.
+- **`--params`**: JSON string with user-configured parameters.
+
+### Output
+
+The plugin writes a MessagePack file containing per-atom properties and optional metadata. The VOLT platform reads this file, stores it in MinIO, and makes it available for visualization in the 3D viewer.
