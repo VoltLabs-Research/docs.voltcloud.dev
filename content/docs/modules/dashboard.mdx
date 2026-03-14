@@ -1,0 +1,74 @@
+---
+title: Dashboard
+description: A centralized overview of metrics, activity, team presence, and quick actions.
+---
+
+## Overview
+
+The Dashboard is the first screen you see when you open VOLT. It provides a high-level summary of your team's activity — trajectory counts, analysis progress, cluster health, recent work, and quick access to common actions. Everything updates in real time as your team works.
+
+![Dashboard Overview](/assets/modules/dashboard/dashboard-overview.png)
+
+## Metrics Overview
+
+The top of the dashboard displays metric cards for key resources: trajectories, analyses, containers, and plugins. Each card shows the current count and a sparkline chart illustrating the weekly trend so you can see whether activity is increasing or decreasing at a glance.
+
+![Metrics Cards](/assets/modules/dashboard/metrics-cards.png)
+
+## Cluster Health
+
+The Cluster Health panel shows the status of your team's connected clusters. It displays gauges for CPU utilization, RAM consumption, and connection status. If a cluster goes offline or a service becomes unhealthy, the dashboard reflects the change immediately.
+
+![Cluster Health](/assets/modules/dashboard/cluster-health.png)
+
+## Quick Actions
+
+Quick Actions provide one-click shortcuts to common workflows:
+
+- Upload a new trajectory
+- Create a new container
+- Open the Scripting workspace
+- Start a new Volt AI conversation
+
+## Recent Activity
+
+### Recent Analyses
+
+A chronological list of the latest analyses run by your team, showing the plugin name, trajectory, status, and completion time. Click any entry to navigate directly to the analysis results.
+
+### Team Timeline
+
+The Team Timeline shows a feed of significant events across the team — trajectory uploads, analyses started and completed, SSH imports, container deployments, and more. Each entry includes the user who triggered the action and when it occurred.
+
+### In-App Activity
+
+The In-App Activity panel displays real-time actions happening across the platform, giving you a live pulse of what your team is working on.
+
+## Team Presence
+
+The Team Presence section shows which team members are currently online. Each member's avatar and name are displayed, with a real-time indicator of their connection status.
+
+## Notifications Feed
+
+The dashboard includes a compact notifications feed showing your most recent unread notifications — analysis completions, team invitations, SSH import results, and more. Click a notification to navigate to the relevant resource.
+
+## Global Search
+
+The Global Search bar at the top of the dashboard lets you search across multiple resource types simultaneously.
+
+| Resource Type | What It Searches |
+|---|---|
+| **Trajectories** | Trajectory names and metadata |
+| **Analyses** | Analysis names and linked trajectories |
+| **Containers** | Container names and images |
+| **Teams** | Team names |
+| **Plugins** | Plugin names and descriptions |
+| **Chats** | Chat names and group names |
+
+![Global Search](/assets/modules/dashboard/global-search.png)
+
+Type your query and results appear instantly, grouped by resource type. Click any result to navigate directly to it.
+
+## Trajectory Preview
+
+If your team has at least one completed trajectory, the dashboard shows a 3D preview card with an interactive thumbnail of the simulation. Click it to open the full trajectory viewer.

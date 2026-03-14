@@ -1,0 +1,68 @@
+---
+title: Chat
+description: Real-time messaging with direct messages, group chats, file sharing, and reactions.
+---
+
+## Overview
+
+The Chat module provides real-time messaging for your team directly inside VOLT. You can send direct messages, create group chats, share files, react to messages, and see who is online — all without leaving the platform. Messages are delivered instantly via WebSocket connections.
+
+![Chat Overview](/assets/modules/chat/chat-overview.png)
+
+## Chat Sidebar
+
+The chat sidebar lists all your conversations — both direct messages and group chats — sorted by the most recent activity. Each entry shows the other participant's name (or group name), a preview of the last message, and an unread message indicator. Click any conversation to open it in the main chat area.
+
+![Chat Sidebar](/assets/modules/chat/chat-sidebar.png)
+
+## Direct Messages
+
+To start a direct message, select a team member from the sidebar. If a conversation already exists, it opens immediately. Otherwise, a new one is created automatically. Direct messages are private between you and the other participant.
+
+## Group Chats
+
+Group chats let you bring multiple team members into a single conversation.
+
+1. Click the **Create Group** button in the chat sidebar.
+2. Enter a **group name** and an optional **description**.
+3. Select the team members you want to add as participants.
+4. Optionally upload a **group avatar**.
+5. Click **Create** to start the group conversation.
+
+![Create Group](/assets/modules/chat/create-group.png)
+
+### Group Management
+
+Group admins can manage the group at any time:
+
+- **Add Members**: Invite additional team members to join the conversation.
+- **Remove Members**: Remove participants from the group.
+- **Update Info**: Change the group name, description, or avatar.
+- **Manage Admins**: Promote participants to admin or demote existing admins.
+- **Leave Group**: Any member can leave the group at any time.
+
+## Message Features
+
+| Feature | Description |
+|---|---|
+| **Text Messages** | Standard text messages with real-time delivery |
+| **File Sharing** | Upload and share files directly in the conversation — file name, size, and type are preserved |
+| **Reactions** | React to any message with an emoji — multiple users can react with the same or different emojis |
+| **Edit** | Edit your own messages after sending — an edited timestamp is shown |
+| **Delete** | Delete your own messages — deleted messages show a placeholder for other participants |
+| **Read Receipts** | See which participants have read each message |
+| **Typing Indicators** | See when someone is typing a message in real time |
+
+![Message Features](/assets/modules/chat/message-features.png)
+
+## Online Presence
+
+The chat module tracks online presence for all team members. A green status indicator appears next to users who are currently connected. Presence updates are broadcast via WebSocket, so the status changes in real time as team members come online or go offline.
+
+## Shared Files
+
+The **Shared Files** panel provides a consolidated view of every file shared across a conversation. Instead of scrolling through the message history, you can browse all shared files in one place, filtered by file type.
+
+<Callout type="info">
+All chat data — messages, files, and metadata — is stored on your team's cluster. The VOLT server relays messages in real time but does not retain them.
+</Callout>

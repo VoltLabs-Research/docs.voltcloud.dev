@@ -1,0 +1,59 @@
+---
+title: SSH Import
+description: Import trajectory files from remote servers over SSH.
+---
+
+## Overview
+
+The SSH Import module lets you connect to remote servers — HPC clusters, lab workstations, or any machine accessible via SSH — and import trajectory files directly into VOLT. Instead of manually downloading files and re-uploading them, you browse the remote file system from the VOLT interface and start the import with a single click.
+
+![SSH Import Overview](/assets/modules/ssh-import/ssh-import-overview.png)
+
+## SSH Connections
+
+To import files, you first need to add an SSH connection. Go to the **SSH Import** section from the sidebar and click **Add Connection**.
+
+| Field | Description |
+|---|---|
+| **Name** | A descriptive label for this connection (e.g., "Lab HPC Cluster") |
+| **Host** | The hostname or IP address of the remote server |
+| **Port** | The SSH port (defaults to 22) |
+| **Username** | Your SSH username on the remote server |
+| **Password** | Your SSH password — encrypted before storage |
+
+![Add Connection](/assets/modules/ssh-import/add-connection.png)
+
+<Callout type="info">
+SSH passwords are encrypted using AES-256-GCM before being stored. The encryption key is configured at the server level and never leaves your infrastructure.
+</Callout>
+
+## Testing a Connection
+
+After adding a connection, you can click **Test** to verify that VOLT can successfully establish an SSH session with the remote server. The test checks authentication and basic connectivity — if it fails, you will see an error message describing the issue.
+
+## File Explorer
+
+Once a connection is verified, click **Browse** to open the remote file explorer. You can navigate directories, view file names and sizes, and select the files or folders you want to import.
+
+- **Directory Navigation**: Click on any folder to navigate into it. Use the breadcrumb bar at the top to jump back to a parent directory.
+- **File Selection**: Select one or more LAMMPS dump files, data files, or compressed archives for import.
+
+![File Explorer](/assets/modules/ssh-import/file-explorer.png)
+
+## Importing Files
+
+When you select files and click **Import**, VOLT triggers an automated pipeline that runs entirely on your cluster:
+
+1. **SSH Connect** — The cluster daemon connects to the remote server using the stored (encrypted) credentials.
+2. **Download** — The selected files are downloaded to a temporary working directory on the cluster.
+3. **Extract** — If the files are compressed (`.gz`, `.zip`, `.tar.gz`), they are automatically extracted.
+4. **Parse** — Each dump file is parsed to extract LAMMPS metadata — timestep, atom count, simulation cell geometry, and per-atom properties.
+5. **Upload to Storage** — Parsed frames are compressed and uploaded to MinIO object storage on the cluster.
+6. **Render GLB** — 3D models are generated for each frame so the trajectory can be viewed immediately.
+7. **Register** — The trajectory is registered in the platform with full metadata and becomes available in the trajectory listing.
+
+The entire process runs as a background job. You can monitor its progress from the [Jobs](/docs/modules/analysis) panel.
+
+<Callout type="info">
+SSH Import supports LAMMPS dump files (`.dump`, `.lammpstrj`), LAMMPS data files (`.data`), and compressed archives containing these formats.
+</Callout>

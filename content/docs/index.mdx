@@ -3,6 +3,46 @@ title: Getting Started
 description: Learn how to set up and start using VOLT!
 ---
 
+## What's VOLT?
+![Introducing VOLT](/assets/getting-started/introducing-volt.png)
+
+VOLT is a web-based platform offering a comprehensive suite of tools for researchers’ daily workflows:
+- LaTeX document creation for writing scientific publications.
+- Figure generation for your publications.
+- LAMMPS trajectory visualization directly in the browser, supporting 100M+ atoms.
+- Trajectory analysis with a modular algorithm system—edit existing modules or integrate new ones.
+- Instant messaging to communicate with your team within the platform.
+- Unlimited team creation and members-invitations.
+- Easy sharing of trajectories or results (e.g., DXA) via a single link.
+- Unlimited Docker containers for isolated Linux environments where team members can run LAMMPS simulations.
+- LLM integration—connect your AI provider API keys to use artificial intelligence across all platform modules.
+- Unlimited Jupyter environments for Python-based custom code and plotting, with voltsdk for programmatic API access and secret key management.
+
+VOLT is built for real-time collaborative work: write publications, analyze trajectories, and share results together with your team seamlessly.
+
+As a web platform, you can access VOLT from any device with a browser. Heavy computation—trajectory analysis, virtualized containers, and storage of results like LAMMPS dumps—is handled by what we call a Cluster, and each team connects at least one cluster.
+
+This design makes VOLT extremely scalable. If you run out of compute resources for your team’s workload, just connect another cluster—your own computer, an old machine, or a server.
+
+Think of VOLT as a “Microsoft Office for materials science”—a set of integrated sub-applications that keep your research inside a single ecosystem.
+
+Our mission is to create a modular platform that centralizes materials research teams and offers a robust plugin marketplace for one-click LAMMPS simulation analysis. Everything in VOLT is open-source and free, because science progresses by building on the work of others—and now you can be part of it. 😉
+
+{ /* ### What VOLT IS NOT
+I assume you usually work with OVITO. There are alternatives to OVITO, such as MDapy or SPaMD.
+VOLT is not—and does not intend to be—a “OVITO 2” or a “\{SOME_OVITO_ALTERNATIVE_SOFTWARE_NAME\} 2.”
+
+You understand that the core responsibility of these tools is to visualize LAMMPS trajectories and analyze them using algorithms like Grain Segmentation, Dislocation Analysis, etc.
+And I assume you also understand that OVITO is the industry leader in adoption.
+
+VOLT does not aim to compete with existing tools because they are simply not the same thing.
+
+VOLT allows you to do exactly what those tools do, but as just one module—not the main focus.
+VOLT does not aim to replace them or “kill” them.
+It’s like comparing Canva to the Microsoft Office suite—just because Office has PowerPoint doesn’t make it Canva.
+
+Our mission is to integrate these tools, not replace them. */}
+
 ## Creating your VoltID
 
 Go to [app.voltcloud.dev/auth/sign-in](https://app.voltcloud.dev/auth/sign-in) to get started.

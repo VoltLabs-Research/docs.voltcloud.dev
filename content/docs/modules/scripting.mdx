@@ -1,0 +1,60 @@
+---
+title: Scripting
+description: Create Jupyter notebooks for custom analysis with pre-installed scientific libraries.
+---
+
+## Overview
+
+The Scripting module gives you a full Jupyter Lab environment embedded directly inside VOLT. You can create notebooks to write custom Python scripts for post-processing simulation data, generating plots, or running computations that go beyond built-in analysis plugins. Each notebook runs in its own Docker container on your team's cluster with scientific libraries pre-installed.
+
+![Scripting Workspace](/assets/modules/scripting/scripting-workspace.png)
+
+## Notebook Listing
+
+The main view shows all notebooks for your team. Each entry displays the notebook title, its scope (General or Trajectory), the linked trajectory name if applicable, and the last time it was opened. You can search, rename, or delete notebooks from this view.
+
+![Notebook Listing](/assets/modules/scripting/notebook-listing.png)
+
+## Creating a Notebook
+
+Click **Create Notebook** and provide a title. You then choose the notebook scope:
+
+- **General**: A standalone notebook not linked to any trajectory. Use this for utility scripts, data exploration, or team-shared workflows.
+- **Trajectory**: A notebook linked to a specific trajectory. The trajectory context is available inside the notebook, making it easy to load frames and per-atom data using the Volt SDK.
+
+After creation, the notebook appears in the listing and is ready to open.
+
+### Notebook Scopes
+
+| Scope | Description |
+|---|---|
+| **All** | Lists every notebook in the team regardless of scope |
+| **General** | Standalone notebooks not linked to any trajectory |
+| **Trajectory** | Notebooks linked to a specific trajectory — filtered by the selected trajectory |
+
+## Jupyter Workspace
+
+When you open a notebook, VOLT provisions a Jupyter Lab session and embeds it directly in the browser. The workspace includes a full file browser, terminal, and code editor — everything you get in a standard Jupyter Lab installation.
+
+![Jupyter Workspace](/assets/modules/scripting/jupyter-workspace.png)
+
+The following libraries are pre-installed in every notebook container:
+
+- **voltsdk** — The official VOLT Python SDK for loading trajectory data, frames, and per-atom properties.
+- **pandas** — Data manipulation and analysis.
+- **numpy** — Numerical computing.
+- **scipy** — Scientific computing and optimization.
+- **matplotlib** — Plotting and visualization.
+- **vtk** — 3D visualization and mesh processing.
+
+You can install additional packages using `pip` inside the notebook terminal.
+
+## Notebook Management
+
+- **Rename**: Change a notebook's title at any time from the listing view.
+- **Delete**: Remove a notebook and its associated Jupyter container.
+- **Auto-save**: Notebook content is saved automatically as you work.
+
+<Callout type="info">
+Each Jupyter session runs in its own Docker container with configurable memory and CPU limits. Containers are provisioned on demand and cleaned up when the notebook is deleted.
+</Callout>

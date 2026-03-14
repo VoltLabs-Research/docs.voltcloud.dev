@@ -1,10 +1,18 @@
 {
   "title": "Modules",
   "pages": [
-    "volt-ai",
-    "latex",
-    "containers",
+    "dashboard",
+    "trajectories",
+    "analysis",
+    "simulation-cells",
+    "scripting",
+    "ssh-import",
     "clusters",
-    "whiteboards"
+    "containers",
+    "chat",
+    "notifications",
+    "whiteboards",
+    "latex",
+    "volt-ai"
   ]
 }

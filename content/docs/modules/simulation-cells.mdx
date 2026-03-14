@@ -1,0 +1,41 @@
+---
+title: Simulation Cells
+description: View bounding box geometry, cell vectors, and periodic boundary conditions for each frame.
+---
+
+## Overview
+
+Simulation Cells represent the spatial boundaries of a molecular dynamics simulation at a given timestep. Every time VOLT processes a trajectory frame, it extracts the simulation cell data — bounding box dimensions, cell vectors, cell origin, and periodic boundary conditions — and stores it as a dedicated entity. This data is used by the 3D viewer, analysis plugins, and Volt AI.
+
+## Cell Properties
+
+Each simulation cell contains the following properties:
+
+| Property | Description |
+|---|---|
+| **Bounding Box** | The width, height, and length of the simulation box in angstroms |
+| **Cell Vectors** | A 3×3 matrix defining the cell's lattice vectors — supports triclinic and orthogonal cells |
+| **Cell Origin** | The origin point (x, y, z) of the simulation cell in Cartesian coordinates |
+| **Periodic Boundary Conditions** | Boolean flags for each axis (x, y, z) indicating whether the boundary is periodic |
+| **Timestep** | The timestep number from the LAMMPS dump file that this cell corresponds to |
+| **Trajectory** | The parent trajectory this cell belongs to |
+
+## Simulation Cells Listing
+
+You can view all simulation cells for your team in the Simulation Cells listing. Each entry shows the linked trajectory name, timestep, bounding box dimensions, and periodic boundary conditions. The listing supports sorting and filtering by trajectory.
+
+## How Simulation Cells Are Created
+
+Simulation cells are created automatically — you do not need to define them manually. When VOLT processes a LAMMPS dump or data file, the parser extracts the `ITEM: BOX BOUNDS` section (or equivalent) and creates a simulation cell record for each unique timestep. The parser handles both orthogonal and triclinic box definitions.
+
+<Callout type="info">
+Simulation cells are extracted once during trajectory processing and stored on your cluster. They are immutable — if you need to reprocess, delete and re-upload the trajectory.
+</Callout>
+
+## Integration with Other Modules
+
+Simulation cell data is used across several modules:
+
+- **3D Viewer**: The simulation cell is rendered as a wireframe bounding box overlay in the trajectory viewer, giving you spatial context for the atom positions.
+- **Analysis Plugins**: Plugins that compute spatial properties (e.g., radial distribution functions, density profiles) use the cell vectors and periodic boundary conditions to handle wrapping and distance calculations correctly.
+- **Volt AI**: You can ask [Volt AI](/docs/modules/volt-ai) to list simulation cells, retrieve bounding box dimensions, or check periodic boundary conditions for any trajectory in your team.

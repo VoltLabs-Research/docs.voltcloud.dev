@@ -1,0 +1,91 @@
+---
+title: Trajectories
+description: Upload, visualize, and analyze molecular dynamics simulation trajectories in 3D.
+---
+
+## Overview
+
+Trajectories are the core workflow in VOLT. A trajectory represents a molecular dynamics simulation — typically a LAMMPS dump or data file — that the platform parses, stores, and renders into an interactive 3D model. From a single upload, you can navigate frames, inspect atoms, apply color coding, filter particles, run analysis plugins, and share results with your team.
+
+![Trajectory Viewer](/assets/modules/trajectories/trajectory-viewer.png)
+
+## Trajectory Listing
+
+The main view shows all trajectories for your team, organized by folders. Each trajectory displays its name, status, frame count, atom count, and creation date. You can create folders to group related simulations, move trajectories between folders, and use search to find specific files.
+
+![Trajectory Listing](/assets/modules/trajectories/trajectory-listing.png)
+
+## Uploading a Trajectory
+
+To upload a trajectory, click the **Upload** button and select one or more LAMMPS dump or data files. VOLT supports `.dump`, `.lammpstrj`, `.data`, and compressed archives (`.gz`, `.zip`, `.tar.gz`). After uploading, the trajectory goes through an automated processing pipeline:
+
+| Status | Description |
+|---|---|
+| **Queued** | The trajectory is waiting for a worker to become available |
+| **Processing** | Files are being parsed and metadata is being extracted |
+| **Rendering** | 3D GLB models are being generated for each frame |
+| **Completed** | The trajectory is ready for viewing and analysis |
+| **Failed** | An error occurred during processing — check the error details for more information |
+
+![Upload Trajectory](/assets/modules/trajectories/upload-trajectory.png)
+
+## 3D Viewer
+
+Once a trajectory reaches the **Completed** status, you can open it in the 3D viewer. The viewer renders atoms as spheres in a WebGL scene using GLB models streamed from your cluster's object storage.
+
+- **Frame Navigation**: Use the timeline slider to scrub through timesteps, or press play to animate the simulation.
+- **Orbit Controls**: Rotate, pan, and zoom the camera to inspect the structure from any angle.
+- **Atom Inspection**: Click on any atom to see its properties — element type, position, velocity, and any per-atom quantities present in the dump file.
+- **Simulation Cell**: The bounding box of the simulation cell is displayed as a wireframe overlay, showing periodic boundary conditions.
+
+![3D Viewer Controls](/assets/modules/trajectories/3d-viewer-controls.png)
+
+## Per-Atom Property Viewer
+
+The Per-Atom Property Viewer displays a tabular breakdown of every per-atom property extracted from the dump file — such as element type, coordinates, velocities, forces, potential energy, or any custom compute output. You can sort and filter the table to locate specific atoms or property ranges.
+
+## Color Coding
+
+Color coding maps a per-atom property to a color gradient across the 3D model, letting you visually identify patterns like stress concentrations or temperature distributions.
+
+1. Open a trajectory in the 3D viewer and click **Color Coding**.
+2. Select the per-atom property you want to visualize (e.g., `c_pe`, `vx`, `type`).
+3. Review the min/max statistics for the selected property.
+4. Choose a color gradient (e.g., blue-to-red, viridis, plasma).
+5. Click **Apply** — the viewer re-renders the model with the new color mapping and adds a scene artifact.
+
+![Color Coding](/assets/modules/trajectories/color-coding.png)
+
+## Particle Filters
+
+Particle filters let you isolate subsets of atoms based on property conditions. You can preview the filter before applying it to confirm the selection.
+
+| Action | Description |
+|---|---|
+| **Highlight** | Keep only the matching atoms visible, hiding everything else |
+| **Delete** | Remove the matching atoms from the scene, keeping everything else |
+
+Filters support standard comparison operators (`=`, `!=`, `>`, `<`, `>=`, `<=`) applied to any per-atom property. After applying a filter, a new scene artifact is created so you can toggle it on and off without losing the original view.
+
+## Scene Artifacts
+
+Every color coding, particle filter, or plugin exposure that generates a 3D overlay is stored as a **scene artifact**. The artifacts panel in the viewer lists all generated overlays for the current trajectory and timestep. You can toggle each artifact on and off, switch between them, or remove ones you no longer need.
+
+Scene artifacts can originate from three sources: color coding operations, particle filter actions, and analysis plugin exposures that produce GLB models.
+
+![Scene Artifacts](/assets/modules/trajectories/scene-artifacts.png)
+
+## Sample Simulations
+
+If you want to explore the platform without uploading your own data, VOLT provides sample simulations. Click **Sample Simulations** from the trajectory listing to browse and download pre-built LAMMPS trajectories that are automatically imported into your workspace.
+
+## Additional Features
+
+- **Download**: Export the original trajectory files from the platform at any time.
+- **Public Sharing**: Mark a trajectory as public to generate a shareable link that anyone can use to view it — no account required.
+- **Folder Organization**: Create folders, rename them, and move trajectories between folders to keep your workspace organized.
+- **Volt AI Integration**: Ask [Volt AI](/docs/modules/volt-ai) to list trajectories, get details, run analyses, or manage your simulation data using natural language.
+
+<Callout type="info">
+Trajectory data is stored on your team's cluster in MinIO object storage. The VOLT server streams 3D models on demand — it does not keep copies of your simulation files.
+</Callout>

@@ -1,0 +1,84 @@
+---
+title: Analysis & Jobs
+description: Run analysis plugins on trajectories and monitor job execution across your cluster.
+---
+
+## Overview
+
+The Analysis module lets you run computational plugins against your trajectories to extract quantitative data — radial distribution functions, mean squared displacement, stress tensors, and more. Each analysis runs as a set of jobs distributed across your cluster, with real-time progress tracking and automatic result storage.
+
+![Analysis Overview](/assets/modules/analysis/analysis-overview.png)
+
+## Running an Analysis
+
+1. Open a trajectory and navigate to the **Analysis** tab.
+2. Select a plugin from the list of available analysis plugins.
+3. Configure the plugin parameters (frame range, property selections, thresholds, etc.).
+4. Click **Run Analysis** to submit the job.
+5. Monitor progress in real time as frames are processed.
+
+![Run Analysis](/assets/modules/analysis/run-analysis.png)
+
+## Analysis Listing
+
+Each analysis entry shows the plugin name, the linked trajectory, progress, and status.
+
+| Status | Description |
+|---|---|
+| **Queued** | The analysis is waiting for available workers |
+| **Running** | Frames are actively being processed |
+| **Completed** | All frames have been processed successfully |
+| **Failed** | One or more frames encountered errors — you can retry failed frames |
+
+![Analysis Listing](/assets/modules/analysis/analysis-listing.png)
+
+## Progress Tracking
+
+While an analysis is running, VOLT displays a progress bar showing the number of completed frames relative to the total. Progress updates are pushed via WebSocket, so the UI refreshes in real time without polling.
+
+## Retrying Failed Frames
+
+If individual frames fail during analysis — due to memory limits, data issues, or transient errors — you do not need to re-run the entire analysis. Click **Retry Failed Frames** to resubmit only the frames that did not complete successfully.
+
+## Analysis Results
+
+When an analysis completes, the results are stored as exposures in your cluster's object storage. Depending on the plugin, results can include:
+
+- **Tables**: Tabular data viewable in the platform with sorting and filtering.
+- **Charts**: Pre-generated plots and visualizations.
+- **3D Overlays**: GLB models that appear as scene artifacts in the trajectory viewer, letting you overlay analysis results directly on the simulation.
+
+![Analysis Results](/assets/modules/analysis/analysis-results.png)
+
+## Jobs System
+
+Behind every analysis is the Jobs system. Jobs provide the infrastructure for distributing work across your cluster and tracking its execution.
+
+### Job Hierarchy
+
+Jobs are organized in a three-level hierarchy:
+
+- **Session**: A top-level grouping created when you start an analysis. It tracks the total number of jobs and overall completion status.
+- **Trajectory Group**: Jobs within a session that belong to the same trajectory.
+- **Frame Job**: An individual unit of work — the processing of a single frame by a plugin.
+
+### Job Status
+
+| Status | Description |
+|---|---|
+| **Queued** | The job is waiting in the queue for a worker |
+| **Running** | A worker is actively processing the job |
+| **Completed** | The job finished successfully |
+| **Failed** | The job encountered an error — the error message is stored for debugging |
+
+### Job Actions
+
+From the Jobs panel, you can manage your team's job queue:
+
+- **Clear History**: Remove all completed and failed jobs from the history.
+- **Retry Failed**: Resubmit all failed jobs across the team.
+- **Remove Running**: Cancel all currently running jobs.
+
+<Callout type="info">
+Job progress and status updates are delivered via WebSocket. You can navigate away from the page and return later — the state is always current.
+</Callout>
