@@ -12,6 +12,13 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: 'VOLT',
     },
+    links: [
+      {
+        text: 'API Spec',
+        url: 'https://server.voltcloud.dev/api-docs',
+        external: true,
+      },
+    ],
     githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
   };
 }
