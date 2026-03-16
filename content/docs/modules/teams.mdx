@@ -1,0 +1,96 @@
+---
+title: Teams
+description: Create and manage teams, invite members, assign roles, and configure API keys.
+---
+
+<Callout type="info">
+**TL;DR** — A team is your workspace. It owns trajectories, clusters, analyses, and members. Create multiple teams for different projects or research groups.
+</Callout>
+
+## Overview
+
+Teams are the top-level organizational unit in VOLT. When you create a team, you get an isolated workspace with its own trajectories, clusters, containers, analyses, and member list. Every action in the platform happens within the context of a team.
+
+You can create as many teams as you need — one per research project, one per lab group, or any structure that fits your workflow.
+
+## Creating a Team
+
+1. Open the team selector from the sidebar.
+2. Click **Create Team**.
+3. Enter a team name.
+4. Click **Create**.
+
+You are automatically assigned as the owner of the new team.
+
+## Inviting Members
+
+1. Click the **person-add icon** in the top-right area of the dashboard header.
+2. A popover panel opens with two tabs: **Share** and **Invitation Code**.
+
+### Invite by Email (Share tab)
+
+1. In the **Share** tab, enter the person's email address in the input field.
+2. Click **Invite**.
+3. The invitation appears in the pending list below. You can cancel pending invitations from here.
+4. Use the **Copy link** button in the footer to share the invitation link directly.
+
+### Invite by Code (Invitation Code tab)
+
+1. Switch to the **Invitation Code** tab.
+2. Click **Generate Invite Code** to create a 5-character code.
+3. Share the code or its link with anyone you want to invite — they will join the team automatically when they open it.
+4. You can regenerate or delete the code at any time from the three-dot menu.
+
+The invited person receives a notification (email invitations) or joins immediately (code invitations). Once they accept, they appear in the team member list.
+
+## Roles and Permissions
+
+Teams support role-based access control (RBAC). Each team has a set of roles, and each role defines what actions a member can perform.
+
+| Default Role | Permissions |
+|---|---|
+| **Owner** | Full access — manage members, roles, clusters, and all resources |
+| **Admin** | Manage resources and members, but cannot delete the team |
+| **Member** | Use all modules (trajectories, analysis, containers, etc.) but cannot manage team settings |
+
+### Custom Roles
+
+You can create custom roles with fine-grained permissions:
+
+1. Go to team settings.
+2. Click **Roles**.
+3. Click **Create Role**.
+4. Name the role and select the permissions you want to grant.
+5. Click **Save**.
+
+Assign custom roles to members from the member list.
+
+## API Secret Keys
+
+Teams can generate API secret keys for programmatic access via the [VoltSDK](/docs/open-source/volt-client).
+
+1. Go to team settings.
+2. Click **Secret Keys**.
+3. Click **Create Key**.
+4. Copy the generated key immediately — it is only shown once.
+
+<Callout type="warn">
+Secret keys grant full API access on behalf of the team. Store them securely and revoke keys you no longer need.
+</Callout>
+
+## Task: Invite a member and assign a role
+
+1. Click the **person-add icon** in the dashboard header.
+2. In the **Share** tab, enter the person's email address and click **Invite**.
+3. Once they accept, go to team settings and assign them a role (Owner, Admin, Member, or a custom role) from the member list.
+
+**Expected outcome:** The invited person appears in the team member list with the assigned role and can access the team's resources.
+
+## Task: Create an API secret key
+
+1. Go to team settings.
+2. Click **Secret Keys**.
+3. Click **Create Key**.
+4. Copy the key and store it securely.
+
+**Expected outcome:** A new API key appears in the list. You can use it with `voltsdk` or `@voltstack/voltclient` for programmatic access.

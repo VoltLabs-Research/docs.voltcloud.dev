@@ -3,6 +3,10 @@ title: Scripting
 description: Create Jupyter notebooks for custom analysis with pre-installed scientific libraries.
 ---
 
+<Callout type="info">
+**TL;DR** — Create Jupyter notebooks that run in Docker containers on your cluster. Each notebook comes with a full scientific Python stack pre-installed — including `numpy`, `scipy`, `matplotlib`, `pandas`, `voltsdk`, `ovito`, `ase`, `pymatgen`, `MDAnalysis`, `matminer`, `vtk`, and more. Link notebooks to trajectories for easy data access.
+</Callout>
+
 ## Overview
 
 The Scripting module gives you a full Jupyter Lab environment embedded directly inside VOLT. You can create notebooks to write custom Python scripts for post-processing simulation data, generating plots, or running computations that go beyond built-in analysis plugins. Each notebook runs in its own Docker container on your team's cluster with scientific libraries pre-installed.
@@ -44,10 +48,18 @@ The following libraries are pre-installed in every notebook container:
 
 - **voltsdk** — The official VOLT Python SDK for loading trajectory data, frames, and per-atom properties.
 - **pandas** — Data manipulation and analysis.
-- **numpy** — Numerical computing.
-- **scipy** — Scientific computing and optimization.
-- **matplotlib** — Plotting and visualization.
+- **numpy** — Numerical computing (from the base `scipy-notebook` image).
+- **scipy** — Scientific computing and optimization (from the base `scipy-notebook` image).
+- **matplotlib** — Plotting and visualization (from the base `scipy-notebook` image).
+- **scikit-learn** — Machine learning (from the base `scipy-notebook` image).
 - **vtk** — 3D visualization and mesh processing.
+- **ovito** — Scientific visualization and analysis for atomistic simulation data.
+- **ase** — Atomic Simulation Environment for building and manipulating atomic structures.
+- **pymatgen** — Python Materials Genomics for materials analysis.
+- **MDAnalysis** — Molecular dynamics trajectory analysis.
+- **matminer** — Materials data mining and featurization.
+- **minio** — MinIO Python SDK for direct object storage access.
+- **msgpack** — MessagePack serialization for reading analysis results.
 
 You can install additional packages using `pip` inside the notebook terminal.
 
@@ -56,6 +68,18 @@ You can install additional packages using `pip` inside the notebook terminal.
 - **Rename**: Change a notebook's title at any time from the listing view.
 - **Delete**: Remove a notebook and its associated Jupyter container.
 - **Auto-save**: Notebook content is saved automatically as you work.
+
+## Task: Create a Jupyter notebook linked to a trajectory
+
+1. In the Scripting module, click **Create Notebook**.
+2. Enter a title for the notebook.
+3. Select **Trajectory** as the notebook scope.
+4. Pick the trajectory you want to link from the dropdown.
+5. Click **Create** to confirm.
+6. Open the newly created notebook from the listing.
+7. In a code cell, run `import voltsdk` to verify the SDK is available and the trajectory context is loaded.
+
+**Expected outcome:** The notebook opens in Jupyter Lab with the linked trajectory accessible through `voltsdk`. You can immediately load frames and per-atom data from the selected trajectory.
 
 <Callout type="info">
 Each Jupyter session runs in its own Docker container with configurable memory and CPU limits. Containers are provisioned on demand and cleaned up when the notebook is deleted.

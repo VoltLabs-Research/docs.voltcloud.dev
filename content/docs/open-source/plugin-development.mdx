@@ -3,6 +3,10 @@ title: Plugin Development
 description: Build custom analysis plugins for VOLT using CoreToolkit.
 ---
 
+<Callout type="info">
+**TL;DR** — Write a C++ executable that links against CoreToolkit, reads a LAMMPS dump frame via `--input`, runs your analysis algorithm, and writes MessagePack results to `--output`. Build with CMake + Conan, then deploy to any cluster.
+</Callout>
+
 ## Overview
 
 VOLT plugins are standalone C++ executables that link against **CoreToolkit**. Each plugin reads a LAMMPS dump frame, performs an analysis algorithm, and outputs results in MessagePack format. Once compiled, a plugin can be installed on any ClusterDaemon.

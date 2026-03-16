@@ -41,3 +41,14 @@ Simulation cell data is used across several modules:
 - **3D Viewer**: The simulation cell is rendered as a wireframe bounding box overlay in the trajectory viewer, giving you spatial context for the atom positions.
 - **Analysis Plugins**: Plugins that compute spatial properties (e.g., radial distribution functions, density profiles) use the cell vectors and periodic boundary conditions to handle wrapping and distance calculations correctly.
 - **Volt AI**: You can ask [Volt AI](/docs/modules/volt-ai) to list simulation cells, retrieve bounding box dimensions, or check periodic boundary conditions for any trajectory in your team.
+
+## Task: View simulation cell data for a trajectory
+
+1. Open the **Simulation Cells** listing from the sidebar.
+2. Use the trajectory filter to narrow results to your target trajectory.
+3. Click on a simulation cell entry to view its details.
+4. Verify the **Bounding Box** dimensions (width, height, length) are displayed.
+5. Confirm the **Cell Vectors** (3×3 matrix) are shown.
+6. Check that the **Periodic Boundary Conditions** flags for each axis (x, y, z) are visible.
+
+**Expected outcome:** The simulation cell detail view shows the complete spatial data — bounding box, cell vectors, origin, and periodic boundary conditions — for the selected timestep of the trajectory.

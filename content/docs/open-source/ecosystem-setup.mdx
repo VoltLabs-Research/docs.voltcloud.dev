@@ -112,7 +112,7 @@ Pass `--no-cache` to force Docker to rebuild from scratch:
 
 ## Build Output
 
-After a successful run, the compiled plugin binaries are placed in the output directory (default: `scripts/out/`). Each plugin produces a standalone executable that reads a LAMMPS dump frame from stdin (or a file path), runs its analysis, and writes JSON results to stdout.
+After a successful run, the compiled plugin binaries are placed in the output directory (default: `scripts/out/`). Each plugin produces a standalone executable that accepts `--input` (path to a LAMMPS dump file), `--output` (path for results), and `--params` (JSON configuration) as command-line arguments, and writes analysis results in MessagePack format to the specified output path.
 
 <Callout type="warn">
 The Docker-based build currently compiles only the **plugin** repositories (the Foundational Algorithms). The tools (`VoltSDK`, `SpatialAssembler`, etc.) and the app (`Volt`, `ClusterDaemon`) are cloned but not built by this script.

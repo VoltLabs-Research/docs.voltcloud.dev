@@ -3,6 +3,10 @@ title: Self-Hosting
 description: Deploy VOLT on your own infrastructure.
 ---
 
+<Callout type="info">
+**TL;DR** — VOLT self-hosting requires a Linux server, Node.js, Docker, MongoDB, Redis, and MinIO. Clone the repo, configure `.env` files, build server and client, set up nginx as a reverse proxy, and verify connectivity.
+</Callout>
+
 ## Overview
 
 VOLT can be self-hosted on any Linux server. The platform consists of two Node.js applications (server and client) plus three external services (MongoDB, Redis, MinIO).
@@ -34,7 +38,55 @@ Self-hosting gives you full control over your data and infrastructure. All simul
 
 ### 1. Start External Services
 
-You can run MongoDB, Redis, and MinIO using Docker:
+The quickest way to start all services is with Docker Compose. Create a `docker-compose.yml`:
+
+```yaml
+version: "3.8"
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: volt
+      MONGO_INITDB_ROOT_PASSWORD: changeme
+    volumes:
+      - volt-mongo-data:/data/db
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    command: --requirepass changeme
+
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: voltadmin
+      MINIO_ROOT_PASSWORD: changeme
+    volumes:
+      - volt-minio-data:/data
+    command: server /data --console-address ":9001"
+
+volumes:
+  volt-mongo-data:
+  volt-minio-data:
+```
+
+Then run:
+
+```bash
+docker compose up -d
+```
+
+<Callout type="info">
+If you prefer running containers individually, expand the section below.
+</Callout>
+
+Alternatively, start each service separately:
 
 ```bash
 # MongoDB
@@ -104,7 +156,7 @@ MONGO_URI=mongodb://volt:changeme@127.0.0.1:27017
 MONGO_AUTH_SOURCE=admin
 PRODUCTION_DATABASE=voltcloud@production
 
-# Security (generate unique values!)
+# Security — generate with: openssl rand -hex 32
 SECRET_KEY=your-random-secret-key
 SSH_ENCRYPTION_KEY=your-random-encryption-key
 JWT_EXPIRATION_DAYS=7d
@@ -147,6 +199,21 @@ The server listens on port **8000** by default and binds to `0.0.0.0`.
 ### 7. Serve the Client
 
 The client build outputs static files. Serve them with **nginx** or any static file server.
+
+### 8. Verify the deployment
+
+After starting all services, verify everything is working:
+
+1. **Check the API** — Open `https://your-domain.com/api/` in a browser. You should see a JSON response confirming the server is running.
+2. **Check the client** — Open `https://your-domain.com` in a browser. The VOLT sign-in page should load.
+3. **Check MongoDB** — Run `docker logs volt-mongo` and confirm there are no authentication errors.
+4. **Check Redis** — Run `docker exec volt-redis redis-cli -a changeme ping` — you should see `PONG`.
+5. **Check MinIO** — Open `http://your-server:9001` and sign in with your MinIO credentials. The console should load and show the auto-created buckets after the server starts.
+6. **Create an account and connect a cluster** — Sign up, create a team, and connect a cluster to confirm the full pipeline works end to end.
+
+<Callout type="warn">
+If any service fails to connect, check `docker ps` to confirm all containers are running, and verify that the ports in your `.env` match the exposed Docker ports.
+</Callout>
 
 ## Reverse Proxy (nginx)
 

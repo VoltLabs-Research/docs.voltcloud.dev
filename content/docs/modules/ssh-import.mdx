@@ -3,6 +3,10 @@ title: SSH Import
 description: Import trajectory files from remote servers over SSH.
 ---
 
+<Callout type="info">
+**TL;DR** — Connect to remote servers via SSH, browse their file system, and import LAMMPS files directly into VOLT. The entire download-parse-render pipeline runs automatically on your cluster.
+</Callout>
+
 ## Overview
 
 The SSH Import module lets you connect to remote servers — HPC clusters, lab workstations, or any machine accessible via SSH — and import trajectory files directly into VOLT. Instead of manually downloading files and re-uploading them, you browse the remote file system from the VOLT interface and start the import with a single click.
@@ -59,3 +63,15 @@ The entire process runs as a background job. You can monitor its progress from t
 <Callout type="info">
 SSH Import supports LAMMPS dump files (`.dump`, `.lammpstrj`), LAMMPS data files (`.data`), and compressed archives containing these formats.
 </Callout>
+
+## Task: Import a trajectory from a remote server
+
+1. Go to the **SSH Import** section from the sidebar.
+2. Click **Add Connection** and fill in the host, port, username, and password for the remote server.
+3. Click **Test** to verify the connection succeeds.
+4. Click **Browse** to open the remote file explorer.
+5. Navigate to the directory containing your dump file and select it.
+6. Click **Import** to start the automated pipeline.
+7. Open the **Jobs** panel to monitor download, parsing, and upload progress.
+
+**Expected outcome:** The trajectory appears in the trajectory listing with full metadata, frames, and 3D models ready for viewing.

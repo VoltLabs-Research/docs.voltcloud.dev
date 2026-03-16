@@ -3,6 +3,10 @@ title: LaTeX
 description: Collaborative LaTeX editor with real-time compilation and AI assistance.
 ---
 
+<Callout type="info">
+**TL;DR** — A collaborative LaTeX editor with a three-panel layout: file tree, code editor, and live PDF preview. Supports real-time collaboration, Volt AI integration, and project import/export.
+</Callout>
+
 ## Overview
 
 The LaTeX module is a full-featured collaborative editor built into VOLT. It provides a three-panel layout — file tree, code editor, and live PDF preview — so you can write, compile, and review your documents without leaving the platform.
@@ -60,3 +64,23 @@ LaTeX projects support real-time collaboration. Multiple team members can edit t
 |---|---|
 | **Import** | `.zip` archive containing `.tex` files and assets |
 | **Export** | Individual `.tex` files or full project as `.zip` |
+
+## Task: Create and compile a LaTeX document
+
+1. Click **Create Project** and enter a name for the project.
+2. Open the project to enter the three-panel editor.
+3. In the code editor, write your LaTeX content in the `.tex` file (e.g., add a `\section{}` and body text).
+4. Click **Compile** to trigger compilation.
+5. Check the PDF preview panel on the right to verify the output reflects your changes.
+
+**Expected outcome:** The PDF preview updates with the compiled document showing your content without errors.
+
+## Task: Use Volt AI to fix LaTeX errors
+
+1. Open a LaTeX document that contains compilation errors.
+2. Open the **Volt AI** panel from the editor sidebar.
+3. Ask the AI to fix the errors (e.g., "Fix the compilation errors in this document").
+4. Review the suggested changes the AI applies to your `.tex` file.
+5. Click **Compile** again to recompile the document.
+
+**Expected outcome:** The compilation completes without errors and the PDF preview displays the corrected document.

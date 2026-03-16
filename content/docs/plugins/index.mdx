@@ -1,13 +1,17 @@
 ---
-title: Overview
+title: Plugin System
 description: Overview of VOLT's plugin ecosystem for atomistic simulation analysis.
 ---
+
+<Callout type="info">
+**TL;DR** — A VOLT plugin is a node-based workflow that runs analysis binaries on your trajectory frames. Plugins are automatically deployed when you create a team. Results are stored as MessagePack files on your cluster.
+</Callout>
 
 ## Overview
 
 When you create a new team in VOLT and connect a cluster, a default set of plugins is automatically deployed to that cluster — ready to use out of the box.
 
-This set of plugins implements the [Foundational Algorithms](/docs/open-source-ecosystem#foundational-algorithms) from the VOLT open-source ecosystem.
+This set of plugins implements the [Foundational Algorithms](/docs/open-source#foundational-algorithms) from the VOLT open-source ecosystem.
 
 ## What is a Plugin
 
@@ -100,7 +104,7 @@ The node-based architecture means you can connect as many plugins as you want. Y
 
 This is what defines VOLT: *"I can run any algorithm on any simulation — just give me the steps and the executable."* You always work with the state of the art without depending on any specific VOLT version, because you can always import new plugins.
 
-## Export Node
+### Export Node
 
 The Export Node takes an Exposure Node's output file and generates 3D models for visualization in the UI. Currently supported exporters:
 
@@ -111,7 +115,7 @@ The Export Node takes an Exposure Node's output file and generates 3D models for
 | **Atomistic Exporter** | Exports an atom point cloud. |
 | **Chart Exporter** | *Coming soon.* |
 
-The 3D model construction for the Dislocation, Mesh, and Atomistic exporters is handled by [SpatialAssembler](/docs/open-source-ecosystem) — a tool developed by VOLT Labs.
+The 3D model construction for the Dislocation, Mesh, and Atomistic exporters is handled by [SpatialAssembler](/docs/open-source/spatial-assembler) — a tool developed by VOLT Labs.
 
 ## Output File Format
 
@@ -137,15 +141,8 @@ The specific contents of each section vary per plugin and are documented in each
 
 ## Storage and Data Flow
 
-After a plugin finishes execution, the exported `.msgpack` files and any generated 3D models are uploaded to block storage. VOLT itself does not store any of this data — everything lives on the team's clusters.
-
-Each cluster has **4 services** deployed, including:
-
-- **MongoDB** — Stores `main_listing` and `sub_listings` data for fast querying.
-- **MinIO** — Acts as the block storage server where `.msgpack` files and 3D models are uploaded.
-
-When a user requests results through the UI, the VOLT server forwards the request to the cluster daemon of the team that owns the data. The daemon retrieves the files from MinIO and the listings from MongoDB, then sends them back.
+After a plugin finishes, the exported `.msgpack` files and any generated 3D models are uploaded to MinIO on the team's cluster. VOLT itself does not store analysis data — everything lives on your infrastructure.
 
 <Callout type="info">
-This architecture is what makes VOLT scalable. Since all data lives on the team's clusters, if you run out of storage or compute resources, you simply connect another cluster.
+For details on how clusters store and serve data, see [Clusters](/docs/modules/clusters).
 </Callout>

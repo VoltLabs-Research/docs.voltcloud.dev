@@ -3,6 +3,10 @@ title: Analysis & Jobs
 description: Run analysis plugins on trajectories and monitor job execution across your cluster.
 ---
 
+<Callout type="info">
+**TL;DR** — Select a trajectory, pick a plugin, configure parameters, and click Run. VOLT distributes the work across your cluster as jobs and streams progress in real time. Results include tables, charts, and 3D models.
+</Callout>
+
 ## Overview
 
 The Analysis module lets you run computational plugins against your trajectories to extract quantitative data — radial distribution functions, mean squared displacement, stress tensors, and more. Each analysis runs as a set of jobs distributed across your cluster, with real-time progress tracking and automatic result storage.
@@ -48,9 +52,30 @@ When an analysis completes, the results are stored as exposures in your cluster'
 
 - **Tables**: Tabular data viewable in the platform with sorting and filtering.
 - **Charts**: Pre-generated plots and visualizations.
-- **3D Overlays**: GLB models that appear as scene artifacts in the trajectory viewer, letting you overlay analysis results directly on the simulation.
+- **3D Models**: GLB models that appear as scene artifacts in the trajectory viewer, letting you overlay analysis results directly on the simulation.
 
 ![Analysis Results](/assets/modules/analysis/analysis-results.png)
+
+## Task: Run an analysis on a trajectory
+
+1. Open the trajectory you want to analyze and navigate to the **Analysis** tab.
+2. Select a plugin from the available analysis plugins list.
+3. Configure the plugin parameters — set the frame range, select properties, and adjust thresholds as needed.
+4. Click **Run Analysis** to submit the job to your cluster.
+5. Monitor the progress bar as frames are processed in real time.
+6. Once the status changes to **Completed**, open the results to review tables, charts, or 3D models.
+
+**Expected outcome:** The analysis runs across your cluster, all frames are processed, and results appear as exposures in the Analysis Results section.
+
+## Task: Retry failed frames
+
+1. Open the **Analysis Listing** and locate the analysis with a **Failed** status.
+2. Click on the failed analysis to view the frame-level breakdown.
+3. Click **Retry Failed Frames** to resubmit only the frames that encountered errors.
+4. Monitor progress as the failed frames are reprocessed.
+5. Verify that all frames now show a **Completed** status.
+
+**Expected outcome:** Only the previously failed frames are reprocessed, and the analysis reaches a fully **Completed** state without re-running successful frames.
 
 ## Jobs System
 
@@ -82,5 +107,5 @@ From the Jobs panel, you can manage your team's job queue:
 - **Remove Running**: Cancel all currently running jobs.
 
 <Callout type="info">
-Job progress and status updates are delivered via WebSocket. You can navigate away from the page and return later — the state is always current.
+Job progress and status updates are delivered in real time. You can navigate away from the page and return later — the state is always current.
 </Callout>

@@ -3,6 +3,10 @@ title: Clusters
 description: Connect, monitor, and manage the infrastructure that powers your team.
 ---
 
+<Callout type="info">
+**TL;DR** — A cluster is any machine you connect to VOLT. It runs MongoDB, MinIO, Redis, and a daemon automatically. All your data lives on your clusters — VOLT itself stores nothing.
+</Callout>
+
 ## Overview
 
 Clusters are the backbone of VOLT. Each cluster is a machine — your personal computer, a spare server, or a dedicated host — that runs the services your team needs to store data and execute analyses.
@@ -14,7 +18,7 @@ When you connect a cluster, VOLT automatically deploys **four services** on it:
 | Service | Purpose |
 |---|---|
 | **MongoDB** | Stores simulation listings, sub-listings, metadata, and all structured data |
-| **MinIO** | Block storage for 3D models, `.msgpack` files, and other binary assets |
+| **MinIO** | Object storage for 3D models, `.msgpack` files, and other binary assets |
 | **Redis** | Caching and real-time data (used for sessions, queues, etc.) |
 | **Daemon** | The agent that communicates with the VOLT server and orchestrates operations |
 

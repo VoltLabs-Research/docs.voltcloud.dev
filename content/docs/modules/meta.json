@@ -1,18 +1,24 @@
 {
   "title": "Modules",
   "pages": [
+    "index",
+    "---Core Workflow---",
     "dashboard",
     "trajectories",
     "analysis",
     "simulation-cells",
-    "scripting",
-    "ssh-import",
+    "---Compute & Infrastructure---",
     "clusters",
     "containers",
+    "ssh-import",
+    "---Scripting & AI---",
+    "scripting",
+    "volt-ai",
+    "---Collaboration---",
+    "teams",
     "chat",
-    "notifications",
-    "whiteboards",
     "latex",
-    "volt-ai"
+    "whiteboards",
+    "notifications"
   ]
 }

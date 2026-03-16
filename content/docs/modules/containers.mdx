@@ -3,6 +3,10 @@ title: Containers
 description: Deploy and manage Docker containers with resource controls and terminal access.
 ---
 
+<Callout type="info">
+**TL;DR** — Deploy Docker containers on your clusters with custom resource limits, port mappings, and environment variables. Access them via a browser-based terminal, file explorer, or remote desktop.
+</Callout>
+
 ## Overview
 
 The Containers module lets you deploy and manage Docker containers directly from VOLT. Each container runs on one of your team's clusters and can be configured with custom resource limits, port mappings, and environment variables.
@@ -52,6 +56,26 @@ Once a container is running, you can:
 - **Port Management**: View and modify exposed ports.
 - **Environment Variables**: Update environment variables without rebuilding.
 - **Remote Desktop**: Connect to containers with a graphical environment via XRDP.
+
+## Task: Deploy a Docker container
+
+1. Click the **Create Container** button from the container listing view.
+2. Enter a descriptive **name** for the container.
+3. Specify the **Docker image** to use (e.g., `ubuntu:latest`).
+4. Set **CPU** and **memory** resource limits appropriate for your workload.
+5. Configure any required **port mappings** and **environment variables**.
+6. Review the full configuration summary on the review step.
+7. Click **Confirm** to deploy the container.
+
+**Expected outcome:** The container appears in the listing with a green status indicator, confirming it is running.
+
+## Task: Open a terminal in a container
+
+1. Select a running container from the container listing.
+2. Click the **Terminal** option in the container's feature panel.
+3. Wait for the WebSocket connection to establish.
+
+**Expected outcome:** A shell prompt appears in the browser, ready to accept commands inside the container.
 
 <Callout type="info">
 Containers run on your team's clusters, so resource availability depends on the hardware you have connected.

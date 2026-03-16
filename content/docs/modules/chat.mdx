@@ -3,6 +3,10 @@ title: Chat
 description: Real-time messaging with direct messages, group chats, file sharing, and reactions.
 ---
 
+<Callout type="info">
+**TL;DR** — Real-time messaging built into VOLT. Send direct messages, create group chats, share files, react to messages, and see who's online — all without leaving the platform.
+</Callout>
+
 ## Overview
 
 The Chat module provides real-time messaging for your team directly inside VOLT. You can send direct messages, create group chats, share files, react to messages, and see who is online — all without leaving the platform. Messages are delivered instantly via WebSocket connections.
@@ -64,6 +68,16 @@ The chat module tracks online presence for all team members. A green status indi
 ## Shared Files
 
 The **Shared Files** panel provides a consolidated view of every file shared across a conversation. Instead of scrolling through the message history, you can browse all shared files in one place, filtered by file type.
+
+## Task: Create a group chat
+
+1. Click the **Create Group** button in the chat sidebar.
+2. Enter a **group name** and an optional description.
+3. Select the team members you want to include as participants.
+4. Optionally upload a **group avatar** image.
+5. Click **Create** to finalize the group.
+
+**Expected outcome:** The new group chat appears in the chat sidebar and is ready for messaging.
 
 <Callout type="info">
 All chat data — messages, files, and metadata — is stored on your team's cluster. The VOLT server relays messages in real time but does not retain them.

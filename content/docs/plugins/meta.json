@@ -2,14 +2,17 @@
   "title": "Plugins",
   "pages": [
     "index",
-    "open-dxa",
-    "grain-segmentation",
-    "elastic-strain",
-    "displacements-analysis",
+    "---Structural Analysis---",
+    "structure-identification",
     "coordination-analysis",
     "centrosymmetry-parameter",
+    "cluster-analysis",
+    "---Deformation & Strain---",
     "atomic-strain",
-    "structure-identification",
-    "cluster-analysis"
+    "elastic-strain",
+    "displacements-analysis",
+    "---Advanced---",
+    "open-dxa",
+    "grain-segmentation"
   ]
 }

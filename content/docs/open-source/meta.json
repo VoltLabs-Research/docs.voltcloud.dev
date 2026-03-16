@@ -4,6 +4,7 @@
     "index",
     "ecosystem-setup",
     "core-toolkit",
+    "plugin-development",
     "---VoltSDK---",
     "volt-client",
     "daemon-cluster-client",

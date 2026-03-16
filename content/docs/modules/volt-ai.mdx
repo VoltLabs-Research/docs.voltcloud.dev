@@ -3,6 +3,10 @@ title: Volt AI
 description: Multi-provider AI assistant integrated across the entire platform.
 ---
 
+<Callout type="info">
+**TL;DR** — Volt AI is a built-in assistant that supports 13 AI providers and 71 tools. Each team configures its own API keys. Volt AI can manage trajectories, run analyses, edit LaTeX documents, and control containers using natural language.
+</Callout>
+
 ## Overview
 
 Volt AI is the built-in AI assistant that works across the entire VOLT platform. It supports **13 AI providers**, giving your team full flexibility to use the models and services that best fit your needs. Each team configures its own providers and API keys — there is no shared or centralized AI service.
@@ -175,3 +179,24 @@ Some tools require your explicit approval before execution (e.g., deleting resou
 |---|---|
 | `list_scripting_notebooks` | List all Jupyter scripting notebooks in the team |
 | `list_simulation_cells` | List all simulation cells in the team |
+
+## Task: Set up an AI provider
+
+1. Go to the **Volt AI** section from the sidebar.
+2. Click **Add Provider**.
+3. Enter a name for the provider (e.g., "OpenAI Production").
+4. Paste your API key into the key field.
+5. Select the models you want to enable for your team.
+6. Save the provider configuration.
+
+**Expected outcome:** The provider appears in the provider list with its enabled models available in the chat interface and AI-powered tools.
+
+## Task: Run an analysis using natural language
+
+1. Open a **Volt AI** conversation from the chat interface.
+2. Type a request such as "Run Coordination Analysis on trajectory X" (replacing X with the trajectory name).
+3. Volt AI will identify the trajectory and the analysis plugin, then present a tool call for approval.
+4. Review the parameters and click **Approve** to authorize execution.
+5. Wait for the analysis job to start.
+
+**Expected outcome:** The analysis appears in the Jobs panel as running, and once completed, the results are accessible from the trajectory's analysis listing.
