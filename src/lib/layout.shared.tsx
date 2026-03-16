@@ -18,12 +18,7 @@ export function baseOptions(): BaseLayoutProps {
         url: 'https://server.voltcloud.dev/api-docs',
         external: true,
       },
-      {
-        text: 'GitHub',
-        url: 'https://github.com/voltlabs-research/',
-        external: true,
-      },
     ],
-    githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
+    githubUrl: 'https://github.com/voltlabs-research/',
   };
 }
