@@ -1,15 +1,23 @@
 ---
 title: Architecture
-description: High-level overview of how all VOLT ecosystem components connect.
+description: How the app, the cluster daemon, storage, workflows, and native tooling fit together.
 ---
 
 <Callout type="info">
-**TL;DR** — VOLT has three layers: a web app (React + Express), a compute layer (ClusterDaemon on your machines), and shared C++ libraries. The server coordinates; your clusters do the heavy lifting. All communication uses WebSocket.
+**TL;DR** -- VOLT has a clear split of responsibilities. The product server coordinates users, teams, APIs, and real-time state. The cluster daemon does the heavy operational work on your infrastructure: trajectory processing, plugin execution, notebooks, previews, imports, and remote access.
 </Callout>
 
-## System Overview
+## The mental model
 
-VOLT is a modular platform for high-performance molecular dynamics simulation analysis. The ecosystem is split into three layers: the **web platform**, the **compute layer**, and the **shared libraries**.
+The easiest way to understand VOLT is to think in layers.
+
+- the **workspace layer** is the app your team interacts with,
+- the **runtime layer** is the daemon running on connected machines,
+- and the **native/tooling layer** is the C++ and SDK ecosystem that makes parsing, analysis, 3D export, and automation possible.
+
+That separation is what lets VOLT feel like a single product in the browser while still keeping data and execution close to your own machines.
+
+## System overview
 
 ```mermaid
 graph TB
@@ -41,7 +49,7 @@ graph TB
         CoreToolkit["CoreToolkit\n(C++ math + analysis)"]
         LammpsIO["LammpsIO\n(trajectory parsing)"]
         SpatialAssembler["SpatialAssembler\n(GLB assembly)"]
-        HeadlessRasterizer["HeadlessRasterizer\n(GLB → PNG)"]
+        HeadlessRasterizer["HeadlessRasterizer\n(GLB to PNG)"]
         VoltSDK["VoltSDK\n(REST + WS clients)"]
     end
 
@@ -55,98 +63,156 @@ graph TB
     Daemon -.->|"native addon"| HeadlessRasterizer
 ```
 
-## Data Flow: Analysis Execution
+## The workspace layer
 
-Here's how a simulation analysis flows through the system:
+At the top is the main VOLT application: a React client and an Express-based server. This layer handles the things you would expect from a team workspace: authentication, team state, permissions, conversations, routes, APIs, and the real-time event flow the UI depends on.
+
+It is also where domain modules such as trajectories, analysis, containers, scripting, LaTeX, chat, notifications, and AI are coordinated.
+
+What this layer does not do is become the place where all scientific data lives forever. It is the coordinator, not the permanent home of your simulation workload.
+
+## The cluster daemon layer
+
+ClusterDaemon is the operational heart of the system.
+
+It connects outward to VOLT over a reverse control channel, so you do not need to expose inbound HTTP services on the cluster just to let the product drive work there. Once connected, it can:
+
+- receive analysis requests,
+- maintain heartbeats and metrics,
+- orchestrate job queues,
+- parse and preprocess trajectories,
+- generate GLB models and preview rasters,
+- create Jupyter runtimes,
+- manage remote-access bridges,
+- import trajectories over SSH,
+- and coordinate artifacts and exports.
+
+This is one of the most important things to understand about the platform. If the server is the workspace brain, the daemon is the set of hands actually touching your infrastructure.
+
+## Data flow for analysis
 
 ```mermaid
 sequenceDiagram
-    participant U as User (Client)
+    participant U as User
     participant S as VOLT Server
     participant D as ClusterDaemon
     participant M as MinIO
     participant P as Plugin Binary
 
-    U->>S: Upload LAMMPS trajectory
-    S->>M: Store trajectory file
-    U->>S: Run Analysis (select plugin)
-    S->>D: analysis.dispatch (WebSocket)
-    D->>D: Queue job (BullMQ)
-    D->>M: Download trajectory frame
+    U->>S: Start an analysis from a trajectory
+    S->>D: analysis.start
+    D->>D: Plan workflow and enqueue jobs
+    D->>M: Download frame dump
     D->>P: Execute plugin binary
-    P->>P: Read frame → run algorithm
-    P-->>D: Write MessagePack results
-    D->>M: Upload results
-    D->>S: Report completion (WebSocket)
-    S->>U: Notify via WebSocket
-    U->>M: Load results in 3D viewer
+    P-->>D: Write MessagePack exposures
+    D->>M: Upload result artifacts
+    D->>S: Report progress and completion
+    S->>U: Stream live updates
 ```
 
-## Components
+This is why analysis results often appear in more than one form. The daemon is not just returning raw output. It can upload MessagePack data, project listings into storage, create exports, and make 3D artifacts available to the viewer.
 
-### VOLT Platform (Web Application)
+## Data flow for trajectories
 
-The main application, consisting of a **React** client and an **Express** server.
+Trajectory handling follows a similarly layered pattern. After an upload is registered, background processing and daemon-side native tooling take over. Dumps are parsed, metadata is extracted, simulation-cell records are built, GLB assets are generated, and preview rasters can be produced for faster visual entry points later.
 
-| Component | Technology | Purpose |
+That is why a trajectory in VOLT feels richer than a plain uploaded file. By the time you open it, several runtime layers have already prepared it for the workspace.
+
+## Workflow runtime versus plugin binaries
+
+VOLT plugins have two different faces depending on where you are looking from.
+
+In the product, a plugin is a node-based workflow with arguments, context, iteration, exposures, and exports. In the runtime, that workflow eventually resolves into one or more binary or Python execution steps.
+
+The workflow engine handles the structural logic around nodes such as context, `forEach`, arguments, and branching. The job runtime then turns that plan into actual frame work, downloads what it needs, resolves the plugin payload, executes it, and processes the resulting artifacts.
+
+## Native tooling and open-source layers
+
+Several capabilities that feel like built-in product features are actually powered by the wider open-source ecosystem around VOLT.
+
+| Tool | Role in the Runtime |
+|---|---|
+| **CoreToolkit** | Shared C++ foundation used by the scientific plugin binaries |
+| **LammpsIO** | Native parsing of LAMMPS-oriented data |
+| **SpatialAssembler** | Conversion of structured output into GLB geometry |
+| **HeadlessRasterizer** | Rendering of GLB assets into PNG previews |
+| **VoltSDK** | Programmatic access for external automation and notebooks |
+
+This is why the platform docs and the open-source docs belong together. The app is only one layer of the ecosystem.
+
+## Networking and operational shape
+
+| Connection | Direction | Why It Exists |
 |---|---|---|
-| **Client** | React 18, Three.js, Material-UI, Monaco Editor | UI, 3D visualization, code editing |
-| **Server** | Express 5, Socket.IO, Passport.js | REST API, WebSocket gateway, OAuth |
-| **MongoDB** | Mongoose ODM | Users, teams, simulations, analyses |
-| **Redis** | ioredis + BullMQ | Job queues, caching, pub/sub |
-| **MinIO** | S3-compatible | File storage (dumps, models, plugins, avatars) |
+| Client to Server | HTTPS and WSS | UI, auth, APIs, and live updates |
+| Server to Daemon | Reverse control over WebSocket | Job dispatch, remote operations, cluster lifecycle |
+| Daemon to MinIO | HTTP(S) | Artifact and dump upload/download |
+| Daemon to MongoDB | TCP | Metadata and listings |
+| Daemon to Redis | TCP | Queues, state, and caching |
+| Daemon to Docker | Unix socket | Containers and Jupyter runtimes |
 
-The server acts as the **coordinator**: it authenticates users, manages teams, and dispatches analysis jobs to cluster daemons via WebSocket.
+The important design decision here is the reverse channel between the product and the daemon. It keeps the cluster-side deployment much friendlier in real environments where opening inbound ports is not desirable.
 
-### ClusterDaemon (Compute Node)
+## Bootstrap plane vs control plane
 
-A Node.js service that runs on each compute node (a user's PC or a dedicated server). It connects to the VOLT server over **socket.io** and executes commands on behalf of the platform.
+It helps to separate two phases that are easy to blur together.
 
-**Responsibilities:**
-- Receive and execute analysis jobs (plugin binaries).
-- Manage Docker containers and Jupyter notebook sessions.
-- Parse and rasterize LAMMPS trajectories using native C++ addons.
-- Report metrics (CPU, memory, disk) back to the platform.
-- Handle SSH-based file imports.
+- The **bootstrap plane** is what gets a cluster installed and enrolled in the first place.
+- The **control plane** is what keeps that cluster useful after it is online.
+
+During bootstrap, VOLT generates install material, the installer writes environment and compose files, local services come up, and the daemon reaches the point where it can announce itself successfully.
+
+After that, the system shifts into its steady-state model: heartbeats, reverse-channel commands, job dispatch, remote access, notebook sessions, exposure registry updates, and lifecycle events all flow through the daemon connection.
+
+That distinction matters operationally because a cluster can fail in one phase but not the other. A machine may install correctly yet never become a healthy control-plane participant, or it may bootstrap once and later drift into disconnection.
+
+## Daemon startup order
+
+ClusterDaemon has a fairly deliberate startup sequence.
+
+1. load configuration,
+2. create the local platform module,
+3. create runtime modules such as metrics, trajectory-native, workflow, Jupyter, SSH import, job runtime, cloud control, and artifacts,
+4. connect local dependencies first,
+5. start memory monitoring,
+6. connect to VoltCloud,
+7. start the exposure registry,
+8. then start the workers for analysis, GLB generation, rasterization, and SSH import.
+
+That order explains a lot of real behavior. If MongoDB, Redis, MinIO, or Docker are unavailable locally, the daemon can fail before the cloud side ever sees a meaningful runtime.
+
+## Memory-aware runtime behavior
+
+The daemon is not a passive Node.js process. It is tuned around memory pressure because several workloads it runs can get heavy quickly.
+
+The launcher calculates heap size from available memory, enables manual garbage collection support, and the runtime monitors pressure over time. When the system is under stress, workers can delay or requeue jobs instead of continuing to pile work onto an already unhealthy process.
+
+That is a design choice worth knowing, because a delayed job is not always a queue bug. Sometimes it is the daemon protecting itself.
+
+## Exposure registry and service discovery
+
+One of the more interesting pieces of the runtime is the exposure registry. The daemon inspects managed containers, reads their labels, figures out which services should be reachable through VOLT, and periodically publishes snapshots back to the platform.
+
+This is how things like proxied HTTP services, notebook targets, and remote desktop-related flows can feel dynamic in the product without requiring you to register each endpoint by hand.
+
+## Shutdown behavior
+
+The shutdown path is also structured. The daemon does not simply die and let the operating system clean up the rest. It stops memory monitoring, winds down debug and worker activity, stops exposure sync, disconnects the cloud channel, closes queue state, and then releases its local dependencies.
+
+That is useful to know when you are debugging upgrades or controlled shutdowns, because a clean stop should look different from a crash.
+
+## What to inspect when something feels wrong
+
+When the architecture is behaving poorly, the fastest mental checklist is usually:
+
+- is the cluster connected,
+- are local platform dependencies healthy,
+- is the daemon under memory pressure,
+- are workers running,
+- and is the reverse channel still alive?
+
+Those five questions cover a surprising amount of the real failure surface.
 
 <Callout type="info">
-The daemon uses a reverse channel pattern — it does not expose any HTTP endpoints. The VOLT server sends commands through the WebSocket, and the daemon responds. This means you do not need to open inbound ports on your cluster machine.
+If you are reading this because you want to operate your own deployment, continue with [Self-Hosting](/docs/self-hosting). If you want to understand how plugin workflows become artifacts and overlays, continue with [Plugin System](/docs/plugins).
 </Callout>
-
-### Plugin Binaries (Foundational Algorithms)
-
-Standalone C++ executables compiled against **CoreToolkit**. Each plugin reads a LAMMPS dump frame, runs a specific analysis algorithm, and writes results in MessagePack format (a binary serialization format, like JSON but smaller and faster to parse).
-
-There are currently **9 plugins**: OpenDXA, AtomicStrain, ElasticStrain, GrainSegmentation, StructureIdentification, ClusterAnalysis, CoordinationAnalysis, CentrosymmetryParameter, and DisplacementsAnalysis.
-
-See [Plugin Development](/docs/open-source/plugin-development) for how to build your own.
-
-### Shared Libraries
-
-| Library | Type | Used by |
-|---|---|---|
-| **CoreToolkit** | C++ static library | All plugin binaries |
-| **LammpsIO** | Node.js native addon | ClusterDaemon (trajectory parsing) |
-| **SpatialAssembler** | Node.js native addon | ClusterDaemon (GLB generation) |
-| **HeadlessRasterizer** | Node.js native addon | ClusterDaemon (thumbnail rendering) |
-| **VoltSDK** | TypeScript + Python | External integrations, scripting |
-
-### VoltSDK (Client Libraries)
-
-Two client libraries for programmatic access to the VOLT API:
-
-- **`@voltstack/voltclient`** (Node.js/Browser) — Typed HTTP client with auth presets, pagination, and a declarative service DSL.
-- **`@voltstack/daemon-cluster-client`** (Node.js) — WebSocket client used by ClusterDaemon to communicate with the VOLT server.
-- **`voltsdk`** (Python) — REST client for downloading analysis results, converting MessagePack to DataFrames, and viewing GLB models.
-
-## Networking
-
-| Connection | Protocol | Direction |
-|---|---|---|
-| Client ↔ Server | HTTPS + WSS | Bidirectional |
-| Server → ClusterDaemon | WSS (socket.io) | Server initiates commands |
-| ClusterDaemon → Server | WSS (socket.io) | Daemon sends heartbeats, results |
-| ClusterDaemon → MinIO | HTTP(S) | Upload/download artifacts |
-| ClusterDaemon → MongoDB | TCP | Store analysis metadata |
-| ClusterDaemon → Redis | TCP | Job queues, caching |
-| ClusterDaemon → Docker | Unix socket | Container management |

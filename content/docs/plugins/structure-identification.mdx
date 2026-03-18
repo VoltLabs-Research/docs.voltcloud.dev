@@ -1,18 +1,27 @@
 ---
 title: Structure Identification
-description: Crystal structure identification algorithms for atomistic simulations.
+description: Classify local atomic environments and provide the structural labels many other plugins build on.
 ---
 
 ## Overview
 
-Structure Identification classifies atoms by their local structural environment to detect **BCC**, **FCC**, **HCP**, **diamond cubic**, and other crystal structures. It helps identify phase boundaries, defects, and amorphous regions in simulation data.
+Structure Identification is one of the foundational plugins in the whole ecosystem. On its own, it classifies atoms by local structure. But it also acts as a supporting layer for other workflows such as OpenDXA and Grain Segmentation, which rely on those classifications and, in PTM mode, on orientation-related data as well.
+
+That is why this plugin is worth understanding even if you rarely run it in isolation.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `mode` | `string` | `CNA` | Identification algorithm to use. Options: `CNA`, `PTM`, `DIAMOND`. |
-| `rmsd` | `float` | `0.1` | RMSD threshold for PTM classification (only applies when using PTM). |
+| `mode` | `string` | `CNA` | Identification algorithm. Options exposed in the product are `CNA`, `PTM`, and `DIAMOND`. |
+| `rmsd` | `float` | `0.1` | RMSD threshold for PTM classification. Only applies in PTM mode. |
+
+## Practical notes
+
+- `PTM` is the richest mode when you need orientations and correspondences.
+- `CNA` is the lighter structural screening path.
+- `DIAMOND` appears as an exposed mode, but the current implementation is not as cleanly separated internally as the UI may suggest.
+- The plugin also emits grouped atoms in a separate `_atoms.msgpack` file.
 
 ## Output
 
@@ -20,11 +29,8 @@ Structure Identification classifies atoms by their local structural environment 
 
 ```ts
 type Vec3 = [float, float, float];
-
-// [x, y, z, w]
 type Quaternion = [float, float, float, float];
 
-// CNA / DIAMOND mode
 interface PerAtomProperties {
     id: int;
     structure_type: int;
@@ -32,7 +38,6 @@ interface PerAtomProperties {
     pos: Vec3;
 }
 
-// PTM mode
 interface PTMPerAtomProperties {
     id: int;
     structure_type: int;
@@ -45,9 +50,6 @@ interface StructureIdentificationOutput {
     main_listing: {
         total_atoms: int;
         analysis_method: string;
-        // For each detected structure type, a pair of keys is added dynamically:
-        //   `{type}_count`: int
-        //   `{type}_percentage`: float
         [key: `${string}_count`]: int;
         [key: `${string}_percentage`]: float;
         total_identified: int;
@@ -59,8 +61,12 @@ interface StructureIdentificationOutput {
 }
 ```
 
+### `{outputBase}_atoms.msgpack`
+
+Atoms grouped by structure name for visualization and downstream use.
+
 ## See Also
 
-- [OpenDXA](/docs/plugins/open-dxa) — dislocation analysis using structure identification
-- [Grain Segmentation](/docs/plugins/grain-segmentation) — grain detection using PTM
-- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — complementary defect detection
+- [OpenDXA](/docs/plugins/open-dxa) — dislocation analysis built on local structure work
+- [Grain Segmentation](/docs/plugins/grain-segmentation) — grain grouping driven by PTM-related orientation data
+- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — complementary scalar defect highlighting

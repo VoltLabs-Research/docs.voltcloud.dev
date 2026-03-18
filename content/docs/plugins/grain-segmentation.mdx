@@ -1,21 +1,29 @@
 ---
 title: Grain Segmentation
-description: Detect and segment grain boundaries in polycrystalline materials.
+description: Segment polycrystalline regions by grouping atoms with compatible orientations.
 ---
 
 ## Overview
 
-Grain Segmentation identifies individual grains in polycrystalline materials. It detects grain boundaries, computes grain orientations, and extracts grain-level statistics from atomistic simulation data.
+Grain Segmentation is best understood as an orientation-based grouping workflow. It uses PTM-derived orientation information to separate crystalline domains that belong to different grains, then reports grain-level properties such as size, centroid, and representative orientation.
+
+This makes it especially useful in polycrystalline systems, coherent-interface problems, and workflows where you want to move from atom-level structure labels to grain-level organization.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `rmsd` | `float` | `0.1` | RMSD threshold for PTM structure identification. |
-| `minGrainAtomCount` | `int` | `100` | Minimum number of atoms required to consider a cluster as a grain. |
-| `adoptOrphanAtoms` | `bool` | `true` | Adopt orphan atoms into the nearest grain. |
-| `handleCoherentInterfaces` | `bool` | `true` | Handle coherent interfaces between grains. |
-| `outputBonds` | `bool` | `false` | Output neighbor bonds. |
+| `minGrainAtomCount` | `int` | `100` | Minimum number of atoms required to keep a grain. |
+| `adoptOrphanAtoms` | `bool` | `true` | Exposed in the interface, but the current implementation does not visibly perform a dedicated orphan-adoption phase. |
+| `handleCoherentInterfaces` | `bool` | `true` | Handle coherent interfaces between compatible structures. |
+| `outputBonds` | `bool` | `false` | Exposed parameter; bond output is not currently surfaced as a documented result file. |
+
+## Practical notes
+
+- This plugin depends strongly on PTM-style orientation information.
+- It is closer to "separate differently oriented crystalline regions" than to "detect all grain boundaries geometrically."
+- In addition to grain listings, the implementation also exports grouped atoms data.
 
 ## Output
 
@@ -23,15 +31,12 @@ Grain Segmentation identifies individual grains in polycrystalline materials. It
 
 ```ts
 type Vec3 = [float, float, float];
-
-// [x, y, z, w]
 type Quaternion = [float, float, float, float];
 
 interface Grain {
     id: int;
     size: int;
     orientation: Quaternion;
-    // center of mass
     pos: Vec3;
 }
 
@@ -46,7 +51,11 @@ interface GrainSegmentationOutput {
 }
 ```
 
+### `{outputBase}_atoms.msgpack`
+
+Atoms grouped by identified structure family for downstream visualization.
+
 ## See Also
 
-- [OpenDXA](/docs/plugins/open-dxa) — dislocation analysis in polycrystals
-- [Structure Identification](/docs/plugins/structure-identification) — identify crystal structures within grains
+- [OpenDXA](/docs/plugins/open-dxa) — dislocation-network reconstruction in crystalline systems
+- [Structure Identification](/docs/plugins/structure-identification) — the structural groundwork this plugin depends on

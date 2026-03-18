@@ -1,82 +1,46 @@
 ---
 title: Chat
-description: Real-time messaging with direct messages, group chats, file sharing, and reactions.
+description: Real-time messaging for team conversations, group coordination, and shared files.
 ---
 
 <Callout type="info">
-**TL;DR** — Real-time messaging built into VOLT. Send direct messages, create group chats, share files, react to messages, and see who's online — all without leaving the platform.
+**TL;DR** -- Chat keeps discussions inside the same team workspace where the trajectories, notebooks, and documents already live. It supports direct messages, group chats, presence, file sharing, reactions, and live updates.
 </Callout>
 
 ## Overview
 
-The Chat module provides real-time messaging for your team directly inside VOLT. You can send direct messages, create group chats, share files, react to messages, and see who is online — all without leaving the platform. Messages are delivered instantly via WebSocket connections.
+The point of Chat is simple: keep team communication close to the work instead of pushing it into another app.
+
+That matters more than it sounds. In VOLT, conversations happen in the same workspace context as clusters, analyses, documents, and trajectories, which makes it easier to move from talking about something to opening it.
 
 ![Chat Overview](/assets/overviews/overviews_chat.png)
 
-## Chat Sidebar
+## Sidebar and conversation flow
 
-The chat sidebar lists all your conversations — both direct messages and group chats — sorted by the most recent activity. Each entry shows the other participant's name (or group name), a preview of the last message, and an unread message indicator. Click any conversation to open it in the main chat area.
+The sidebar organizes direct messages and group chats by recent activity, so the conversation that just moved is usually the one closest at hand.
 
-![Chat Sidebar](/assets/modules/chat/chat-sidebar.png)
+From there, the flow is natural. You either open an existing thread or start a new one. If a direct conversation with the selected teammate already exists, VOLT reuses it instead of creating duplicates.
 
-## Direct Messages
+## Group chats
 
-To start a direct message, select a team member from the sidebar. If a conversation already exists, it opens immediately. Otherwise, a new one is created automatically. Direct messages are private between you and the other participant.
+Group chats are useful when the conversation belongs to a project or a recurring topic rather than a single person-to-person exchange.
 
-## Group Chats
+Admins inside the group can manage membership, update the group details, and assign other admins. Members can leave when the conversation is no longer relevant to them.
 
-Group chats let you bring multiple team members into a single conversation.
+## The real-time layer
 
-1. Click the **Create Group** button in the chat sidebar.
-2. Enter a **group name** and an optional **description**.
-3. Select the team members you want to add as participants.
-4. Optionally upload a **group avatar**.
-5. Click **Create** to start the group conversation.
+What makes the module feel alive is not just message delivery. Presence, typing indicators, unread state, reactions, and last-message updates all move through the same real-time layer.
 
-![Create Group](/assets/modules/chat/create-group.png)
+That means the page behaves more like a live workspace than a mailbox. When someone starts typing or a file arrives, the sidebar and the active thread both update in context.
 
-### Group Management
+## Shared files and conversation context
 
-Group admins can manage the group at any time:
+Chat also carries files, which is useful when a discussion depends on an image, a document, or a small supporting artifact. The shared-files view gives you a way to return to that material without scrolling through the whole conversation history.
 
-- **Add Members**: Invite additional team members to join the conversation.
-- **Remove Members**: Remove participants from the group.
-- **Update Info**: Change the group name, description, or avatar.
-- **Manage Admins**: Promote participants to admin or demote existing admins.
-- **Leave Group**: Any member can leave the group at any time.
+## Why Chat belongs in VOLT
 
-## Message Features
-
-| Feature | Description |
-|---|---|
-| **Text Messages** | Standard text messages with real-time delivery |
-| **File Sharing** | Upload and share files directly in the conversation — file name, size, and type are preserved |
-| **Reactions** | React to any message with an emoji — multiple users can react with the same or different emojis |
-| **Edit** | Edit your own messages after sending — an edited timestamp is shown |
-| **Delete** | Delete your own messages — deleted messages show a placeholder for other participants |
-| **Read Receipts** | See which participants have read each message |
-| **Typing Indicators** | See when someone is typing a message in real time |
-
-![Message Features](/assets/modules/chat/message-features.png)
-
-## Online Presence
-
-The chat module tracks online presence for all team members. A green status indicator appears next to users who are currently connected. Presence updates are broadcast via WebSocket, so the status changes in real time as team members come online or go offline.
-
-## Shared Files
-
-The **Shared Files** panel provides a consolidated view of every file shared across a conversation. Instead of scrolling through the message history, you can browse all shared files in one place, filtered by file type.
-
-## Task: Create a group chat
-
-1. Click the **Create Group** button in the chat sidebar.
-2. Enter a **group name** and an optional description.
-3. Select the team members you want to include as participants.
-4. Optionally upload a **group avatar** image.
-5. Click **Create** to finalize the group.
-
-**Expected outcome:** The new group chat appears in the chat sidebar and is ready for messaging.
+There are plenty of good chat tools in the world. What makes VOLT Chat worth having is that it shares team scope, permissions, and runtime context with the rest of the platform. If you are discussing a trajectory, an analysis result, or a LaTeX draft, you are already in the same system that owns the resource.
 
 <Callout type="info">
-All chat data — messages, files, and metadata — is stored on your team's cluster. The VOLT server relays messages in real time but does not retain them.
+Presence and conversation state are team-scoped. When you switch teams, Chat follows that boundary and loads the conversation graph for the new workspace.
 </Callout>

@@ -1,95 +1,115 @@
 ---
 title: Getting Started
-description: Learn how to set up and start using VOLT.
+description: Learn how VOLT fits together and how to get your first team online.
 ---
 
 ## What's VOLT?
 
 ![Introducing VOLT](/assets/getting-started/introducing-volt.png)
 
-VOLT is a web platform for **materials science research teams** running LAMMPS molecular dynamics simulations. If you spend your day writing LAMMPS input scripts, visualizing atomic trajectories, and analyzing simulation results, VOLT centralizes that workflow into a single collaborative environment.
+VOLT is a collaborative platform for materials science teams working with LAMMPS simulations. It brings together the parts of the workflow that usually end up scattered across desktops, scripts, shared drives, notebooks, and cluster terminals: trajectory processing, analysis, notebooks, LaTeX writing, containers, team coordination, and infrastructure.
 
-### Who VOLT is for
+If you mostly think in terms of dumps, timesteps, defect analysis, notebooks, and papers, VOLT is designed to feel like a workspace built around that reality rather than a generic file manager with a 3D viewer attached.
 
-- Graduate students and postdocs running MD simulations.
-- Research groups that need to share trajectories, results, and publications.
-- Teams that want one-click analysis without managing local tool installations.
+### Who it is for
 
-### What you can do
+- Research groups running molecular dynamics workloads on laptops, workstations, or lab servers.
+- Students and postdocs who need to move from raw trajectories to figures, tables, and papers without stitching together five different tools.
+- Teams that want shared infrastructure without handing their simulation data over to a centralized cloud service.
 
-- **Visualize trajectories** — Render LAMMPS dumps in an interactive 3D viewer supporting 100M+ atoms. Scrub frames, inspect atoms, apply color coding, and filter particles.
-- **Run analyses** — Execute analysis plugins (Coordination Analysis, DXA, Grain Segmentation, etc.) on your trajectories with a few clicks. Results include tables, charts, and 3D models.
-- **Write publications** — Use the built-in collaborative LaTeX editor with live compilation, figure generation, and AI assistance.
-- **Script custom workflows** — Create Jupyter notebooks with a full scientific Python stack (`numpy`, `scipy`, `matplotlib`, `pandas`, `voltsdk`, `ovito`, `ase`, `pymatgen`, `MDAnalysis`, and more) for post-processing beyond built-in plugins.
-- **Deploy containers** — Spin up Docker containers on your clusters to run LAMMPS simulations or host custom tools.
-- **Import from HPC** — Pull trajectory files from remote servers over SSH without manual downloads.
-- **Collaborate in real time** — Chat, whiteboards, shared trajectories, and team management with role-based access.
-- **Use AI across the platform** — Connect any of 13 AI providers (OpenAI, Anthropic, Google, etc.) and use Volt AI's 71 tools to manage resources with natural language.
+### What you can do inside VOLT
+
+Instead of treating simulation work as a series of disconnected steps, VOLT keeps the whole loop in one place. You can upload a trajectory, wait for it to be parsed and preprocessed, open it in the 3D viewer, run an analysis plugin, inspect the resulting listings or 3D overlays, then jump into a notebook or a LaTeX document without changing context.
+
+Along the way, you can also:
+
+- connect one or more team clusters,
+- import data from remote machines over SSH,
+- run custom Docker containers,
+- automate workflows with Volt AI or the SDKs,
+- and collaborate through chat, whiteboards, notifications, and shared team roles.
 
 ### What VOLT is not
 
-VOLT is not a replacement for OVITO, VMD, or other standalone visualization tools. Those tools focus on desktop trajectory visualization and analysis. VOLT includes visualization and analysis as modules within a broader platform that also handles collaboration, publishing, scripting, and infrastructure management. Think of it as a "Microsoft Office for materials science" — just because it has a presentation tool doesn't make it Canva.
+VOLT is not trying to replace every specialist tool in the field. It does not position itself as a desktop-first alternative to OVITO or VMD. Instead, it wraps visualization and analysis into a larger system that also handles storage, orchestration, automation, collaboration, and publishing.
 
-### Key concepts
+That difference matters. In VOLT, a trajectory is not just something you open locally. It is part of a team workspace with cluster-backed processing, reusable analysis results, notebooks, access control, AI tooling, and a paper-writing flow living next to it.
+
+### Key ideas that make the platform click
 
 | Concept | Meaning |
 |---|---|
-| **Team** | A workspace that owns trajectories, clusters, members, and settings. You can create multiple teams. |
-| **Cluster** | A machine (your laptop, a server, etc.) that stores your data and runs analyses. Each team needs at least one. |
-| **Trajectory** | A LAMMPS simulation file (dump or data) that VOLT parses, stores, and renders into an interactive 3D model. |
-| **Plugin** | An analysis workflow made of connected nodes. Plugins run on your cluster and produce exposures. |
-| **Exposure** | An output file produced by a plugin — tables, charts, or 3D models viewable in the platform. |
+| **Team** | Your workspace. Teams own trajectories, clusters, notebooks, containers, LaTeX documents, and permissions. |
+| **Cluster** | A machine connected to a team. It runs the daemon and the local services that store data and execute heavy work. |
+| **Trajectory** | A processed simulation dataset. Once uploaded, VOLT extracts metadata, simulation cells, frame dumps, GLB models, and previews. |
+| **Plugin** | A node-based analysis workflow that eventually executes one or more scientific binaries on your cluster. |
+| **Exposure** | A result produced by an analysis, usually as MessagePack data, charts, or derived 3D outputs. |
+| **Scene artifact** | A 3D layer you can toggle in the viewer, such as color coding, a filtered subset, or a plugin-generated model. |
 
-### How it works
+### How the system is arranged
 
-VOLT itself does not store your simulation data. Everything lives on your team's clusters. The VOLT server acts as a real-time proxy — when you request data through the UI, it forwards the request to the appropriate cluster. This makes the platform horizontally scalable: need more resources, just connect another cluster.
+The important thing to know early is that VOLT is not built around centralizing your simulation files on the product server. Your team's cluster is where the real work happens. The platform server coordinates users, teams, auth, APIs, and real-time updates, but the daemon on your cluster handles processing, file access, notebook runtime, plugin execution, previews, and storage.
 
-## Creating your VoltID
+That design is why the platform can scale from a personal machine to a dedicated server setup without changing the mental model. When you need more compute or storage, you add or upgrade clusters rather than migrating your workflow into a different product tier.
 
-Go to [app.voltcloud.dev/auth/sign-in](https://app.voltcloud.dev/auth/sign-in) to get started.
-You can sign in using your **Google**, **GitHub**, or **Microsoft** account.
-If you prefer not to use any of those options, you can enter your email address and continue. If an account already exists with that email, you'll be asked for your password — otherwise, you'll be prompted to fill in your details to create a new account.
+## Create your VoltID
+
+Go to [app.voltcloud.dev/auth/sign-in](https://app.voltcloud.dev/auth/sign-in) to create or access your account.
+
+You can sign in with **Google**, **GitHub**, or **Microsoft**. If you prefer email, VOLT also supports a direct email flow that either signs you in or guides you through account creation depending on whether the address already exists.
 
 ![Sign in page](/assets/getting-started/sign-in.png)
 
-## Onboarding
+## Your first team
 
-### Team Creation
-
-After creating your account, the first step is to create a team. A team is your **workspace** — it owns your trajectories, clusters, analyses, and members.
+After signing in, the first thing VOLT asks for is a team. That is because almost everything in the platform is team-scoped: trajectories, clusters, analyses, chats, notebooks, roles, and AI integrations all belong to a team.
 
 ![Team creation](/assets/getting-started/onboarding-team-creation.png)
 
-You can rename your team later, and you can create additional teams at any time.
+You can rename the team later, create additional teams for other projects, and invite collaborators once the workspace is ready.
 
-### Connecting a Cluster
+## Connect your first cluster
 
-A cluster can be your personal computer, a spare machine, or a dedicated server.
-Each team must have at least one cluster.
+A team is only half of the setup. To actually process trajectories and run analyses, you need at least one connected cluster.
+
+A cluster can be:
+
+- your own laptop,
+- a workstation in the lab,
+- or a dedicated Linux server.
 
 ![Connect a cluster](/assets/getting-started/onboarding-connect-cluster.png)
 
-After selecting your cluster type, assign it a name:
+After choosing the cluster type, assign it a name and copy the install command VOLT gives you.
 
 ![Cluster name](/assets/getting-started/onboarding-cluster-name.png)
 
-Finally, run the provided command in your terminal. If you selected **server**, run the command via SSH on your server. If you're using your **personal computer**, open a terminal and run it there.
+Run that command on the target machine. Under the hood, the installation bootstraps the daemon and the local services the team needs, then enrolls the machine with your workspace.
 
 ![Cluster command](/assets/getting-started/onboarding-cluster-command.png)
 
 <Callout type="warn">
-On Windows, make sure to open the terminal with **administrator privileges**. The command will install Docker — if the installation fails, try [installing Docker manually](https://docs.docker.com/get-started/get-docker/).
+On Windows, open the terminal with administrator privileges. The installer may need to set up Docker before the cluster can connect.
 </Callout>
 
 ![Running the cluster command](/assets/getting-started/onboarding-cluster-command-run.png)
 
-Once the command finishes, you're all set to start using VOLT.
+Once the daemon starts sending heartbeats, the cluster moves from waiting to connected and the rest of the platform comes alive.
 
 ![Cluster connected](/assets/getting-started/onboarding-cluster-connected.png)
 
-## Optional: Downloading VOLT
+## What happens next
 
-You can use VOLT directly from your browser. There is also a desktop app with identical functionality — some people simply prefer a dedicated window.
+Once your team and cluster are ready, the normal path looks like this:
+
+1. upload a trajectory,
+2. let VOLT parse and preprocess it,
+3. open the viewer and inspect frames,
+4. run one or more analysis plugins,
+5. explore the results as listings, charts, or 3D artifacts,
+6. move into notebooks, LaTeX, or AI-assisted workflows as needed.
+
+If you want a desktop window instead of the browser, you can also install the client app.
 
 | Platform | Download |
 |---|---|
@@ -98,12 +118,12 @@ You can use VOLT directly from your browser. There is also a desktop app with id
 | **Linux (Debian-based)** | [VoltClient-Latest.deb](https://repo.voltcloud.dev/releases/linux/debian/VoltClient-Latest.deb) |
 | **Linux (AppImage)** | [VoltClient-Latest.AppImage](https://repo.voltcloud.dev/releases/linux/VoltClient-Latest.AppImage) |
 
-## What's Next?
+## Where to go from here
 
 <Cards>
-  <Card title="Modules Overview" href="/docs/modules" description="Explore all platform modules organized by function." />
-  <Card title="Plugin System" href="/docs/plugins" description="Learn how analysis plugins work and what's available." />
-  <Card title="Architecture" href="/docs/architecture" description="Understand how VOLT's server, clusters, and real-time layer connect." />
-  <Card title="Self-Hosting" href="/docs/self-hosting" description="Deploy your own VOLT instance." />
-  <Card title="Open Source Ecosystem" href="/docs/open-source" description="Browse the open-source tools and algorithms behind VOLT." />
+  <Card title="Modules Overview" href="/docs/modules" description="See how the workspace is organized and where each part of the workflow lives." />
+  <Card title="Architecture" href="/docs/architecture" description="Understand how the app, the daemon, storage, and the runtime layers fit together." />
+  <Card title="Plugin System" href="/docs/plugins" description="Learn how analysis workflows, binaries, exposures, and exports work." />
+  <Card title="Open Source Ecosystem" href="/docs/open-source" description="Explore the tools, SDKs, and scientific repositories behind VOLT." />
+  <Card title="Self-Hosting" href="/docs/self-hosting" description="Run the stack on your own infrastructure and understand the moving parts." />
 </Cards>

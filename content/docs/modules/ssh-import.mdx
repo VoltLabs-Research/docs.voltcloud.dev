@@ -1,75 +1,66 @@
 ---
 title: SSH Import
-description: Import trajectory files from remote servers over SSH.
+description: Connect to remote machines over SSH and bring trajectory data closer to your team workspace.
 ---
 
 <Callout type="info">
-**TL;DR** — Connect to remote servers via SSH, browse their file system, and import LAMMPS files directly into VOLT. The entire download-parse-render pipeline runs automatically on your cluster.
+**TL;DR** -- SSH Import stores reusable SSH connections for your team and lets you browse remote directories from VOLT. The import runtime is built to pull simulation data into the cluster-side processing pipeline instead of making you download and re-upload files manually.
 </Callout>
 
 ## Overview
 
-The SSH Import module lets you connect to remote servers — HPC clusters, lab workstations, or any machine accessible via SSH — and import trajectory files directly into VOLT. Instead of manually downloading files and re-uploading them, you browse the remote file system from the VOLT interface and start the import with a single click.
+SSH Import is meant for the common case where the data you need is already sitting on another machine: an HPC cluster, a lab server, or a workstation with large dumps you do not want to move by hand.
+
+Instead of treating that remote machine as a separate workflow, VOLT lets you save the connection details once, test them, and explore the remote filesystem from inside the workspace.
 
 ![SSH Import Overview](/assets/overviews/overviews_ssh-import.png)
 
-## SSH Connections
+## SSH connections
 
-To import files, you first need to add an SSH connection. Go to the **SSH Import** section from the sidebar and click **Add Connection**.
+Each saved connection stores the basic credentials needed to open an SSH and SFTP session.
 
 | Field | Description |
 |---|---|
-| **Name** | A descriptive label for this connection (e.g., "Lab HPC Cluster") |
-| **Host** | The hostname or IP address of the remote server |
-| **Port** | The SSH port (defaults to 22) |
-| **Username** | Your SSH username on the remote server |
-| **Password** | Your SSH password — encrypted before storage |
+| **Name** | A label the team can recognize later |
+| **Host** | Remote hostname or IP address |
+| **Port** | SSH port, usually `22` |
+| **Username** | Remote login name |
+| **Password** | Stored encrypted and used by the import runtime |
 
 ![Add Connection](/assets/modules/ssh-import/add-connection.png)
 
 <Callout type="info">
-SSH passwords are encrypted using AES-256-GCM before being stored. The encryption key is configured at the server level and never leaves your infrastructure.
+The platform stores SSH passwords in encrypted form, and the daemon needs the server-side encryption key to decrypt them when an import job runs.
 </Callout>
 
-## Testing a Connection
+## Testing and browsing
 
-After adding a connection, you can click **Test** to verify that VOLT can successfully establish an SSH session with the remote server. The test checks authentication and basic connectivity — if it fails, you will see an error message describing the issue.
+After saving a connection, the first useful step is usually to test it. That confirms the credentials and the basic network path before you commit to an import.
 
-## File Explorer
+From there, the file explorer lets you navigate directories and inspect what is available remotely.
 
-Once a connection is verified, click **Browse** to open the remote file explorer. You can navigate directories, view file names and sizes, and select the files or folders you want to import.
+Today, this explorer is best thought of as a browsing surface rather than a full remote file manager. It is there to help you locate the data and verify the path.
 
-- **Directory Navigation**: Click on any folder to navigate into it. Use the breadcrumb bar at the top to jump back to a parent directory.
-- **File Selection**: Select one or more LAMMPS dump files, data files, or compressed archives for import.
+## How the import pipeline works
 
-![File Explorer](/assets/modules/ssh-import/file-explorer.png)
+Once an import job is triggered, the daemon on your team cluster takes over. It opens the remote session, downloads the selected file or directory into temporary workspace storage, extracts archives when needed, parses the trajectory metadata, compresses and uploads the resulting dumps into MinIO, and kicks off GLB preprocessing so the trajectory can become viewable inside VOLT.
 
-## Importing Files
+That is the important shift: SSH Import is not just a downloader. It is an alternate front door into the same trajectory pipeline used by normal uploads.
 
-When you select files and click **Import**, VOLT triggers an automated pipeline that runs entirely on your cluster:
+## Supported data shapes
 
-1. **SSH Connect** — The cluster daemon connects to the remote server using the stored (encrypted) credentials.
-2. **Download** — The selected files are downloaded to a temporary working directory on the cluster.
-3. **Extract** — If the files are compressed (`.gz`, `.zip`, `.tar.gz`), they are automatically extracted.
-4. **Parse** — Each dump file is parsed to extract LAMMPS metadata — timestep, atom count, simulation cell geometry, and per-atom properties.
-5. **Upload to Storage** — Parsed frames are compressed and uploaded to MinIO object storage on the cluster.
-6. **Render GLB** — 3D models are generated for each frame so the trajectory can be viewed immediately.
-7. **Register** — The trajectory is registered in the platform with full metadata and becomes available in the trajectory listing.
+The runtime is built around LAMMPS-oriented inputs such as dump files, data files, and archives that contain them. If the selected input expands into multiple valid simulation files, the daemon processes them as part of the same import workflow.
 
-The entire process runs as a background job. You can monitor its progress from the [Jobs](/docs/modules/analysis) panel.
+## Current product reality
+
+One thing worth knowing is that the remote-browsing and connection-management experience is more visible in the current UI than the import action itself. The backend and daemon runtime clearly support queue-based trajectory import over SSH, but the workflow may feel more operational than polished depending on which part of the product you are using.
+
+That does not make the module less valuable. It just means it helps to think of SSH Import as a runtime capability first and a UI surface second.
+
+## Why teams use it
+
+SSH Import is most useful when your cluster-side workflow already lives near a remote machine. It avoids the common pattern of pulling huge files down to a laptop just to push them back into another system moments later.
 
 <Callout type="info">
-SSH Import supports LAMMPS dump files (`.dump`, `.lammpstrj`), LAMMPS data files (`.data`), and compressed archives containing these formats.
+Imported trajectories still end up in the normal [Trajectories](/docs/modules/trajectories) and [Analysis & Jobs](/docs/modules/analysis) flow once processing finishes.
 </Callout>
-
-## Task: Import a trajectory from a remote server
-
-1. Go to the **SSH Import** section from the sidebar.
-2. Click **Add Connection** and fill in the host, port, username, and password for the remote server.
-3. Click **Test** to verify the connection succeeds.
-4. Click **Browse** to open the remote file explorer.
-5. Navigate to the directory containing your dump file and select it.
-6. Click **Import** to start the automated pipeline.
-7. Open the **Jobs** panel to monitor download, parsing, and upload progress.
-
-**Expected outcome:** The trajectory appears in the trajectory listing with full metadata, frames, and 3D models ready for viewing.

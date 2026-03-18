@@ -1,51 +1,34 @@
 ---
 title: Notifications
-description: Real-time notification system for trajectory, analysis, and team events.
+description: Follow important user-scoped events across the workspace in real time.
 ---
 
 ## Overview
 
-The Notifications module delivers real-time alerts for important events across the platform. Notifications are pushed to your browser via WebSocket the moment they occur — no need to refresh or poll. Each notification is scoped to your user account, so you only see events relevant to you.
+Notifications give you a personal event stream for the things you are likely to care about: completed trajectory processing, analysis outcomes, invitations, and other workspace events that should not require constant manual checking.
 
 ![Notifications Overview](/assets/overviews/overviews_notifications.png)
 
-## Notification Popover
+The important detail is that notifications are user-scoped, not just team-scoped. Two people in the same team can share the same workspace but still see their own feed and unread state.
 
-Notifications are accessible from the **bell icon** in the top navigation bar. A badge displays the number of unread notifications. Click the bell to open the popover, which lists your recent notifications with unread items visually highlighted.
+## Popover and unread state
 
-![Notification Popover](/assets/modules/notifications/notification-popover.png)
+The notification experience is intentionally lightweight. A bell icon in the top navigation opens the recent feed, highlights unread items, and gives you a quick path into the linked resource when a notification carries one.
 
-Each notification shows a title, content summary, and timestamp. If the notification is linked to a resource (e.g., a completed trajectory or a team invitation), clicking it navigates you directly to that resource.
+That makes the module useful as a layer of gentle awareness rather than a destination page you have to actively monitor.
 
-## Notification Events
+## What kinds of events appear here
 
-The platform generates notifications for the following events:
+In practice, notifications tend to cluster around a few moments in the workflow: long-running work finishing, imports succeeding or failing, and team-level events that need your attention.
 
-| Event | Description |
-|---|---|
-| **Trajectory Completed** | A trajectory has finished processing and is ready for viewing |
-| **Trajectory Failed** | A trajectory encountered an error during processing |
-| **Analysis Completed** | An analysis plugin has finished processing all frames |
-| **Analysis Failed** | An analysis encountered errors during execution |
-| **SSH Import Completed** | A trajectory has been successfully imported from a remote server |
-| **SSH Import Failed** | An SSH import job encountered an error |
-| **Team Invitation** | You have been invited to join a team |
+Examples include trajectory completion, analysis completion or failure, SSH import updates, and invitations into a workspace.
 
-## Managing Notifications
+## Managing the feed
 
-- **Mark All as Read**: Click the **Mark all as read** button in the notification popover to clear all unread indicators at once.
-- **Click to Navigate**: Click any notification with a link to navigate directly to the relevant resource — the notification is automatically marked as read.
+The current interaction model is simple on purpose. You open the popover, scan what is new, follow the links that matter, and mark everything as read when you are done.
 
-## Task: Review and clear notifications
-
-1. Click the **bell icon** in the top navigation bar to open the notification popover.
-2. Read through the listed notifications, noting any unread items highlighted.
-3. Click a notification linked to a resource to navigate directly to it.
-4. Return to the notification popover and click **Mark all as read**.
-5. Verify the unread badge on the bell icon clears.
-
-**Expected outcome:** All notifications are marked as read and the badge indicator is removed from the bell icon.
+That fits the role notifications play in VOLT: they are there to keep you oriented, not to become another inbox to maintain.
 
 <Callout type="info">
-Notifications are scoped to your user account. When you connect to the platform, you are automatically joined to your personal notification channel — no configuration required.
+Notifications arrive through the real-time layer and are associated with your account automatically. There is no separate subscription setup required.
 </Callout>

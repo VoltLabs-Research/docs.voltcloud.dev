@@ -1,70 +1,67 @@
 ---
 title: Dashboard
-description: A centralized overview of metrics, activity, team presence, and quick actions.
+description: "The operational home for your team: metrics, activity, jobs, search, and quick actions."
 ---
 
 <Callout type="info">
-**TL;DR** — The Dashboard is your landing screen. It shows team metrics, cluster health, recent analyses, quick actions, global search, and a 3D trajectory preview — all updating in real time.
+**TL;DR** -- The dashboard is not just a welcome screen. It is the place where you get a quick read on the team, jump into the next task, and see what is already moving across trajectories, clusters, jobs, chats, and notifications.
 </Callout>
 
 ## Overview
 
-The Dashboard is the first screen you see when you open VOLT. It provides a high-level summary of your team's activity — trajectory counts, analysis progress, cluster health, recent work, and quick access to common actions. Everything updates in real time as your team works.
+When you land on the dashboard, VOLT is trying to answer a practical question: what is happening in this team right now, and what do you probably want to do next?
 
-## Metrics Overview
+That is why the page mixes metrics, recent work, quick actions, search, cluster health, presence, and a live trajectory preview. It is meant to feel like a control room for the workspace rather than a static home page.
 
-The top of the dashboard displays metric cards for key resources: trajectories, analyses, containers, and plugins. Each card shows the current count and a sparkline chart illustrating the weekly trend so you can see whether activity is increasing or decreasing at a glance.
+## What you see first
 
-![Metrics Cards](/assets/modules/dashboard/metrics-cards.png)
+The metric cards at the top give you a fast sense of how active the team is. They track major resource groups such as trajectories, analyses, containers, and plugins, and pair the current counts with short trend lines so you can spot whether activity is ramping up or cooling down over the last week.
 
-## Cluster Health
+One of the cards rotates through additional metrics over time, so the top row surfaces more than a fixed set of counters.
 
-The Cluster Health panel shows the status of your team's connected clusters. It displays gauges for CPU utilization, RAM consumption, and connection status. If a cluster goes offline or a service becomes unhealthy, the dashboard reflects the change immediately.
+## Cluster health without leaving the page
 
-![Cluster Health](/assets/modules/dashboard/cluster-health.png)
+The dashboard also keeps one eye on infrastructure. The cluster health area reflects heartbeat and resource data coming back from connected team clusters, including CPU, memory, and service availability.
+
+That makes the page especially useful when jobs feel slow or a trajectory is stuck in processing. You do not have to jump straight into the cluster detail view to see whether the team is short on resources or waiting for a machine to reconnect.
 
 ## Quick Actions
 
-Quick Actions provide one-click shortcuts to common workflows:
+Quick Actions are there for the things people do repeatedly. Instead of navigating through the sidebar each time, you can start a trajectory upload, create a container, open Scripting, or begin a Volt AI conversation directly from the dashboard.
 
-- Upload a new trajectory
-- Create a new container
-- Open the Scripting workspace
-- Start a new Volt AI conversation
+## Recent work and team activity
 
-## Recent Activity
+The middle of the page helps you re-enter context. You can usually tell what the team has been doing without opening five separate modules.
 
-### Recent Analyses
+- **Recent analyses** surface the latest plugin runs, along with plugin names, linked trajectories, and status.
+- **In-app activity** gives you a more general live pulse of work happening around the workspace.
+- **Notifications** show a compact feed of recent personal events such as completed analyses, team invitations, or import results.
 
-A chronological list of the latest analyses run by your team, showing the plugin name, trajectory, status, and completion time.
+## Presence and search
 
-### In-App Activity
+The dashboard is also where VOLT feels most collaborative. Team presence tells you who is currently online, and the global search bar lets you search across several resource types from one place.
 
-The In-App Activity panel displays real-time actions happening across the platform, giving you a live pulse of what your team is working on.
-
-## Team Presence
-
-The Team Presence section shows which team members are currently online. Each member's avatar and name are displayed, with a real-time indicator of their connection status.
-
-## Notifications Feed
-
-The dashboard includes a compact notifications feed showing your most recent unread notifications — analysis completions, team invitations, SSH import results, and more. Click a notification to navigate to the relevant resource.
-
-## Global Search
-
-The Global Search bar at the top of the dashboard lets you search across multiple resource types simultaneously.
-
-| Resource Type | What It Searches |
+| Resource Type | What It Covers |
 |---|---|
-| **Trajectories** | Trajectory names and metadata |
-| **Analyses** | Analysis names and linked trajectories |
+| **Trajectories** | Trajectory names and related metadata |
+| **Analyses** | Analysis records and linked trajectories |
 | **Containers** | Container names and images |
-| **Teams** | Team names |
+| **Teams** | Team names, including team switching results |
 | **Plugins** | Plugin names and descriptions |
-| **Chats** | Chat names and group names |
+| **Chats** | Direct and group conversation names |
 
-Type your query and results appear instantly, grouped by resource type. Click any result to navigate directly to it.
+Because search is federated, it works best as a way to jump into a known resource quickly instead of browsing a full dataset.
 
-## Trajectory Preview
+## Embedded trajectory preview
 
-If your team has at least one completed trajectory, the dashboard shows a 3D preview card with an interactive thumbnail of the simulation. Click it to open the full trajectory viewer.
+If the team already has processed data, the dashboard can also surface a trajectory preview card. That gives you a visual entry point back into recent simulation work and makes the page feel connected to the scientific workflow, not just the admin side of the product.
+
+## When the dashboard is most useful
+
+The page tends to matter most in three situations:
+
+- when you are joining a busy team workspace and want instant context,
+- when you are monitoring whether uploads or analyses are progressing,
+- or when you want to jump into the next action without hunting through the sidebar.
+
+In other words, the dashboard is less about deep work and more about orientation. It helps you decide where to go next.

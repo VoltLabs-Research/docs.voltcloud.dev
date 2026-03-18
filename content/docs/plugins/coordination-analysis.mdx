@@ -1,18 +1,26 @@
 ---
 title: Coordination Analysis
-description: Compute coordination numbers and nearest neighbor statistics for each atom.
+description: Count neighbors within a cutoff and compute a radial distribution function for the frame.
 ---
 
 ## Overview
 
-Coordination Analysis computes coordination numbers and nearest neighbor statistics for each atom. It analyzes local atomic environments and detects under/over-coordinated atoms, which can indicate defects or surface sites.
+Coordination Analysis is one of the simplest and most useful baseline plugins in the catalog. It counts how many neighbors each atom has inside a chosen cutoff and, at the same time, computes a radial distribution function for the full system.
+
+That makes it a good first pass when you want a quick read on local environment and global pair structure without jumping immediately into a heavier structural workflow.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `cutoff` | `float` | `3.2` | Cutoff radius for neighbor search. |
-| `rdfBins` | `int` | `500` | Number of bins for radial distribution function (RDF) calculation. |
+| `rdfBins` | `int` | `500` | Number of bins for RDF calculation. |
+
+## Practical notes
+
+- The plugin reports coordination counts and a global RDF. It does not separately label atoms as under-coordinated or over-coordinated for you.
+- This is a strong quick-look tool, but a deliberately lightweight one.
+- The RDF is normalized using the simulation-cell volume, so sensible cell metadata matters.
 
 ## Output
 
@@ -28,9 +36,7 @@ interface CoordinationOutput {
     main_listing: {
         cutoff: float;
         rdf: {
-            // radial distance bins
             x: float[];
-            // RDF values per bin
             y: float[];
         };
     };
@@ -40,5 +46,5 @@ interface CoordinationOutput {
 
 ## See Also
 
-- [Structure Identification](/docs/plugins/structure-identification) — identify crystal structures alongside coordination analysis
-- [Cluster Analysis](/docs/plugins/cluster-analysis) — group atoms by connectivity
+- [Structure Identification](/docs/plugins/structure-identification) — local crystal labels alongside neighbor information
+- [Cluster Analysis](/docs/plugins/cluster-analysis) — connectivity-based grouping

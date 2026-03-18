@@ -1,74 +1,86 @@
 ---
 title: Open Source Ecosystem
+description: A map of the repositories, tools, SDKs, and scientific code that make up the broader VOLT stack.
 ---
 
-## Philosophy
-We've built an entire open-source ecosystem around VOLT. 
+## Overview
 
-We believe in transparency, collaboration, and giving back to the community.
-Science, or rather, human knowledge, has always advanced on the foundation of others' work. And this is our contribution to making the world a better place.
+The open-source side of VOLT makes more sense when you stop looking at it as a flat list of repositories.
 
-## VOLT Labs Ecosystem
+It is really a layered ecosystem. Some repositories implement scientific algorithms, some provide the native infrastructure that the daemon relies on, some expose SDKs for automation, and some are the applications your team interacts with directly.
 
-| Repository | Description | Links |
+That is why the docs site sits next to all of them. It is documenting a stack, not a single repo.
+
+## The ecosystem in layers
+
+### Foundational tools
+
+These repositories provide the shared runtime and native capabilities the rest of the ecosystem builds on.
+
+| Repository | Role | Links |
 |---|---|---|
-| **SpatialAssembler** | Volt's 3D model assembler. Also available on npm: `npm install @voltstack/spatial-assembler` | [GitHub](https://github.com/VoltLabs-Research/SpatialAssembler) · [npm](https://www.npmjs.com/package/@voltstack/spatial-assembler) |
-| **HeadlessRasterizer** | Rasterize GLB models without a browser! Also available on npm: `npm install @voltstack/headless-rasterizer` | [GitHub](https://github.com/VoltLabs-Research/HeadlessRasterizer) · [npm](https://www.npmjs.com/package/@voltstack/headless-rasterizer) |
-| **CoreToolkit** | Core C++ library providing math primitives (Vector3, Matrix3, Quaternion), spatial data structures (KD-trees, octrees), simulation cell handling, and parallel a… | [GitHub](https://github.com/VoltLabs-Research/CoreToolkit) |
-| **LammpsIO** | High-performance parser & utilities for LAMMPS trajectory frames. Also available on npm: `npm install @voltstack/lammps-io` | [GitHub](https://github.com/VoltLabs-Research/LammpsIO) · [npm](https://www.npmjs.com/package/@voltstack/lammps-io) |
-| **VoltSDK** | The SDK to interact with the Volt APIs. Available on npm: `npm install @voltstack/voltclient` and PyPI: `pip install voltsdk` | [GitHub](https://github.com/VoltLabs-Research/VoltSDK) · [npm](https://www.npmjs.com/package/@voltstack/voltclient) · [PyPI](https://pypi.org/project/voltsdk/) |
-| **ClusterDaemon** | The compute node for your Volt Team! Also available on npm: `npm install @voltstack/daemon-cluster-client` | [GitHub](https://github.com/VoltLabs-Research/ClusterDaemon) · [npm](https://www.npmjs.com/package/@voltstack/daemon-cluster-client) |
-| **Volt** | The next-generation platform designed for high-performance research teams and enthusiastic materials scientists! | [GitHub](https://github.com/VoltLabs-Research/Volt) |
-| **docs.voltcloud.dev** | Docs for VOLT Labs Open-Source Software Ecosystem. | [GitHub](https://github.com/VoltLabs-Research/docs.voltcloud.dev) |
+| **CoreToolkit** | Shared C++ foundation for math, geometry, simulation-cell handling, serialization, and analysis helpers used by scientific plugins | [GitHub](https://github.com/VoltLabs-Research/CoreToolkit) |
+| **LammpsIO** | High-performance native parser for LAMMPS-oriented data used by the daemon | [GitHub](https://github.com/VoltLabs-Research/LammpsIO) · [npm](https://www.npmjs.com/package/@voltstack/lammps-io) |
+| **SpatialAssembler** | Native GLB assembly for turning structured outputs into 3D assets | [GitHub](https://github.com/VoltLabs-Research/SpatialAssembler) · [npm](https://www.npmjs.com/package/@voltstack/spatial-assembler) |
+| **HeadlessRasterizer** | Native raster pipeline for turning GLB assets into PNG previews | [GitHub](https://github.com/VoltLabs-Research/HeadlessRasterizer) · [npm](https://www.npmjs.com/package/@voltstack/headless-rasterizer) |
 
-### Foundational Algorithms 
-| Repository | Description | Links |
+### SDKs and integration tools
+
+These repositories are what you reach for when you want to automate VOLT from code instead of only through the UI.
+
+| Repository | Role | Links |
 |---|---|---|
-| **OpenDXA** | A modified DXA! Supports multiple structure identification methods including PTM, CNA, and Diamond structure analysis. Identifies dislocation lines, computes Bu… | [GitHub](https://github.com/VoltLabs-Research/OpenDXA) |
-| **GrainSegmentation** | Algorithms for detects and segments grain boundaries in polycrystalline materials. Identifies individual grains, computes grain orientations, and extracts grain… | [GitHub](https://github.com/VoltLabs-Research/GrainSegmentation) |
-| **ElasticStrain** | Computes elastic strain tensors by mapping local atomic environments to reference crystal structures. Separates elastic from plastic deformation and calculates … | [GitHub](https://github.com/VoltLabs-Research/ElasticStrain) |
-| **DisplacementsAnalysis** | Calculates atomic displacement vectors between reference and deformed configurations. Tracks atom movements, identifies displaced atoms, and computes displaceme… | [GitHub](https://github.com/VoltLabs-Research/DisplacementsAnalysis) |
-| **CoordinationAnalysis** | Computes coordination numbers and nearest neighbor statistics for each atom. Analyzes local atomic environments and detects under/over-coordinated atoms indicat… | [GitHub](https://github.com/VoltLabs-Research/CoordinationAnalysis) |
-| **CentrosymmetryParameter** | Calculates the centrosymmetry parameter (CSP) for each atom to detect point defects, surfaces, and dislocation cores. Useful for visualizing crystal defects in … | [GitHub](https://github.com/VoltLabs-Research/CentrosymmetryParameter) |
-| **AtomicStrain** | Computes per-atom strain tensors from atomic configurations. Calculates Green-Lagrangian strain, von Mises strain, and principal strains for deformation analysi… | [GitHub](https://github.com/VoltLabs-Research/AtomicStrain) |
-| **StructureIdentification** | Algorithms for crystal structure identification in atomistic simulations. Classifies atoms by local structural environment to detect BCC, FCC, HCP, diamond cubi… | [GitHub](https://github.com/VoltLabs-Research/StructureIdentification) |
-| **ClusterAnalysis** | Groups particles into clusters based on distance cutoff or bond topology. Identifies connected components, computes cluster sizes, centers of mass, and gyration… | [GitHub](https://github.com/VoltLabs-Research/ClusterAnalysis) |
+| **VoltSDK** | TypeScript and Python client libraries for talking to VOLT APIs, reading analysis results, and integrating with external workflows | [GitHub](https://github.com/VoltLabs-Research/VoltSDK) · [npm](https://www.npmjs.com/package/@voltstack/voltclient) · [PyPI](https://pypi.org/project/voltsdk/) |
+| **ClusterDaemon client** | WebSocket client used by the daemon to connect into the control plane | [GitHub](https://github.com/VoltLabs-Research/ClusterDaemon) · [npm](https://www.npmjs.com/package/@voltstack/daemon-cluster-client) |
 
-#### Disclaimer
+### Scientific algorithm repositories
 
-When you create a team in VOLT, a set of plugins is automatically uploaded to one of the team's available clusters. Each of these plugins runs the [Foundational Algorithms](#foundational-algorithms) under the hood.
+These are the scientific cores behind many of the plugins you run inside VOLT.
 
-For context, there are several tools on the market that allow you to analyze LAMMPS simulations. Some, like [mdapy](https://github.com/mushroomfire/mdapy), use the `ovito` library published on PyPI to programmatically interact with OVITO's modifiers through Python, as well as their own algorithms. OVITO is currently the most widely used tool in the field and, consequently, the most cited — so if you need a reliable reference to compare results against, OVITO is a solid choice.
+| Repository | What It Contributes | Links |
+|---|---|---|
+| **OpenDXA** | Dislocation analysis and related structural workflows | [GitHub](https://github.com/VoltLabs-Research/OpenDXA) |
+| **GrainSegmentation** | Grain and boundary segmentation algorithms | [GitHub](https://github.com/VoltLabs-Research/GrainSegmentation) |
+| **ElasticStrain** | Elastic strain calculations from local environments | [GitHub](https://github.com/VoltLabs-Research/ElasticStrain) |
+| **DisplacementsAnalysis** | Atomic displacement measurements between configurations | [GitHub](https://github.com/VoltLabs-Research/DisplacementsAnalysis) |
+| **CoordinationAnalysis** | Coordination-number and nearest-neighbor analysis | [GitHub](https://github.com/VoltLabs-Research/CoordinationAnalysis) |
+| **CentrosymmetryParameter** | CSP-based defect and local environment analysis | [GitHub](https://github.com/VoltLabs-Research/CentrosymmetryParameter) |
+| **AtomicStrain** | Per-atom strain calculations and related deformation metrics | [GitHub](https://github.com/VoltLabs-Research/AtomicStrain) |
+| **StructureIdentification** | Local structure classification and a building block used by other plugins | [GitHub](https://github.com/VoltLabs-Research/StructureIdentification) |
+| **ClusterAnalysis** | Clustering and connected-component style analysis over particles | [GitHub](https://github.com/VoltLabs-Research/ClusterAnalysis) |
 
-With that context in mind, the Foundational Algorithms (and by extension the Plugins) are built entirely using our own software ecosystem.
+### Applications
 
-<Callout type="info">
-It's important to know that when running something like **CoordinationAnalysis**, VOLT and OVITO produce exactly the same results. However, for more complex algorithms such as **OpenDXA** or **ElasticStrain**, you may observe differences compared to OVITO.
-</Callout>
+These are the repositories you interact with most directly as a user or operator.
 
-This does not necessarily mean the results are incorrect. There are several factors that can contribute to these differences:
+| Repository | Role | Links |
+|---|---|---|
+| **Volt** | Main collaborative application and workspace UI | [GitHub](https://github.com/VoltLabs-Research/Volt) |
+| **ClusterDaemon** | Runtime agent that executes analysis, notebooks, imports, previews, and remote operations on your infrastructure | [GitHub](https://github.com/VoltLabs-Research/ClusterDaemon) |
+| **docs.voltcloud.dev** | Documentation site for the ecosystem | [GitHub](https://github.com/VoltLabs-Research/docs.voltcloud.dev) |
 
-1. **VOLT's algorithms are not 1:1 replicas of OVITO's.** The algorithms are independently developed.
-2. **Compiler optimization flags** used in Release builds can introduce small numerical differences.
-3. **If point 2 occurs and the numerical difference is significant**, it may indicate undefined behavior (UB). During the development of OpenDXA, UB was encountered and took weeks to track down — it was caused by compiler optimizations applied to code that was technically correct.
-4. **VOLT's algorithms are parallelized using different libraries and implementations** than those used by OVITO. This shouldn't be a problem in general, but you may notice that after several runs of the same algorithm, results are not perfectly deterministic. This is expected if the differences are small.
-5. **In complex algorithms** like GrainSegmentation, OpenDXA, or structural identification methods such as CNA or PTM, even the smallest change — a sign flip, a single line of code — can have catastrophic effects. At one point, estimating the RMSD for DXA + PTM seemed like a good idea — it wasn't. Currently, the way cluster construction works in OpenDXA differs from OVITO's DislocationAnalysisEngine. While results are virtually identical when using CNA, we cannot guarantee the same level of accuracy when using PTM or other structural identification algorithms beyond "it makes sense because the algorithm classifies better than CNA."
+## How the pieces connect in practice
 
-The way we can ensure your confidence in the Foundational Algorithms is by providing benchmarks that compare VOLT's and OVITO's results for the same timestep. We're working on it! 🙂
+The easiest way to understand the ecosystem is to follow one analysis.
+
+You upload a trajectory in Volt. The daemon parses it with native tooling, stores the dumps and derived assets, then executes a scientific plugin binary built on top of shared libraries such as CoreToolkit. The results come back as structured data, and VOLT or the SDKs consume that data as listings, charts, or 3D artifacts.
+
+So the ecosystem is not a shelf of unrelated repos. It is a pipeline from raw simulation data to workspace-visible results.
+
+## A note on the scientific algorithms
+
+The foundational algorithms are developed independently and are not promised to be byte-for-byte replicas of OVITO or any other external implementation. In many cases the results line up closely, but for more involved algorithms you should expect implementation-specific behavior, parallelization differences, and the occasional numerical divergence that comes with independent scientific software.
+
+That does not make the outputs untrustworthy. It means they should be understood as part of a serious software stack with its own assumptions and engineering tradeoffs.
 
 ## Contributing
-We welcome contributions from the community! Whether it's fixing a bug, improving documentation, or proposing a new feature, your help is appreciated.
 
-1. **Fork** the repository you want to contribute to.
-2. **Create a branch** for your changes.
-3. **Submit a pull request** with a clear description of what you've done.
-
-Please make sure to read the `CONTRIBUTING.md` file in each repository for specific guidelines.
+Contributions are welcome across the ecosystem, but the kind of contribution matters. Documentation, SDK ergonomics, product improvements, and tooling are usually approachable entry points. The foundational algorithms are more specialized and deserve extra care, review, and domain understanding.
 
 <Callout type="warn">
-A set of AI-powered agents is available in the `.github` directory of the Volt repository. You can use them to develop new features or fix bugs with the help of artificial intelligence. However, **do not use AI for the Foundational Algorithms** — these are non-trivial algorithms, and even state-of-the-art models tend to hallucinate when working with them.
+Do not treat the scientific repositories like generic CRUD code. Many of them implement subtle numerical and geometry-heavy algorithms where small changes can have outsized consequences.
 </Callout>
 
-## License
+## Where to continue
 
-All VOLT Labs open source projects are released under the [MIT License](https://opensource.org/licenses/MIT) unless otherwise specified in the repository.
+If you want to clone the whole stack locally, start with [Ecosystem Setup](/docs/open-source/ecosystem-setup). If you want to understand how those repositories show up inside the product, continue with [Plugin System](/docs/plugins) and [Architecture](/docs/architecture).

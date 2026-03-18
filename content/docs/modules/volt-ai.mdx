@@ -4,18 +4,20 @@ description: Multi-provider AI assistant integrated across the entire platform.
 ---
 
 <Callout type="info">
-**TL;DR** — Volt AI is a built-in assistant that supports 13 AI providers and 71 tools. Each team configures its own API keys. Volt AI can manage trajectories, run analyses, edit LaTeX documents, and control containers using natural language.
+**TL;DR** -- Volt AI is a built-in assistant that supports 13 AI providers and 71 tools. Each team configures its own API keys. Volt AI can manage trajectories, run analyses, edit LaTeX documents, and control containers using natural language.
 </Callout>
 
 ## Overview
 
-Volt AI is the built-in AI assistant that works across the entire VOLT platform. It supports **13 AI providers**, giving your team full flexibility to use the models and services that best fit your needs. Each team configures its own providers and API keys — there is no shared or centralized AI service.
+Volt AI is the built-in assistant that sits across the whole VOLT workspace. You can use it as a dedicated conversation surface, as a floating assistant, or as a contextual helper inside modules like [LaTeX](/docs/modules/latex). In every case, the important detail is the same: it works with team-scoped providers, team-scoped tools, and the same permissions model as the rest of the platform.
 
-Volt AI is not limited to a standalone chat interface. It is deeply integrated into other modules like the [LaTeX editor](/docs/modules/latex), where it can edit documents, compile projects, generate figures, fix errors, and more.
+That means Volt AI is not a shared global service owned by the product. Each team chooses its own providers, stores its own API keys, and decides which models are available.
 
 ![Volt AI Overview](/assets/overviews/overviews_vol-ai.png)
 
 ## Supported Providers
+
+Volt AI currently supports the following providers:
 
 | Provider | Description |
 |---|---|
@@ -35,46 +37,46 @@ Volt AI is not limited to a standalone chat interface. It is deeply integrated i
 
 ## Setting Up a Provider
 
-To start using Volt AI, you need to add at least one AI provider to your team. Go to the **Volt AI** section from the sidebar and you will see the provider management panel.
+Before anyone can use Volt AI, the team needs at least one provider configured in the team integrations area.
 
 ![AI Providers](/assets/modules/team/ai-integration/providers.png)
 
-Click the **Add Provider** button. You will be prompted to enter a name for the provider and your API key.
+Click **Add Provider**, choose a name that makes sense for the team, and enter the API key for the service you want to use.
 
 ![Add Provider](/assets/modules/team/ai-integration/add-provider.png)
 
 <Callout type="info">
-API keys are encrypted before being stored. Each team manages its own keys — VOLT does not share keys across teams.
+API keys are encrypted before being stored. Each team manages its own keys, and those keys do not spill across workspaces.
 </Callout>
 
 ### Getting an API Key
 
-Each provider has its own developer console where you can generate API keys. For example, here is the xAI console:
+Each provider has its own developer console. For hosted models, this usually means creating a key in the provider dashboard. For self-hosted setups like Ollama, it means pointing Volt AI at the right base URL and enabling the models you want the team to use.
 
 ![xAI API Key](/assets/modules/team/ai-integration/xai-create-api-key.png)
 
 ### Selecting Models
 
-After adding a provider, you can select which models to enable. Only enabled models will be available in the chat interface and AI-powered tools.
+After a provider is added, you can choose which models should be available to the team. Only enabled models show up in the Volt AI interface, which makes it easier to keep the workspace focused on the models you actually want people to use.
 
 ![Model Selection](/assets/modules/team/ai-integration/xai-models.png)
 
 ## Chat Interface
 
-The chat interface supports real-time streaming responses, so you see the AI's reply as it is being generated. Conversations are saved per team and can be accessed by any team member.
+The chat experience is persistent and streamed in real time. Conversations are saved, responses arrive incrementally, and the same assistant can follow you across multiple tasks inside the workspace.
 
 ![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-1.png)
 
-Volt AI can interact with every module on the platform — from managing containers and trajectories to editing LaTeX documents and running analyses. It acts as a unified interface to your entire workspace.
+Because Volt AI is wired into the rest of the platform, a conversation can move naturally from "show me the trajectories in this team" to "run this analysis" to "help me rewrite the LaTeX section that explains the result." That continuity is the real feature.
 
 ![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-2.png)
 
 ## Available Tools
 
-Volt AI has access to **71 tools** organized across 8 categories. These tools allow it to read, create, update, and delete resources across the platform on your behalf.
+Volt AI has access to **71 tools** organized across 8 categories. Some are read-oriented, some modify workspace resources, and some trigger operational actions like analysis execution or container management.
 
 <Callout type="info">
-Some tools require your explicit approval before execution (e.g., deleting resources, creating containers). Volt AI will ask for confirmation before proceeding.
+Some tools require explicit approval before execution, especially when the action creates, deletes, or changes something important in the workspace.
 </Callout>
 
 ### LaTeX Documents (11 tools)
@@ -180,23 +182,33 @@ Some tools require your explicit approval before execution (e.g., deleting resou
 | `list_scripting_notebooks` | List all Jupyter scripting notebooks in the team |
 | `list_simulation_cells` | List all simulation cells in the team |
 
+## What Volt AI is especially good at
+
+In day-to-day use, Volt AI is most helpful when you want to move quickly across modules without manually opening each one in turn. It works well for workspace discovery, first-pass analysis orchestration, LaTeX assistance, and repetitive admin tasks that already have clean tool coverage.
+
+It is also one of the clearest places where the team boundary in VOLT matters. The same assistant behaves differently depending on the team you are in, the providers that team has configured, and the permissions the current user has.
+
 ## Task: Set up an AI provider
 
 1. Go to the **Volt AI** section from the sidebar.
 2. Click **Add Provider**.
-3. Enter a name for the provider (e.g., "OpenAI Production").
-4. Paste your API key into the key field.
-5. Select the models you want to enable for your team.
+3. Enter a name for the provider, such as `OpenAI Production`.
+4. Paste the API key into the key field.
+5. Select the models you want to enable for the team.
 6. Save the provider configuration.
 
-**Expected outcome:** The provider appears in the provider list with its enabled models available in the chat interface and AI-powered tools.
+**Expected outcome:** The provider appears in the provider list, and its enabled models become available in Volt AI surfaces across the workspace.
 
 ## Task: Run an analysis using natural language
 
-1. Open a **Volt AI** conversation from the chat interface.
-2. Type a request such as "Run Coordination Analysis on trajectory X" (replacing X with the trajectory name).
-3. Volt AI will identify the trajectory and the analysis plugin, then present a tool call for approval.
-4. Review the parameters and click **Approve** to authorize execution.
-5. Wait for the analysis job to start.
+1. Open a **Volt AI** conversation.
+2. Type a request such as `Run Coordination Analysis on trajectory X`.
+3. Volt AI resolves the trajectory and plugin, then prepares the tool call.
+4. Review the proposed action and click **Approve** if confirmation is required.
+5. Wait for the analysis to appear in the normal jobs and analysis flow.
 
-**Expected outcome:** The analysis appears in the Jobs panel as running, and once completed, the results are accessible from the trajectory's analysis listing.
+**Expected outcome:** The run starts through the same underlying analysis system used elsewhere in VOLT, and the results become available from the trajectory and analysis views.
+
+<Callout type="info">
+If Volt AI surfaces are visible but not useful, the most common causes are simple: no configured provider, an invalid key, or no enabled models for the current team.
+</Callout>

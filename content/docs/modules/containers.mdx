@@ -1,82 +1,64 @@
 ---
 title: Containers
-description: Deploy and manage Docker containers with resource controls and terminal access.
+description: Run Docker workloads on team clusters with terminals, files, ports, and optional remote desktop.
 ---
 
 <Callout type="info">
-**TL;DR** — Deploy Docker containers on your clusters with custom resource limits, port mappings, and environment variables. Access them via a browser-based terminal, file explorer, or remote desktop.
+**TL;DR** -- Containers let your team run custom services and environments on connected clusters without stepping outside VOLT. You can create them from templates or custom images, then work with terminals, files, stats, exposed ports, and VNC-style desktop sessions.
 </Callout>
 
 ## Overview
 
-The Containers module lets you deploy and manage Docker containers directly from VOLT. Each container runs on one of your team's clusters and can be configured with custom resource limits, port mappings, and environment variables.
-
-Containers are useful for running custom tools, services, or development environments alongside your simulations — all managed from the same platform.
+The Containers module is where VOLT stops being only a simulation workspace and starts acting like an application platform for the team. If you need a custom runtime, a lightweight service, a notebook-adjacent helper, or a desktop-enabled environment, this is where it lives.
 
 ![Containers Overview](/assets/overviews/overviews_containers.png)
 
-## Container Listing
+Containers run on team clusters, so they inherit the strengths and limits of the hardware you have connected. That means the module works best when you think of it as a layer on top of cluster capacity, not a separate pool of compute.
 
-The main view shows all containers for your team, with real-time status indicators. A green indicator means the container is running.
+## Listing and day-to-day management
+
+The listing gives you the current fleet view: which containers exist, which are running, and which one you may want to open next.
 
 ![Container Listing](/assets/modules/containers/container-listing.png)
 
-## Creating a Container
+From there, the usual lifecycle is straightforward. You create a container, adjust its resources and ports, start using it, and come back later for logs, processes, files, or updates.
 
-Container creation follows a multi-step wizard:
+## Creating a container
 
-### Step 1: Configuration
+The creation flow is a guided wizard because there is more going on than just picking an image.
 
-Specify the container settings:
-
-- **Name**: A descriptive name for the container.
-- **Image**: The Docker image to use (e.g., `ubuntu:latest`, `python:3.12`).
-- **CPU Limit**: Maximum CPU cores allocated to the container.
-- **Memory Limit**: Maximum RAM allocated to the container.
-- **Port Mappings**: Map container ports to host ports for network access.
-- **Environment Variables**: Set key-value pairs available inside the container.
+You choose the team cluster, define CPU and memory limits, configure environment variables, decide how ports should be exposed, and optionally enable extra capabilities such as remote desktop support.
 
 ![Create Container](/assets/modules/containers/create-container.png)
 
-### Step 2: Review
-
-Before deploying, you get a summary of the full configuration to review.
-
 ![Review Configuration](/assets/modules/containers/review-config.png)
 
-After confirming, the container is created and started on the selected cluster.
+If you do not provide a command and choose not to use the image's own command, VOLT falls back to keeping the container alive with a simple idle command so you can still enter it later.
 
-## Container Features
+## What you can do after deployment
 
-Once a container is running, you can:
+Once a container exists, the module gives you several ways to interact with it depending on the workload.
 
-- **Terminal Access**: Open a WebSocket-based terminal directly in the browser. No SSH setup required.
-- **File Explorer**: Browse, upload, and download files inside the container.
-- **Resource Monitoring**: Track CPU and memory usage in real time.
-- **Port Management**: View and modify exposed ports.
-- **Environment Variables**: Update environment variables without rebuilding.
-- **Remote Desktop**: Connect to containers with a graphical environment via XRDP.
+- **Terminal access** for shell-based work directly in the browser.
+- **File access** for browsing and reading container content.
+- **Process and stats views** for operational visibility.
+- **Port access** for services that need to be opened safely through the platform.
+- **Remote desktop** for GUI-capable images that expose the expected VNC/XRDP setup.
 
-## Task: Deploy a Docker container
+## Port proxying and accessible services
 
-1. Click the **Create Container** button from the container listing view.
-2. Enter a descriptive **name** for the container.
-3. Specify the **Docker image** to use (e.g., `ubuntu:latest`).
-4. Set **CPU** and **memory** resource limits appropriate for your workload.
-5. Configure any required **port mappings** and **environment variables**.
-6. Review the full configuration summary on the review step.
-7. Click **Confirm** to deploy the container.
+One of the more useful ideas here is that VOLT does not just show you port mappings. It can create controlled sessions that proxy access to a containerized service through the team cluster and the product runtime.
 
-**Expected outcome:** The container appears in the listing with a green status indicator, confirming it is running.
+That makes containers practical for dashboards, internal tools, and notebook-adjacent services that need a browser entry point without asking the user to manage direct host networking manually.
 
-## Task: Open a terminal in a container
+## Remote desktop support
 
-1. Select a running container from the container listing.
-2. Click the **Terminal** option in the container's feature panel.
-3. Wait for the WebSocket connection to establish.
+For containers built with a desktop environment, VOLT can open a remote desktop session in the browser. In practice, that is a capability rather than a default. The image and port setup have to support it, and the container needs to be running before the UI exposes the session entry point.
 
-**Expected outcome:** A shell prompt appears in the browser, ready to accept commands inside the container.
+## When containers are a good fit
+
+Containers are especially useful when you want to keep a support tool close to the scientific workflow. For example, you might run a small service next to your trajectories, a custom environment for a team utility, or a desktop-oriented helper that does not belong inside a notebook.
 
 <Callout type="info">
-Containers run on your team's clusters, so resource availability depends on the hardware you have connected.
+Containers, notebooks, and plugin execution all depend on the same cluster foundation. If a cluster is low on memory or disconnected, the symptoms often show up here first.
 </Callout>

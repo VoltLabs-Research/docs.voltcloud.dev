@@ -1,148 +1,88 @@
 ---
 title: Plugin System
-description: Overview of VOLT's plugin ecosystem for atomistic simulation analysis.
+description: How VOLT turns node-based workflows and scientific binaries into analysis results.
 ---
 
 <Callout type="info">
-**TL;DR** — A VOLT plugin is a node-based workflow that runs analysis binaries on your trajectory frames. Plugins are automatically deployed when you create a team. Results are stored as MessagePack files on your cluster.
+**TL;DR** -- In the UI, a plugin is a workflow. Under the hood, that workflow eventually drives one or more scientific binaries from the wider VOLT ecosystem. The outputs are usually MessagePack exposures that VOLT can list, export, and render back into the viewer.
 </Callout>
 
 ## Overview
 
-When you create a new team in VOLT and connect a cluster, a default set of plugins is automatically deployed to that cluster — ready to use out of the box.
+Plugins are where VOLT's scientific side becomes extensible.
 
-This set of plugins implements the [Foundational Algorithms](/docs/open-source#foundational-algorithms) from the VOLT open-source ecosystem.
+When a team is created and a cluster is connected, a default set of plugins is deployed so analysis can start immediately. Those plugins are built on top of the open-source algorithm repositories maintained in the ecosystem, which means the product-level plugin system and the lower-level scientific code are closely related but not identical.
 
-## What is a Plugin
+That distinction helps avoid confusion: the plugin you see in VOLT is the workflow and runtime contract; the repository in `plugins/` is usually the underlying scientific implementation.
 
-In VOLT, a plugin is a **collection of nodes** that together form a workflow. When you run an analysis — for example, a Dislocation Analysis — the cluster begins executing that workflow.
+## What a plugin really is
 
-Here is the workflow for the Dislocation Analysis plugin:
+The easiest way to think about a plugin is as a workflow graph with enough structure for VOLT to understand how to execute it safely and how to interpret the results afterward.
 
 ![Dislocation Analysis workflow](/assets/plugins/plugin-example-workflow.png)
 
-## Node Types
+The workflow defines metadata, user-facing arguments, the execution context, iteration behavior, the actual binary or entrypoint to run, and the outputs that should come back into the platform as exposures or exports.
 
-### Modifier Node
+## Main node types
 
-Defines the plugin metadata: name, version, description, author details, and UI-related settings.
+### Modifier node
 
-### Arguments Node
+This is the descriptive layer: name, version, authoring details, and the basic information the UI needs to present the plugin in a usable way.
 
-Defines the list of arguments the binary expects to receive. For instance, the arguments for Dislocation Analysis are documented in the [OpenDXA](/docs/plugins/open-dxa) plugin page.
+### Arguments node
 
-Each argument has the following configuration:
+Arguments define what the user is allowed to configure before a run starts. Some values are visible and editable in the UI, while others can be hidden and fixed by the plugin author.
 
-- **Argument Key** — The CLI flag the binary expects (e.g. `crystalStructure`). When the plugin runs, `--` is automatically prepended, resulting in `--crystalStructure`.
-- **Label** — A human-readable name displayed in the UI. For example, the key `crystalStructure` would have the label `Crystal Structure`.
-- **Type** — Determines the input control rendered in the UI:
+That is what lets a plugin feel approachable in the product even when the underlying binary expects a fairly technical CLI.
 
-| Type | Description | Example |
-|---|---|---|
-| **Number** | A numeric input. Supports optional `min`, `max`, and `step` constraints. For instance, the `rmsd` field can use a step of `0.01` so the user can increment from `0.10` to `0.11` with arrow keys. | `cutoff`, `rmsd` |
-| **Boolean** | A checkbox. When checked, the flag is sent as `--flag true`; otherwise it is omitted. | `markCoreAtoms` |
-| **Select** | A dropdown with a predefined set of options. Each option has a **key** (the value sent to the binary) and a **label** (what the user sees). | `identificationMode` with options: PTM → *Polyhedral Template Matching*, CNA → *Common Neighbor Analysis*, DIAMOND → *Diamond Structures Identifier* |
-| **String** | A free-form text input. | — |
-| **Frame** | A frame picker from the current trajectory. The binary receives the file path to the selected frame's dump. | `reference` in Atomic Strain |
+### Context and `forEach`
 
-- **Default Value** — A preset value so the user doesn't have to configure everything manually. For example, `identificationMode` defaults to `PTM` in Dislocation Analysis.
-- **Value** — If set, the argument becomes **hidden from the user** and always uses this fixed value. Useful for parameters you don't want the user to modify (e.g. a hardcoded thread count).
+These nodes define what the workflow will iterate over. A common pattern is to bind the workflow to trajectory dumps and then process them frame by frame through a `forEach` step.
 
-### Context Node
+This is one reason analysis progress in VOLT is naturally frame-oriented.
 
-Defines a data source to iterate over. Currently available sources:
+### Entrypoint
 
-- **Trajectory Dumps** — Iterates over every dump file available in the trajectory.
+The entrypoint is where the workflow crosses from product logic into execution. It defines the binary or script payload and the argument template used at runtime.
 
-### ForEach Node
+In many of the built-in scientific plugins, that entrypoint ultimately invokes a compiled executable built from one of the repositories in the open-source plugin layer.
 
-Iterates over the array provided by a Context Node. In a typical plugin workflow, this iterates over `{{ context-node-id.trajectory_dumps }}`. When you run an analysis, it executes on every frame in the trajectory (unless you deselect the "All" option in "Selected Frames" in the UI).
+### Exposure nodes
 
-### Entrypoint Node
+Exposure nodes tell VOLT which result files matter after execution. They are the bridge between raw plugin output and something the product can present as a result.
 
-Contains the binary that runs on each iteration. You upload the compiled executable and define an argument template that is evaluated per iteration. For the Foundational Algorithms, the typical template is:
+An analysis can produce more than one meaningful output, which is why a single run may surface multiple exposures, listings, sub-listings, charts, or 3D artifacts.
 
-```
-{{ forEach-node-id.currentValue.path }} {{ forEach-node-id.currentValue.outputPath }} {{ arguments-node-id.as_str }}
-```
+### Export nodes
 
-Where:
+Export nodes turn selected outputs into richer visual forms such as atomistic point clouds, meshes, dislocation geometry, or chart images. These exporters are part of the reason plugin results can come back into the viewer instead of staying as detached files.
 
-- `currentValue.path` — The file path of the dump for the current frame.
-- `currentValue.outputPath` — A dedicated output directory created for each iteration. This prevents result files from overwriting each other across frames.
-- `as_str` — The argument list with the values the user selected in the UI. For example, if the user configured:
+## Why the design is node-based
 
-```
-Crystal Structure: FCC
-Identification Mode: PTM
-RMSD: 0.10
-Mark Core Atoms: false
-```
+The node model gives VOLT a lot more flexibility than a fixed plugin ABI would. It separates workflow planning from execution, makes room for hidden or computed arguments, and lets the runtime handle iteration, branching, nested plugin references, and result processing in a structured way.
 
-Then `as_str` resolves to:
+That is also why the plugin system can evolve without every analysis looking like a one-off integration.
 
-```
---crystalStructure FCC --identificationMode PTM --rmsd 0.10 --markCoreAtoms false
-```
+## Output model
 
-### Exposure Node
-
-Represents an output file produced by the binary. This is why the Entrypoint Node in the example image has multiple outgoing connections — one per exposed file.
-
-Each Exposure Node has:
-
-- **Exposure Name** — The label shown in the UI when displaying results (e.g. `Dislocations`).
-- **Results File** — The file name exported by the binary (e.g. `dislocations.msgpack`).
-
-<Callout type="warn">
-Exported files must follow the output format described below. If the file does not conform to this structure, VOLT will not be able to parse it, generate 3D models, or display it in the UI.
-</Callout>
-
-## Why This Design
-
-The node-based architecture means you can connect as many plugins as you want. You can add new algorithms to analyze your simulations simply by connecting and configuring nodes — just like building workflows in N8N.
-
-This is what defines VOLT: *"I can run any algorithm on any simulation — just give me the steps and the executable."* You always work with the state of the art without depending on any specific VOLT version, because you can always import new plugins.
-
-### Export Node
-
-The Export Node takes an Exposure Node's output file and generates 3D models for visualization in the UI. Currently supported exporters:
-
-| Exporter | Description |
-|---|---|
-| **Dislocation Exporter** | Builds a 3D model of dislocation lines. |
-| **Mesh Exporter** | Exports a mesh surface. |
-| **Atomistic Exporter** | Exports an atom point cloud. |
-| **Chart Exporter** | *Coming soon.* |
-
-The 3D model construction for the Dislocation, Mesh, and Atomistic exporters is handled by [SpatialAssembler](/docs/open-source/spatial-assembler) — a tool developed by VOLT Labs.
-
-## Output File Format
-
-Every file exported by a plugin must be in **MessagePack** (`.msgpack`) format. The underlying JSON structure must follow this schema:
+Most plugin data returns as MessagePack, but the important part is the shape, not just the file extension.
 
 ```json
 {
-    "main_listing": {
-        ...
-    },
-    "sub_listings": {
-        "sublisting-name": {
-            ...
-        }
-    },
-    "per-atom-properties": {
-        ...
-    }
+  "main_listing": {},
+  "sub_listings": {},
+  "per-atom-properties": {}
 }
 ```
 
-The specific contents of each section vary per plugin and are documented in each plugin's page.
+The platform uses that structure to build listings, summaries, overlays, and exports. In other words, MessagePack is not just a storage choice. It is part of the contract between scientific code and product experience.
 
-## Storage and Data Flow
+## Plugins and the wider ecosystem
 
-After a plugin finishes, the exported `.msgpack` files and any generated 3D models are uploaded to MinIO on the team's cluster. VOLT itself does not store analysis data — everything lives on your infrastructure.
+The built-in scientific plugins are not isolated projects. They share infrastructure through tools such as [CoreToolkit](/docs/open-source/core-toolkit), and some plugin repositories depend on others internally. `StructureIdentification`, for example, acts both as a user-facing algorithm and as a building block for more advanced analyses.
+
+That layered relationship is one of the reasons VOLT can present plugins cleanly in the UI without flattening the underlying science into a pile of unrelated binaries.
 
 <Callout type="info">
-For details on how clusters store and serve data, see [Clusters](/docs/modules/clusters).
+If you want the repository-level picture behind the plugin system, continue with [Open Source Ecosystem](/docs/open-source). If you want to build your own workflow-compatible plugin, see [Plugin Development](/docs/open-source/plugin-development).
 </Callout>

@@ -1,96 +1,59 @@
 ---
 title: Teams
-description: Create and manage teams, invite members, assign roles, and configure API keys.
+description: "Manage the workspace itself: members, roles, invitations, secret keys, and integrations."
 ---
 
 <Callout type="info">
-**TL;DR** — A team is your workspace. It owns trajectories, clusters, analyses, and members. Create multiple teams for different projects or research groups.
+**TL;DR** -- A team is the real boundary inside VOLT. Data, permissions, AI integrations, secret keys, notebooks, analyses, and collaboration all live inside a team context.
 </Callout>
 
 ## Overview
 
-Teams are the top-level organizational unit in VOLT. When you create a team, you get an isolated workspace with its own trajectories, clusters, containers, analyses, and member list. Every action in the platform happens within the context of a team.
+Teams are where VOLT becomes multi-user and operational. A team is not just a list of members. It is the container for the workspace itself: trajectories, clusters, containers, notebooks, chats, LaTeX projects, AI providers, and permissions all belong to it.
 
-You can create as many teams as you need — one per research project, one per lab group, or any structure that fits your workflow.
+That is why switching teams changes so much at once. You are moving between isolated workspaces, not just changing a label in the sidebar.
 
-## Creating a Team
+## Creating and structuring workspaces
 
-1. Open the team selector from the sidebar.
-2. Click **Create Team**.
-3. Enter a team name.
-4. Click **Create**.
+You can create multiple teams for different labs, projects, collaborations, or client boundaries. Once a team exists, the next steps usually involve inviting members, assigning roles, and connecting infrastructure.
 
-You are automatically assigned as the owner of the new team.
+## Invitations and onboarding other people
 
-## Inviting Members
+VOLT supports two invitation styles: direct share by email and invitation codes.
 
-1. Click the **person-add icon** in the top-right area of the dashboard header.
-2. A popover panel opens with two tabs: **Share** and **Invitation Code**.
+Email invitations are useful when you want a traceable invite flow with pending status and cancellation controls. Invite codes work better when you need a faster, lower-friction way to bring someone into the workspace.
 
-### Invite by Email (Share tab)
+In practice, both lead to the same place: the new member joins the team and inherits whatever permissions their role allows.
 
-1. In the **Share** tab, enter the person's email address in the input field.
-2. Click **Invite**.
-3. The invitation appears in the pending list below. You can cancel pending invitations from here.
-4. Use the **Copy link** button in the footer to share the invitation link directly.
+## Roles and RBAC
 
-### Invite by Code (Invitation Code tab)
+Permissions are not hard-coded to just owner versus everyone else. The team module includes a proper RBAC layer, so roles can map to specific resources and actions across the workspace.
 
-1. Switch to the **Invitation Code** tab.
-2. Click **Generate Invite Code** to create a 5-character code.
-3. Share the code or its link with anyone you want to invite — they will join the team automatically when they open it.
-4. You can regenerate or delete the code at any time from the three-dot menu.
-
-The invited person receives a notification (email invitations) or joins immediately (code invitations). Once they accept, they appear in the team member list.
-
-## Roles and Permissions
-
-Teams support role-based access control (RBAC). Each team has a set of roles, and each role defines what actions a member can perform.
-
-| Default Role | Permissions |
+| Role Type | What It Means |
 |---|---|
-| **Owner** | Full access — manage members, roles, clusters, and all resources |
-| **Admin** | Manage resources and members, but cannot delete the team |
-| **Member** | Use all modules (trajectories, analysis, containers, etc.) but cannot manage team settings |
+| **System roles** | Built-in roles such as owner, admin, and member |
+| **Custom roles** | Team-defined roles with more targeted permission sets |
 
-### Custom Roles
+That makes teams especially useful in mixed environments where some people only need to run analyses, others need to manage infrastructure, and a smaller group should control invitations, roles, or destructive operations.
 
-You can create custom roles with fine-grained permissions:
+## Secret keys and programmatic access
 
-1. Go to team settings.
-2. Click **Roles**.
-3. Click **Create Role**.
-4. Name the role and select the permissions you want to grant.
-5. Click **Save**.
+Teams can also issue secret keys for API and SDK use. Those keys make it possible to access the workspace from scripts and integrations through tools such as `voltsdk` or `@voltstack/voltclient`.
 
-Assign custom roles to members from the member list.
-
-## API Secret Keys
-
-Teams can generate API secret keys for programmatic access via the [VoltSDK](/docs/open-source/volt-client).
-
-1. Go to team settings.
-2. Click **Secret Keys**.
-3. Click **Create Key**.
-4. Copy the generated key immediately — it is only shown once.
+Because the key is only shown once at creation time, key management in VOLT follows the usual pattern: copy it immediately, store it safely, and revoke it when it is no longer needed.
 
 <Callout type="warn">
-Secret keys grant full API access on behalf of the team. Store them securely and revoke keys you no longer need.
+Team secret keys are powerful. Treat them like any other production credential: store them securely, rotate them when needed, and revoke them if you think they may have been exposed.
 </Callout>
 
-## Task: Invite a member and assign a role
+## AI integrations live here too
 
-1. Click the **person-add icon** in the dashboard header.
-2. In the **Share** tab, enter the person's email address and click **Invite**.
-3. Once they accept, go to team settings and assign them a role (Owner, Admin, Member, or a custom role) from the member list.
+One detail that is easy to miss at first is that Volt AI provider management is really part of team administration. Provider keys, model availability, and AI configuration all belong to the workspace, not to an individual user profile.
 
-**Expected outcome:** The invited person appears in the team member list with the assigned role and can access the team's resources.
+That keeps AI behavior aligned with the same team boundary used everywhere else.
 
-## Task: Create an API secret key
+## Why this module matters beyond admin work
 
-1. Go to team settings.
-2. Click **Secret Keys**.
-3. Click **Create Key**.
-4. Copy the key and store it securely.
+The Teams module may look administrative, but it has direct consequences for the scientific workflow. It decides who can run analyses, who can connect clusters, who can use AI providers, who can issue API keys, and who can change the shape of the workspace itself.
 
-**Expected outcome:** A new API key appears in the list. You can use it with `voltsdk` or `@voltstack/voltclient` for programmatic access.
+In other words, team settings are not separate from the work. They govern how the work can happen.

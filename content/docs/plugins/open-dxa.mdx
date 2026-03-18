@@ -1,11 +1,13 @@
 ---
 title: OpenDXA
-description: A modified Dislocation Extraction Algorithm (DXA) supporting multiple structure identification methods.
+description: A modified Dislocation Extraction Algorithm pipeline for reconstructing dislocation networks from atomistic data.
 ---
 
 ## Overview
 
-OpenDXA is VOLT's implementation of the Dislocation Extraction Algorithm. It supports multiple structure identification methods including **PTM**, **CNA**, and **Diamond structure analysis**. It identifies dislocation lines, computes Burgers vectors, and extracts dislocation networks from atomistic simulation data.
+OpenDXA is one of the most ambitious plugins in the VOLT ecosystem. It does not just flag a few suspicious atoms and stop there. It runs a longer reconstruction pipeline that starts with local structure identification, builds crystalline regions, works through interface geometry, and ends by tracing dislocation lines and Burgers information.
+
+That is why this plugin tends to produce several outputs instead of a single result file. You are not only getting the dislocation network back. You are also getting supporting geometry and structure-analysis data that help explain how the network was inferred.
 
 ## Parameters
 
@@ -18,8 +20,14 @@ OpenDXA is VOLT's implementation of the Dislocation Extraction Algorithm. It sup
 | `circuitStretchability` | `int` | `9` | Circuit stretchability factor. |
 | `lineSmoothingLevel` | `float` | `1.0` | Dislocation line smoothing level. |
 | `linePointInterval` | `float` | `2.5` | Point interval on dislocation lines. |
-| `onlyPerfectDislocations` | `bool` | `false` | Detect only perfect dislocations. |
-| `markCoreAtoms` | `bool` | `false` | Mark dislocation core atoms. |
+| `onlyPerfectDislocations` | `bool` | `false` | Restrict the result to perfect dislocations. |
+| `markCoreAtoms` | `bool` | `false` | Historical parameter. Core-atom export is currently not emitted by the implementation. |
+
+## Practical notes
+
+- `PTM` is the richest mode when you need orientations and correspondences.
+- The plugin emits more than just dislocation lines. Meshes, simulation-cell data, structure stats, and grouped atoms are part of the normal output story.
+- The `markCoreAtoms` parameter still appears in the interface, but the current implementation does not export a `_core_atoms.msgpack` file.
 
 ## Output
 
@@ -27,7 +35,6 @@ OpenDXA is VOLT's implementation of the Dislocation Extraction Algorithm. It sup
 type Vec3 = [float, float, float];
 type Mat3x3 = [Vec3, Vec3, Vec3];
 
-// [x, y, z, w]
 type Quaternion = [float, float, float, float];
 ```
 
@@ -188,7 +195,7 @@ interface PTMDataOutput {
 
 ### `{outputBase}_atoms.msgpack`
 
-Atoms grouped by their identified structure type name (e.g. `"FCC"`, `"BCC"`, `"Other"`).
+Atoms grouped by identified structure type name.
 
 ```ts
 interface Atom {
@@ -205,14 +212,13 @@ interface AtomsOutput {
 
 ### `{outputBase}_structure_analysis_stats.msgpack`
 
+This file contains both summary statistics and per-atom structural information.
+
 ```ts
 interface StructureAnalysisStatsOutput {
     main_listing: {
         total_atoms: int;
         analysis_method: string;
-        // For each detected structure type, a pair of keys is added dynamically:
-        //   `{type}_count`: int
-        //   `{type}_percentage`: float
         [key: `${string}_count`]: int;
         [key: `${string}_percentage`]: float;
         total_identified: int;
@@ -223,27 +229,8 @@ interface StructureAnalysisStatsOutput {
 }
 ```
 
-### `{outputBase}_core_atoms.msgpack`
-
-Only exported when `markCoreAtoms` is enabled.
-
-```ts
-interface CoreAtom {
-    id: int;
-    pos: Vec3;
-}
-
-interface CoreAtomsOutput {
-    export: {
-        AtomisticExporter: {
-            Core: CoreAtom[];
-        };
-    };
-}
-```
-
 ## See Also
 
-- [Grain Segmentation](/docs/plugins/grain-segmentation) — grain boundary detection
-- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — defect visualization
-- [Structure Identification](/docs/plugins/structure-identification) — crystal classification (used internally by DXA)
+- [Grain Segmentation](/docs/plugins/grain-segmentation) — orientation-driven grain separation
+- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — scalar defect highlighting
+- [Structure Identification](/docs/plugins/structure-identification) — local structure classification used as part of the pipeline

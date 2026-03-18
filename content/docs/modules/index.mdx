@@ -1,52 +1,52 @@
 ---
 title: Modules Overview
-description: All VOLT modules at a glance — organized by function.
+description: A guided map of the modules that make up the VOLT workspace.
 ---
 
 <Callout type="info">
-**TL;DR** — VOLT is organized into modules, each handling a distinct part of your research workflow. Pick the one you need below.
+**TL;DR** -- VOLT is organized by workflow, not by product tier. You move from trajectories and analyses to clusters, notebooks, papers, and collaboration without leaving the same team workspace.
 </Callout>
 
-VOLT's functionality is split into self-contained modules. Every module is available from the sidebar after you sign in and select a team.
+The sidebar is easier to understand once you stop reading it as a menu of isolated features. Most modules are different faces of the same workflow: data comes in through trajectories or SSH import, processing runs on clusters, results appear in analysis and jobs, and the surrounding modules help you automate, inspect, discuss, and publish the work.
 
 ## Core Workflow
 
-These modules handle the primary research loop: upload simulations, visualize them, and run analyses.
+This is where most teams spend their time. You start with the dashboard, work with trajectories, inspect derived simulation metadata, and run analyses that fan out across your cluster.
 
 <Cards>
-  <Card title="Dashboard" href="/docs/modules/dashboard" description="Metrics, activity feed, cluster health, and quick actions." />
-  <Card title="Trajectories" href="/docs/modules/trajectories" description="Upload, visualize, and inspect molecular dynamics simulations in 3D." />
-  <Card title="Analysis & Jobs" href="/docs/modules/analysis" description="Run analysis plugins on trajectories and monitor job execution." />
-  <Card title="Simulation Cells" href="/docs/modules/simulation-cells" description="View bounding box geometry, cell vectors, and periodic boundary conditions." />
+  <Card title="Dashboard" href="/docs/modules/dashboard" description="Your operational home: metrics, quick actions, live activity, jobs, search, and team presence." />
+  <Card title="Trajectories" href="/docs/modules/trajectories" description="Upload simulations, track processing, open the 3D viewer, and work with scene artifacts and public sharing." />
+  <Card title="Analysis & Jobs" href="/docs/modules/analysis" description="Run plugin workflows, follow progress frame by frame, and inspect the result model behind analyses." />
+  <Card title="Simulation Cells" href="/docs/modules/simulation-cells" description="Review the derived box geometry and periodic boundary data created during trajectory processing." />
 </Cards>
 
 ## Compute & Infrastructure
 
-Manage the machines and environments that power your team.
+These modules are what make VOLT feel like an actual workspace instead of a thin web front end. They connect your hardware, expose remote services safely, and give the team places to run custom workloads.
 
 <Cards>
-  <Card title="Clusters" href="/docs/modules/clusters" description="Connect, monitor, and manage the infrastructure that stores data and runs analyses." />
-  <Card title="Containers" href="/docs/modules/containers" description="Deploy Docker containers with resource controls, terminal access, and remote desktop." />
-  <Card title="SSH Import" href="/docs/modules/ssh-import" description="Import trajectory files from remote servers over SSH." />
+  <Card title="Clusters" href="/docs/modules/clusters" description="Enroll machines, watch heartbeats and health metrics, and open remote access sessions into the services backing your team." />
+  <Card title="Containers" href="/docs/modules/containers" description="Run Docker workloads with terminals, file access, port proxying, and optional remote desktop sessions." />
+  <Card title="SSH Import" href="/docs/modules/ssh-import" description="Store SSH connections, browse remote file systems, and pull simulation data closer to your team cluster." />
 </Cards>
 
 ## Scripting & AI
 
-Extend VOLT with custom code and AI-powered assistance.
+When the built-in workflows are not enough, VOLT gives you two different extension points. Scripting is for custom notebook-driven work. Volt AI is for natural-language control across the rest of the platform.
 
 <Cards>
-  <Card title="Scripting" href="/docs/modules/scripting" description="Create Jupyter notebooks with pre-installed scientific libraries." />
-  <Card title="Volt AI" href="/docs/modules/volt-ai" description="Multi-provider AI assistant with 71 tools across the entire platform." />
+  <Card title="Scripting" href="/docs/modules/scripting" description="Open Jupyter sessions on your cluster, work with trajectory-linked notebooks, and build custom post-processing flows." />
+  <Card title="Volt AI" href="/docs/modules/volt-ai" description="Use team-scoped AI providers and tool-calling workflows to operate on trajectories, analyses, documents, and infrastructure." />
 </Cards>
 
 ## Collaboration
 
-Communicate, write, and brainstorm with your team without leaving the platform.
+The collaboration modules are not bolted on. They share the same team context, permissions, notifications, and real-time layer as the scientific workflow.
 
 <Cards>
-  <Card title="Teams" href="/docs/modules/teams" description="Create teams, invite members, assign roles, and manage API keys." />
-  <Card title="Chat" href="/docs/modules/chat" description="Real-time messaging with direct messages, group chats, and file sharing." />
-  <Card title="LaTeX" href="/docs/modules/latex" description="Collaborative LaTeX editor with live compilation and AI assistance." />
-  <Card title="Whiteboards" href="/docs/modules/whiteboards" description="Collaborative drawing canvas for diagrams and brainstorming." />
-  <Card title="Notifications" href="/docs/modules/notifications" description="Real-time alerts for trajectory, analysis, and team events." />
+  <Card title="Teams" href="/docs/modules/teams" description="Manage members, roles, invitations, secret keys, and AI provider integrations for a workspace." />
+  <Card title="Chat" href="/docs/modules/chat" description="Run direct and group conversations with presence, typing indicators, reactions, and file sharing." />
+  <Card title="LaTeX" href="/docs/modules/latex" description="Write papers collaboratively with multi-file editing, PDF preview, imports, exports, and contextual AI assistance." />
+  <Card title="Whiteboards" href="/docs/modules/whiteboards" description="Sketch ideas and diagrams together with live sync and persistent board state stored on your infrastructure." />
+  <Card title="Notifications" href="/docs/modules/notifications" description="Follow team and system events through a real-time personal feed tied to your account." />
 </Cards>

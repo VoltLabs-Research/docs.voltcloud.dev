@@ -1,19 +1,27 @@
 ---
 title: Displacements Analysis
-description: Calculate atomic displacement vectors between reference and deformed configurations.
+description: Compare two configurations atom by atom and measure displacement vectors.
 ---
 
 ## Overview
 
-Displacements Analysis calculates atomic displacement vectors between reference and deformed configurations. It tracks atom movements, identifies displaced atoms, and computes displacement field statistics.
+Displacements Analysis is one of the most direct plugins in the catalog. It compares a current configuration against a reference configuration and reports the displacement vector and magnitude for each atom.
+
+That simplicity is useful. If you want to understand how far atoms moved between two states, this plugin gives you the raw comparison without trying to reinterpret it as strain, defect class, or grain structure.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `reference` | `file` | — | Reference LAMMPS dump file. If omitted, the current frame is used (≈ zero displacement). |
+| `reference` | `file` | — | Reference LAMMPS dump file. If omitted, the current frame is used, which usually produces near-zero displacement. |
 | `mic` | `bool` | `true` | Use minimum image convention. |
 | `affineMapping` | `string` | `noMapping` | Affine mapping mode. Options: `noMapping`, `toReferenceCell`, `toCurrentCell`. |
+
+## Practical notes
+
+- The plugin matches atoms by ID when IDs are available.
+- The reference and current configuration must contain the same number of atoms.
+- This plugin reports vectors and magnitudes. It does not automatically classify "displaced atoms" into separate categories.
 
 ## Output
 
@@ -40,5 +48,5 @@ interface DisplacementsOutput {
 
 ## See Also
 
-- [Atomic Strain](/docs/plugins/atomic-strain) — strain tensors from deformation
-- [Elastic Strain](/docs/plugins/elastic-strain) — elastic vs. plastic deformation
+- [Atomic Strain](/docs/plugins/atomic-strain) — neighborhood-based deformation measures
+- [Elastic Strain](/docs/plugins/elastic-strain) — crystal-referenced elastic strain

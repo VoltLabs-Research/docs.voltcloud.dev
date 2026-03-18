@@ -1,42 +1,45 @@
 ---
 title: Elastic Strain
-description: Compute elastic strain tensors by mapping local atomic environments to reference crystal structures.
+description: Compute crystal-referenced elastic strain by mapping local environments to an ideal lattice.
 ---
 
 ## Overview
 
-Elastic Strain computes elastic strain tensors by mapping local atomic environments to reference crystal structures. It separates elastic from plastic deformation and calculates per-atom strain measures useful for analyzing deformation mechanisms.
+Elastic Strain is the right tool when your system can still be meaningfully compared to an ideal crystal lattice. Instead of comparing a frame to an arbitrary reference configuration, it tries to map local environments onto a chosen crystal structure and then computes elastic strain measures from that mapping.
+
+That makes it a better fit for lattice-referenced deformation analysis than for fully general plastic or highly disordered systems.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `latticeConstant` | `float` | — | Lattice constant a₀. **Required.** |
+| `latticeConstant` | `float` | — | Lattice constant a0. **Required.** |
 | `crystalStructure` | `string` | `BCC` | Reference crystal structure type. Options: `FCC`, `BCC`, `HCP`, `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. |
 | `caRatio` | `float` | `1.0` | c/a ratio for HCP and hexagonal crystals. |
-| `pushForward` | `bool` | `false` | Push strain to spatial frame (Euler–Almansi strain). |
-| `calcDeformationGradient` | `bool` | `true` | Compute deformation gradient F. |
+| `pushForward` | `bool` | `false` | Push strain to the spatial frame. |
+| `calcDeformationGradient` | `bool` | `true` | Compute deformation gradient `F`. |
 | `calcStrainTensors` | `bool` | `true` | Compute strain tensors. |
 | `identificationMode` | `string` | `PTM` | Structure identification mode. Options: `CNA`, `PTM`. |
 | `rmsd` | `float` | `0.10` | RMSD cutoff for PTM classification. |
+
+## Practical notes
+
+- `latticeConstant` is mandatory in practice, not just conceptually important.
+- Atoms that cannot be mapped cleanly to the expected crystal context are emitted with zero-valued strain properties.
+- This plugin does not perform a full elastic-versus-plastic decomposition in the broad continuum-mechanics sense. It computes elastic strain relative to an ideal lattice when that mapping is possible.
 
 ## Output
 
 ### `{outputBase}_elastic_strain.msgpack`
 
 ```ts
-// Voigt order: [xx, yy, zz, xy, xz, yz]
 type StrainTensor = [float, float, float, float, float, float];
-
-// Row-major 3×3
 type DeformationGradient = [float, float, float, float, float, float, float, float, float];
 
 interface PerAtomProperties {
     id: int;
     volumetric_strain: float;
-    // when calcStrainTensors = true
     strain_tensor?: StrainTensor;
-    // when calcDeformationGradient = true
     deformation_gradient?: DeformationGradient;
 }
 
@@ -48,8 +51,12 @@ interface ElasticStrainOutput {
 }
 ```
 
+### `{outputBase}_atoms.msgpack`
+
+Grouped atoms by structure family for visualization and downstream context.
+
 ## See Also
 
-- [Atomic Strain](/docs/plugins/atomic-strain) — Green-Lagrangian strain tensors
-- [Displacements Analysis](/docs/plugins/displacements-analysis) — displacement fields
-- [Structure Identification](/docs/plugins/structure-identification) — required for crystal matching
+- [Atomic Strain](/docs/plugins/atomic-strain) — reference-frame local deformation analysis
+- [Displacements Analysis](/docs/plugins/displacements-analysis) — direct atom-by-atom displacement comparison
+- [Structure Identification](/docs/plugins/structure-identification) — structural matching groundwork

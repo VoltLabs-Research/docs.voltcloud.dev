@@ -1,35 +1,29 @@
 ---
 title: Whiteboards
-description: Collaborative drawing canvas for diagrams, brainstorming, and visual documentation.
+description: Collaborate on diagrams, sketches, and rough thinking inside the same team workspace.
 ---
 
 ## Overview
 
-Whiteboards provide a collaborative drawing canvas where your team can create diagrams, sketch architectures, brainstorm ideas, and document workflows visually. Think of it as an Excalidraw-style infinite canvas built into VOLT.
-
-Changes are synchronized in real time via WebSocket, so multiple team members can draw on the same board simultaneously.
+Whiteboards are VOLT's visual thinking space. They are useful for architecture sketches, experiment planning, paper outlines, meeting diagrams, and all the loose ideas that are easier to move around as shapes than as paragraphs.
 
 ![Whiteboards Overview](/assets/overviews/overviews_whiteboards.png)
 
-## Whiteboard Listing
+Because whiteboards live in the same workspace as everything else, they are a natural place to collect rough system ideas next to the simulations, documents, and chats they relate to.
 
-The main view displays all whiteboards in your team as a grid with thumbnail previews, making it easy to find and open the one you need.
+## Listing and organization
+
+The listing gives you a thumbnail-first view of the boards in a team so you can recognize a canvas visually instead of relying only on names.
 
 ![Whiteboard Listing](/assets/modules/whiteboards/whiteboard-listing.png)
 
-## Canvas
+That is a small detail, but it matters once a team starts using boards regularly for recurring work.
 
-The canvas provides a full set of drawing tools accessible from the toolbar:
+## Canvas experience
 
-- **Shapes**: Rectangles, ellipses, diamonds, and lines.
-- **Text**: Add text labels and annotations.
-- **Arrows**: Connect elements with directional arrows.
-- **Freehand Drawing**: Sketch freely with a pencil tool.
-- **Background Colors**: Customize the canvas background.
+The editor itself is built around the familiar infinite-canvas model: shapes, arrows, text, freehand drawing, and background controls.
 
 ![Whiteboard Example](/assets/modules/whiteboards/whiteboard-example-1.png)
-
-You can use whiteboards for anything — from quick sketches to detailed architecture diagrams.
 
 ![Architecture Diagram](/assets/modules/whiteboards/whiteboard-example-2.png)
 
@@ -37,24 +31,18 @@ You can use whiteboards for anything — from quick sketches to detailed archite
 
 ![Collaborative Drawing](/assets/modules/whiteboards/whiteboard-example-4.png)
 
-## Real-Time Collaboration
+## Real-time collaboration and sync behavior
 
-Whiteboards support real-time collaboration with:
+Whiteboards do update live, but it helps to understand the flavor of that synchronization. VOLT keeps board state in sync in real time and shows who else is present, yet the conflict model is intentionally simple. If local and remote edits collide at the wrong moment, the UI can ask you whether to keep your version or apply the remote one.
 
-- **Live Cursors**: See where other team members are working on the canvas.
-- **Presence Indicators**: Know who is currently viewing the board (e.g., "1 online").
-- **Delta Updates**: Only changes are transmitted, keeping the experience fast even on large boards.
+In practice, that keeps the experience responsive without pretending it is a fully magical merge engine.
 
-## Storage
+## Persistence and storage
 
-Whiteboard canvas state is saved to your team's cluster storage (MinIO). VOLT also generates thumbnail previews that appear in the listing view.
+Board state and supporting assets are stored on your team infrastructure, and the listing can show thumbnail previews derived from that state. So even though the whiteboard feels lightweight while you are using it, it is still part of the same storage model as the rest of the workspace.
 
-## Task: Create a collaborative whiteboard
+## When teams get the most value from whiteboards
 
-1. Click the **Create** button from the whiteboard listing view.
-2. Enter a **name** for the new whiteboard.
-3. Open the canvas and start drawing using the toolbar tools.
-4. Invite a teammate by sharing the whiteboard link or adding them to the board.
-5. Verify that your teammate's live cursor appears on the canvas.
+Whiteboards shine when an idea is still messy. They are the right place for early diagrams, process sketches, UI flows, rough architecture, and anything that should eventually become a cleaner document somewhere else.
 
-**Expected outcome:** Both participants can draw on the same canvas simultaneously, with live cursors visible in real time.
+That makes them a useful bridge between chat and formal writing.

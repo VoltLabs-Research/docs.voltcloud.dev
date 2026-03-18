@@ -1,44 +1,46 @@
 ---
 title: Atomic Strain
-description: Compute per-atom strain tensors from atomic configurations.
+description: Measure local deformation by comparing atomic neighborhoods against a reference configuration.
 ---
 
 ## Overview
 
-Atomic Strain computes per-atom strain tensors from atomic configurations. It calculates Green-Lagrangian strain, von Mises strain, and principal strains for deformation analysis in atomistic simulations.
+Atomic Strain compares each atom's neighborhood in the current frame against a reference frame and estimates the best local affine deformation that connects the two. From that fit, it reports strain-related measures such as shear strain, volumetric strain, deformation gradient, and optionally `D2min`.
+
+This makes it especially useful when you want to study local deformation relative to a known reference state rather than relative to an ideal crystal lattice.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `cutoff` | `float` | `3.0` | Cutoff radius for neighbor search. |
-| `reference` | `file` | — | Reference LAMMPS dump file. If omitted, the current frame is used (≈ zero strain). |
-| `eliminateCellDeformation` | `bool` | `false` | Eliminate cell deformation. |
-| `assumeUnwrapped` | `bool` | `false` | Assume unwrapped coordinates. |
-| `calcDeformationGradient` | `bool` | `true` | Compute deformation gradient F. |
+| `reference` | `file` | — | Reference LAMMPS dump file. If omitted, the current frame is used, which usually produces near-zero strain. |
+| `eliminateCellDeformation` | `bool` | `false` | Eliminate cell deformation before the local fit. |
+| `assumeUnwrapped` | `bool` | `false` | Assume coordinates are already unwrapped. |
+| `calcDeformationGradient` | `bool` | `true` | Compute deformation gradient `F`. |
 | `calcStrainTensors` | `bool` | `true` | Compute strain tensors. |
-| `calcD2min` | `bool` | `true` | Compute D²min (nonaffine displacement). |
+| `calcD2min` | `bool` | `true` | Compute `D2min`, the non-affine residual. |
+
+## Practical notes
+
+- This plugin does not currently emit principal strains, even though that is a common expectation from the name.
+- `invalid` is an important field. It marks atoms for which the local fit could not be computed reliably, and those atoms are emitted with zeroed deformation outputs.
+- Atomic Strain is often easiest to interpret when paired with a carefully chosen reference frame.
 
 ## Output
 
 ### `{outputBase}_atomic_strain.msgpack`
 
 ```ts
-// Voigt order: [xx, yy, zz, xy, xz, yz]
 type StrainTensor = [float, float, float, float, float, float];
-
-// Row-major 3×3: [xx, yx, zx, xy, yy, zy, xz, yz, zz]
 type DeformationGradient = [float, float, float, float, float, float, float, float, float];
 
 interface PerAtomProperties {
     id: int;
     shear_strain: float;
     volumetric_strain: float;
-    // when calcStrainTensors = true
     strain_tensor?: StrainTensor;
-    // when calcDeformationGradient = true
     deformation_gradient?: DeformationGradient;
-    // null when calcD2min = false
     D2min: float | null;
     invalid: boolean;
 }
@@ -57,6 +59,6 @@ interface AtomicStrainOutput {
 
 ## See Also
 
-- [Elastic Strain](/docs/plugins/elastic-strain) — crystal-referenced elastic strain
-- [Displacements Analysis](/docs/plugins/displacements-analysis) — displacement vectors between configurations
-- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — defect detection via CSP
+- [Elastic Strain](/docs/plugins/elastic-strain) — ideal-lattice elastic strain
+- [Displacements Analysis](/docs/plugins/displacements-analysis) — direct reference-versus-current displacement vectors
+- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — defect-oriented scalar highlighting

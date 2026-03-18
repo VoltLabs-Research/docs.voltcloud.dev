@@ -1,21 +1,29 @@
 ---
 title: Cluster Analysis
-description: Group particles into clusters based on distance cutoff or bond topology.
+description: Find connected particle clusters using a distance cutoff.
 ---
 
 ## Overview
 
-Cluster Analysis groups particles into clusters based on distance cutoff or bond topology. It identifies connected components, computes cluster sizes, centers of mass, and gyration radii — useful for studying nucleation, void formation, and phase separation.
+Cluster Analysis groups atoms into connected components using a cutoff-based neighbor graph. In practical terms, it answers a simple question: which atoms belong to the same connected aggregate under the distance rule you chose?
+
+That makes it useful for precipitates, fragments, void-related shells, molecular aggregates, and any workflow where connectivity matters more than crystal identity.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `cutoff` | `float` | `3.2` | Cutoff radius for neighbor search to define connectivity between atoms. |
+| `cutoff` | `float` | `3.2` | Cutoff radius used to define connectivity. |
 | `sortBySize` | `bool` | `true` | Sort clusters by size in descending order. |
-| `unwrap` | `bool` | `false` | Unwrap particle coordinates inside clusters. |
-| `centersOfMass` | `bool` | `false` | Compute cluster centers of mass (uniform weights). |
-| `radiusOfGyration` | `bool` | `false` | Compute radii and tensors of gyration (uniform weights). |
+| `unwrap` | `bool` | `false` | Unwrap particle coordinates inside each cluster. |
+| `centersOfMass` | `bool` | `false` | Compute cluster centers with uniform weights. |
+| `radiusOfGyration` | `bool` | `false` | Compute radii and tensors of gyration with uniform weights. |
+
+## Practical notes
+
+- The current implementation is cutoff-based. Bond-topology mode is not available in the runtime path used by this plugin.
+- Center-of-mass and gyration outputs are purely geometric here; they do not use atom-type-specific masses.
+- When enabled, unwrapped positions are reported per atom so you can inspect cluster geometry across periodic boundaries.
 
 ## Output
 
@@ -23,25 +31,19 @@ Cluster Analysis groups particles into clusters based on distance cutoff or bond
 
 ```ts
 type Vec3 = [float, float, float];
-
-// Voigt order symmetric tensor
 type GyrationTensor = [float, float, float, float, float, float];
 
 interface Cluster {
     cluster_id: int;
     size: int;
-    // when centersOfMass = true
     center?: Vec3;
-    // when radiusOfGyration = true
     radius_of_gyration?: float;
-    // when radiusOfGyration = true
     gyration_tensor?: GyrationTensor;
 }
 
 interface PerAtomProperties {
     id: int;
     cluster: int;
-    // when unwrap = true
     pos_unwrapped?: Vec3;
 }
 
@@ -61,5 +63,5 @@ interface ClusterAnalysisOutput {
 
 ## See Also
 
-- [Coordination Analysis](/docs/plugins/coordination-analysis) — neighbor statistics
-- [Structure Identification](/docs/plugins/structure-identification) — crystal structure classification
+- [Coordination Analysis](/docs/plugins/coordination-analysis) — local neighbor counts and RDF
+- [Structure Identification](/docs/plugins/structure-identification) — local crystal classification
