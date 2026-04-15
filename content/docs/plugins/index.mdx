@@ -559,6 +559,7 @@ Included examples:
 - [hello-world-plugin.zip](/assets/plugins/examples/hello-world-plugin.zip)
 - [arguments-example.zip](/assets/plugins/examples/arguments-example.zip)
 - [listing-example.zip](/assets/plugins/examples/listing-example.zip)
+- [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip)
 - [per-atom-properties.zip](/assets/plugins/examples/per-atom-properties.zip)
 
 ### `hello-world-plugin`
@@ -699,6 +700,107 @@ with open(f'{output_base}_example.msgpack', 'wb') as f:
 
 print(f'Wrote {output_base}_example.msgpack')
 ```
+
+### `atomistic-exporter-clusters`
+
+- Download: [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip)
+- This example shows how to export grouped atoms using `AtomisticExporter`.
+- It reads atom positions from the current dump and groups them into `Cluster 0`, `Cluster 1`, and `Cluster 2`.
+- Those keys are the groups VOLT uses to color the atoms in the viewer.
+- The grouping rule is intentionally simple: it uses `atom_id % 3` only to demonstrate the output format. Replace that part with your real clustering logic later.
+
+**Flow in the builder**
+
+`Modifier -> Arguments -> Context -> ForEach -> Entrypoint -> Exposure -> Export`
+
+To configure this workflow:
+
+- set the **Exposure** results file suffix to `example.msgpack`,
+- connect an **Export** node to that exposure,
+- choose **AtomisticExporter** as the exporter,
+- set the export type to `glb`.
+
+The Python code below writes a MessagePack file with `main_listing`, `sub_listings`, and a grouped `AtomisticExporter` payload. The keys `Cluster 0`, `Cluster 1`, and `Cluster 2` are the grouped export object consumed by VOLT.
+
+```python
+import msgpack
+import sys
+
+with open(sys.argv[1]) as f:
+    lines = f.read().splitlines()
+
+cols_idx = next(
+    idx for idx, line in enumerate(lines)
+    if line.startswith('ITEM: ATOMS')
+)
+
+cols = lines[cols_idx].split()[2:]
+required_cols = ('id', 'x', 'y', 'z')
+missing_cols = [column for column in required_cols if column not in cols]
+if missing_cols:
+    raise ValueError(f'Missing required columns: {", ".join(missing_cols)}')
+
+id_idx = cols.index('id')
+x_idx = cols.index('x')
+y_idx = cols.index('y')
+z_idx = cols.index('z')
+
+# This is only an example grouping strategy.
+# Replace atom_id % cluster_count with your real cluster assignment logic.
+cluster_count = 3
+cluster_labels = [f'Cluster {index}' for index in range(cluster_count)]
+grouped_atoms = {label: [] for label in cluster_labels}
+
+for raw_line in lines[cols_idx + 1:]:
+    values = raw_line.split()
+    atom_id = int(values[id_idx])
+    position = [
+        float(values[x_idx]),
+        float(values[y_idx]),
+        float(values[z_idx])
+    ]
+
+    cluster_label = cluster_labels[atom_id % cluster_count]
+    grouped_atoms[cluster_label].append({
+        'id': atom_id,
+        'pos': position
+    })
+
+export_groups = {
+    label: atoms
+    for label, atoms in grouped_atoms.items()
+    if atoms
+}
+
+cluster_rows = [
+    {
+        'cluster': label,
+        'atoms': len(atoms)
+    }
+    for label, atoms in export_groups.items()
+]
+
+payload = {
+    'main_listing': {
+        'cluster_count': len(export_groups),
+        'exported_atoms': sum(len(atoms) for atoms in export_groups.values())
+    },
+    'sub_listings': {
+        'clusters': cluster_rows
+    },
+    'export': {
+        'AtomisticExporter': export_groups
+    }
+}
+
+output_base = sys.argv[2]
+with open(f'{output_base}_example.msgpack', 'wb') as f:
+    f.write(msgpack.packb(payload, use_bin_type=True))
+
+print(f'Wrote {output_base}_example.msgpack with {len(export_groups)} atom groups')
+```
+
+If you open the resulting export in VOLT, each top-level key inside `AtomisticExporter` becomes a separate colored group in the viewer.
 
 ## Running plugins in the canvas
 
