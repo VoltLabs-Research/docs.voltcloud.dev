@@ -3,12 +3,6 @@ title: OpenDXA
 description: A modified Dislocation Extraction Algorithm pipeline for reconstructing dislocation networks from atomistic data.
 ---
 
-## Overview
-
-OpenDXA is one of the most ambitious plugins in the VOLT ecosystem. It does not just flag a few suspicious atoms and stop there. It runs a longer reconstruction pipeline that starts with local structure identification, builds crystalline regions, works through interface geometry, and ends by tracing dislocation lines and Burgers information.
-
-That is why this plugin tends to produce several outputs instead of a single result file. You are not only getting the dislocation network back. You are also getting supporting geometry and structure-analysis data that help explain how the network was inferred.
-
 ## Parameters
 
 | Parameter | Type | Default | Description |
@@ -22,12 +16,6 @@ That is why this plugin tends to produce several outputs instead of a single res
 | `linePointInterval` | `float` | `2.5` | Point interval on dislocation lines. |
 | `onlyPerfectDislocations` | `bool` | `false` | Restrict the result to perfect dislocations. |
 | `markCoreAtoms` | `bool` | `false` | Historical parameter. Core-atom export is currently not emitted by the implementation. |
-
-## Practical notes
-
-- `PTM` is the richest mode when you need orientations and correspondences.
-- The plugin emits more than just dislocation lines. Meshes, simulation-cell data, structure stats, and grouped atoms are part of the normal output story.
-- The `markCoreAtoms` parameter still appears in the interface, but the current implementation does not export a `_core_atoms.msgpack` file.
 
 ## Output
 

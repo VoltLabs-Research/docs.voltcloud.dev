@@ -3,25 +3,12 @@ title: Structure Identification
 description: Classify local atomic environments and provide the structural labels many other plugins build on.
 ---
 
-## Overview
-
-Structure Identification is one of the foundational plugins in the whole ecosystem. On its own, it classifies atoms by local structure. But it also acts as a supporting layer for other workflows such as OpenDXA and Grain Segmentation, which rely on those classifications and, in PTM mode, on orientation-related data as well.
-
-That is why this plugin is worth understanding even if you rarely run it in isolation.
-
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `mode` | `string` | `CNA` | Identification algorithm. Options exposed in the product are `CNA`, `PTM`, and `DIAMOND`. |
 | `rmsd` | `float` | `0.1` | RMSD threshold for PTM classification. Only applies in PTM mode. |
-
-## Practical notes
-
-- `PTM` is the richest mode when you need orientations and correspondences.
-- `CNA` is the lighter structural screening path.
-- `DIAMOND` appears as an exposed mode, but the current implementation is not as cleanly separated internally as the UI may suggest.
-- The plugin also emits grouped atoms in a separate `_atoms.msgpack` file.
 
 ## Output
 

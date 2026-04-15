@@ -3,24 +3,12 @@ title: Centrosymmetry Parameter
 description: Measure local centrosymmetry as a fast way to highlight disorder and defect-rich regions.
 ---
 
-## Overview
-
-Centrosymmetry Parameter is a classic defect-visualization tool. It gives each atom a scalar value that grows as the local environment becomes less centrosymmetric, which makes it especially useful for surfaces, defect cores, and distorted crystalline regions.
-
-It is best used as a highlighting metric rather than as a full defect classifier. The output tells you where local symmetry is breaking down, and you decide how to interpret that in the context of the system.
-
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `numNeighbors` | `int` | `12` | Number of nearest neighbors to consider. Use a value consistent with the lattice you expect. |
 | `mode` | `string` | `conventional` | CSP calculation mode. Options: `conventional`, `matching`. |
-
-## Practical notes
-
-- The plugin always emits a histogram summary alongside per-atom CSP values.
-- The histogram currently uses a fixed number of bins in the implementation.
-- Atoms with too few neighbors for the requested calculation are emitted with `0.0`, which matters near surfaces or in sparse regions.
 
 ## Output
 

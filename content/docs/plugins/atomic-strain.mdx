@@ -3,12 +3,6 @@ title: Atomic Strain
 description: Measure local deformation by comparing atomic neighborhoods against a reference configuration.
 ---
 
-## Overview
-
-Atomic Strain compares each atom's neighborhood in the current frame against a reference frame and estimates the best local affine deformation that connects the two. From that fit, it reports strain-related measures such as shear strain, volumetric strain, deformation gradient, and optionally `D2min`.
-
-This makes it especially useful when you want to study local deformation relative to a known reference state rather than relative to an ideal crystal lattice.
-
 ## Parameters
 
 | Parameter | Type | Default | Description |
@@ -20,12 +14,6 @@ This makes it especially useful when you want to study local deformation relativ
 | `calcDeformationGradient` | `bool` | `true` | Compute deformation gradient `F`. |
 | `calcStrainTensors` | `bool` | `true` | Compute strain tensors. |
 | `calcD2min` | `bool` | `true` | Compute `D2min`, the non-affine residual. |
-
-## Practical notes
-
-- This plugin does not currently emit principal strains, even though that is a common expectation from the name.
-- `invalid` is an important field. It marks atoms for which the local fit could not be computed reliably, and those atoms are emitted with zeroed deformation outputs.
-- Atomic Strain is often easiest to interpret when paired with a carefully chosen reference frame.
 
 ## Output
 

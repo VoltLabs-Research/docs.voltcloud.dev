@@ -1,88 +1,745 @@
 ---
 title: Plugin System
-description: How VOLT turns node-based workflows and scientific binaries into analysis results.
+description: Build plugins from the UI, choose the right entrypoint runtime, and return listings, per-atom properties, and 3D exports.
 ---
 
 <Callout type="info">
-**TL;DR** -- In the UI, a plugin is a workflow. Under the hood, that workflow eventually drives one or more scientific binaries from the wider VOLT ecosystem. The outputs are usually MessagePack exposures that VOLT can list, export, and render back into the viewer.
+**TL;DR** -- You create the workflow in the UI with nodes. Your code only needs to respect two contracts: write the file declared by the **Exposure** node, and shape the MessagePack payload with the keys VOLT understands.
 </Callout>
 
-## Overview
+## Build a plugin
 
-Plugins are where VOLT's scientific side becomes extensible.
+You do not write a `plugin.json` by hand. You build the workflow in the UI.
 
-When a team is created and a cluster is connected, a default set of plugins is deployed so analysis can start immediately. Those plugins are built on top of the open-source algorithm repositories maintained in the ecosystem, which means the product-level plugin system and the lower-level scientific code are closely related but not identical.
+For most plugins, the authoring flow is:
 
-That distinction helps avoid confusion: the plugin you see in VOLT is the workflow and runtime contract; the repository in `plugins/` is usually the underlying scientific implementation.
+1. add your `modifier`, `arguments`, `context`, `forEach`, and `entrypoint` nodes,
+2. add one **Exposure** node for each result file you want VOLT to ingest,
+3. if one of those results should become a 3D artifact, connect an **Export** node to that exposure,
+4. make your script or binary write the expected MessagePack file.
 
-## What a plugin really is
+In practice, each node answers one question:
 
-The easiest way to think about a plugin is as a workflow graph with enough structure for VOLT to understand how to execute it safely and how to interpret the results afterward.
+- **Modifier**: what is this plugin called and how should it appear in the UI?
+- **Arguments**: which parameters should the user configure before execution?
+- **Context** and **ForEach**: which trajectory data is the plugin iterating over?
+- **Entrypoint**: what runtime should execute the payload you uploaded?
+- **Exposure**: which output file should VOLT read after execution?
+- **Export**: if that exposure contains geometry or chart data, how should VOLT render it?
 
-![Dislocation Analysis workflow](/assets/plugins/plugin-example-workflow.png)
+The mental model is still simple:
 
-The workflow defines metadata, user-facing arguments, the execution context, iteration behavior, the actual binary or entrypoint to run, and the outputs that should come back into the platform as exposures or exports.
+- the **Entrypoint** node runs your uploaded code,
+- the **Exposure** node tells VOLT which output file to ingest,
+- the **Export** node tells VOLT how to turn the `export` payload into a GLB or chart.
 
-## Main node types
+## Node-by-node configuration guide
 
-### Modifier node
+This is the shortest way to understand what each node does and how it should be configured.
 
-This is the descriptive layer: name, version, authoring details, and the basic information the UI needs to present the plugin in a usable way.
+### `Modifier`
 
-### Arguments node
+The **Modifier** node defines how the plugin appears in VOLT.
 
-Arguments define what the user is allowed to configure before a run starts. Some values are visible and editable in the UI, while others can be hidden and fixed by the plugin author.
+Typical configuration:
 
-That is what lets a plugin feel approachable in the product even when the underlying binary expects a fairly technical CLI.
+| Field | Example value | What it does |
+|---|---|---|
+| **Name** | `Hello World Plugin` | Plugin name shown in the UI |
+| **Version** | `1.0.0` | Visible plugin version |
+| **Description** | `Prints execution information to the log` | Short plugin summary |
+| **Author** | `Volt Labs` | Plugin author |
+| **Icon** | `TbPlugConnected` | Icon used in the plugin card/editor |
 
-### Context and `forEach`
+That is usually enough for a first plugin.
 
-These nodes define what the workflow will iterate over. A common pattern is to bind the workflow to trajectory dumps and then process them frame by frame through a `forEach` step.
+The image below shows a typical `Modifier` node configuration in the builder.
 
-This is one reason analysis progress in VOLT is naturally frame-oriented.
+![Modifier node configuration](/assets/plugins/modifier-node-config.png)
 
-### Entrypoint
+### `Arguments`
 
-The entrypoint is where the workflow crosses from product logic into execution. It defines the binary or script payload and the argument template used at runtime.
+The **Arguments** node defines the parameters that the program receives at runtime.
 
-In many of the built-in scientific plugins, that entrypoint ultimately invokes a compiled executable built from one of the repositories in the open-source plugin layer.
+If your **Entrypoint** arguments template contains `{{ plugin-arguments.as_str }}`, VOLT serializes the configured arguments and passes them to your program.
 
-### Exposure nodes
+For Python plugins, those values usually end up in `sys.argv` together with the input path and the output base path.
 
-Exposure nodes tell VOLT which result files matter after execution. They are the bridge between raw plugin output and something the product can present as a result.
+Example configuration:
+| Field | Example value | What it does |
+|---|---|---|
+| **Argument** | `cutoff` | CLI parameter name |
+| **Type** | `number`, `boolean`, `string`, `select`, `list` | Input type shown in the UI |
+| **Label** | `Cutoff` | User-facing label |
+| **Default Value** | `3.25` | Default runtime value |
+| **Min / Max / Step** | `0 / 10 / 0.05` | Numeric constraints |
+| **Options** | `FCC`, `HCP`, `BCC` | Options for select-like inputs |
 
-An analysis can produce more than one meaningful output, which is why a single run may surface multiple exposures, listings, sub-listings, charts, or 3D artifacts.
+The image below shows an `Arguments` node with several argument types configured in the builder.
 
-### Export nodes
+![Arguments node configuration](/assets/plugins/arguments-node-config.png)
 
-Export nodes turn selected outputs into richer visual forms such as atomistic point clouds, meshes, dislocation geometry, or chart images. These exporters are part of the reason plugin results can come back into the viewer instead of staying as detached files.
+### `Context`
 
-## Why the design is node-based
+The **Context** node defines where the workflow gets its runtime data from.
 
-The node model gives VOLT a lot more flexibility than a fixed plugin ABI would. It separates workflow planning from execution, makes room for hidden or computed arguments, and lets the runtime handle iteration, branching, nested plugin references, and result processing in a structured way.
+For normal trajectory-based plugins, the configuration is usually simple:
 
-That is also why the plugin system can evolve without every analysis looking like a one-off integration.
+| Field | Example value | What it does |
+|---|---|---|
+| **Source** | `trajectory_dumps` | Uses the trajectory frames generated by VOLT |
 
-## Output model
+This node is usually stable across plugins. Most analysis workflows use `trajectory_dumps`.
 
-Most plugin data returns as MessagePack, but the important part is the shape, not just the file extension.
+The image below shows the `Context` node configured with `trajectory_dumps`.
+
+![Context node configuration](/assets/plugins/context-node-config.png)
+
+### `ForEach`
+
+The **ForEach** node defines how the workflow iterates over the selected context.
+
+Typical configuration:
+
+| Field | Example value | What it does |
+|---|---|---|
+| **Iterable Source** | `{{ trajectory-context.trajectory_dumps }}` | Iterates through the trajectory dumps one by one |
+
+This is what makes most plugins run frame by frame.
+
+The image below shows the `ForEach` node configured with `{{ trajectory-context.trajectory_dumps }}`.
+
+![ForEach node configuration](/assets/plugins/foreach-node-config.png)
+
+The next image shows the autocomplete that appears while typing `{{ tra... }}`. This is useful because it makes clear that `trajectory_dumps` comes from the `Context` node and can be referenced directly from `ForEach`.
+
+![ForEach trajectory dumps autocomplete](/assets/plugins/foreach-trajectory-dumps.png)
+
+### `Entrypoint`
+
+The **Entrypoint** node defines how the uploaded payload is executed.
+
+Main fields:
+
+| Field | Example value | What it does |
+|---|---|---|
+| **Type** | `python-script` | Chooses the runtime mode |
+| **Binary / Package** | `listing-example.zip` | Uploaded file to execute |
+| **Entry Script** | `main.py` | Script or executable inside the uploaded package |
+| **Requirements File** | `msgpack` | Python dependencies to install |
+| **Arguments** | `{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}` | Runtime argument template |
+| **Timeout** | `-1` | Optional execution timeout |
+
+Use this node to decide whether the payload is a Python ZIP, a single executable, or a packaged executable with extra runtime files.
+
+The first image below shows an `Entrypoint` node configured for a binary-style payload.
+
+![Binary entrypoint node configuration](/assets/plugins/binary-entrypoint-node-config.png)
+
+The next image shows the `Entrypoint` node configured as `python-script`.
+
+![Python script entrypoint node configuration](/assets/plugins/python-script-entrypoint-node-config.png)
+
+When the type is `python-script`, VOLT enables an extra field to specify the PyPI dependencies required by the script. Those dependencies are written in **Requirements File** and are installed before execution.
+
+### `Exposure`
+
+The **Exposure** node tells VOLT which output file should be ingested after execution.
+
+Typical configuration:
+
+| Field | Example value | What it does |
+|---|---|---|
+| **Exposure Name** | `Structure Identification` | Result name shown in VOLT |
+| **Results File Suffix** | `atoms.msgpack` | File suffix your program must write |
+| **Icon** | `TbEye` | Optional result icon |
+
+The first image below shows one `Entrypoint` connected to several `Exposure` nodes. This is useful because a single execution can produce multiple result files, each with its own exposure.
+
+![Entrypoint with many exposures](/assets/plugins/entrypoint-with-many-exposures-example.png)
+
+The next image shows several `Exposure` node configurations together with the `Export` node configuration connected to each one. This is the pattern to follow when different result files from the same entrypoint need different exporters.
+
+![Exposure and export configuration examples](/assets/plugins/exposure-export-config.png)
+
+### `Export`
+
+The **Export** node tells VOLT how to convert the `export` payload from an exposure into an artifact.
+
+Typical configuration:
+
+| Field | Example value | What it does |
+|---|---|---|
+| **Exporter** | `AtomisticExporter` | Chooses the exporter implementation |
+| **Type** | `glb` | Defines the artifact type |
+| **Options** | `{ "smoothIterations": 8 }` | Exporter-specific options |
+
+This node always depends on an **Exposure** node, because the exporter reads the `export` key from the exposure result file.
+
+## Choosing the right Entrypoint type
+
+The most important decision in the workflow is usually the **Type** field in the **Entrypoint** node.
+
+### `Executable`
+
+Choose **Executable** when you already have a single runnable binary.
+
+- Upload a binary file directly.
+- You do **not** set `Entry Script`.
+- You do **not** use `Requirements File`.
+- The daemon runs that binary as-is.
+
+Use this when your plugin payload is already one compiled executable and does not need extra project files around it.
+
+### `Python Script`
+
+Choose **Python Script** when your plugin is Python code packaged as a ZIP project.
+
+- Upload a **ZIP** file that contains your Python project.
+- Set **Entry Script** to the Python file inside that ZIP, for example `main.py` or `scripts/cna_plugin_wrapper.py`.
+- If your project needs Python dependencies, paste them into **Requirements File**.
+- If it does not need dependencies, leave **Requirements File** empty.
+
+### `Packaged Executable`
+
+Choose **Packaged Executable** when your runtime is a ZIP bundle that contains an executable plus supporting files such as `bin/`, `lib/`, lookup tables, or other resources.
+
+- Upload a **ZIP** file.
+- Set **Entry Script** to the executable or launcher inside the archive.
+- Do **not** use **Requirements File**.
+
+At runtime, team clusters extracts the ZIP and resolves the executable path from **Entry Script** before running it.
+
+Use this when your plugin needs more than one file to run. A typical case is a packaged scientific binary with shared libraries. This is the pattern used by the native OpenDXA executable bundle.
+
+### A practical rule
+
+| If your payload is... | Entrypoint type |
+|---|---|
+| one compiled binary file | `Executable` |
+| a Python project in a ZIP | `Python Script` |
+| a ZIP with an executable plus `lib/`, `bin/`, or other runtime files | `Packaged Executable` |
+
+### What to put in `Arguments`
+
+The **Arguments** field is the command template passed to the selected runtime.
+
+The most common values are:
+
+- `{{ foreach-trajectory-dumps.currentValue.path }}` → the current input dump path
+- `{{ foreach-trajectory-dumps.outputPath }}` → the output base path used by exposures
+- `{{ plugin-arguments.as_str }}` → all UI-configured plugin arguments serialized as CLI flags
+- `{{ <entrypoint-node-id>.projectPath }}` → the extracted package directory, useful for packaged executables
+
+For example, a Python ZIP usually looks like this:
+
+```text
+{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}
+```
+
+And a packaged executable may need something like this:
+
+```text
+--library-path {{ opendxa-entrypoint.projectPath }}/lib {{ opendxa-entrypoint.projectPath }}/bin/opendxa {{ foreach-trajectory-dumps.outputPath }}_annotated.dump {{ foreach-trajectory-dumps.outputPath }}
+```
+
+<Callout type="info">
+The upload button in the **Entrypoint** editor is only enabled after the plugin has been saved at least once. In other words: create the workflow, save it, then upload the binary or ZIP.
+</Callout>
+
+## The one rule that matters most
+
+The **Exposure** node is a file contract.
+
+If the exposure says:
+
+| Field | Value |
+|---|---|
+| Exposure Name | `Structure Identification` |
+| Results File Suffix | `atoms.msgpack` |
+
+and the entrypoint receives `abc` as the output base, then your code must write:
+
+`abc_atoms.msgpack`
+
+That is the first thing to get right. If the filename does not match, VOLT will not ingest the result even if the payload itself is valid.
+
+For example, if your entrypoint receives the output base in `sys.argv[2]`, the code can write the exposure file like this:
+
+```python
+import msgpack
+import sys
+
+output_base = sys.argv[2]
+
+payload = {
+    "main_listing": {
+        "identified_atoms": 9211,
+        "defect_atoms": 314
+    }
+}
+
+with open(f"{output_base}_atoms.msgpack", "wb") as f:
+    f.write(msgpack.packb(payload, use_bin_type=True))
+```
+
+If `output_base` is `abc`, this writes `abc_atoms.msgpack`, which matches the `Exposure` node contract.
+
+## What the Exposure node is for
+
+In practice, the fields you will use the most are:
+
+| Exposure field | What it means |
+|---|---|
+| **Exposure Name** | The label shown in VOLT for that result. |
+| **Results File Suffix** | The exact suffix your code must write after the output base, for example `atoms.msgpack`, `defect_mesh.msgpack`, or `dislocations.msgpack`. |
+
+The rest of the exposure settings are more advanced. For most first plugins, **name** plus **results suffix** is enough.
+
+## What your code should receive
+
+The exact entrypoint arguments depend on how you configured the node, but the common pattern is:
+
+- input dump path,
+- output base path,
+- and optional serialized parameters.
+
+For example:
+
+```python
+import sys
+import msgpack
+
+input_file = sys.argv[1]
+output_base = sys.argv[2]
+
+payload = {
+    "main_listing": {
+        "ok": True
+    }
+}
+
+with open(f"{output_base}_results.msgpack", "wb") as f:
+    f.write(msgpack.packb(payload, use_bin_type=True))
+```
+
+If your exposure suffix is `results.msgpack`, that file will be picked up correctly.
+
+## What can go inside one exposure file
+
+An exposure file is usually a MessagePack object with one or more of these keys:
 
 ```json
 {
   "main_listing": {},
   "sub_listings": {},
-  "per-atom-properties": {}
+  "per-atom-properties": [],
+  "export": {}
 }
 ```
 
-The platform uses that structure to build listings, summaries, overlays, and exports. In other words, MessagePack is not just a storage choice. It is part of the contract between scientific code and product experience.
+| Key | Use it for |
+|---|---|
+| `main_listing` | Small summary values |
+| `sub_listings` | Tables with many rows |
+| `per-atom-properties` | Values attached to atoms by `id` |
+| `export` | Data consumed by `AtomisticExporter`, `MeshExporter`, `DislocationExporter`, or `ChartExporter` |
 
-## Plugins and the wider ecosystem
+One exposure can contain only one of these keys, or several at once.
 
-The built-in scientific plugins are not isolated projects. They share infrastructure through tools such as [CoreToolkit](/docs/open-source/core-toolkit), and some plugin repositories depend on others internally. `StructureIdentification`, for example, acts both as a user-facing algorithm and as a building block for more advanced analyses.
+## Returning listings
 
-That layered relationship is one of the reasons VOLT can present plugins cleanly in the UI without flattening the underlying science into a pile of unrelated binaries.
+If you want VOLT to show summary values and result tables, return `main_listing` and `sub_listings`.
 
-<Callout type="info">
-If you want the repository-level picture behind the plugin system, continue with [Open Source Ecosystem](/docs/open-source). If you want to build your own workflow-compatible plugin, see [Plugin Development](/docs/open-source/plugin-development).
-</Callout>
+```python
+payload = {
+    "main_listing": {
+        "total_points": 1145,
+        "dislocations": 319,
+        "total_length": 2825.21
+    },
+    "sub_listings": {
+        "dislocation_segments": [
+            {
+                "segment_id": 0,
+                "length": 11.45,
+                "magnitude": 0.408,
+                "burgers_vector": [-0.16, -0.16, -0.33]
+            }
+        ]
+    }
+}
+```
+
+Use this when your result is mostly tabular or summary-oriented.
+
+## Returning `per-atom-properties`
+
+Use `per-atom-properties` when you want VOLT to attach analysis values back to atoms.
+
+The important rule is that each row must identify the atom with `id`.
+
+### Row format
+
+```json
+{
+  "per-atom-properties": [
+    {
+      "id": 1,
+      "csp": 0.042,
+      "strain": [0.10, 0.02, -0.01],
+      "structure_type": 2
+    },
+    {
+      "id": 2,
+      "csp": 0.731,
+      "strain": [0.18, 0.05, 0.00],
+      "structure_type": 0
+    }
+  ]
+}
+```
+
+### Columnar format
+
+VOLT also accepts a columnar shape:
+
+```json
+{
+  "per-atom-properties": {
+    "id": [1, 2],
+    "csp": [0.042, 0.731],
+    "strain": [
+      [0.10, 0.02, -0.01],
+      [0.18, 0.05, 0.00]
+    ],
+    "structure_type": [2, 0]
+  }
+}
+```
+
+Important details:
+
+- `id` is what links the property row back to the atom.
+- Scalar values work as-is.
+- Array values also work. VOLT flattens them into fields such as `strain[0]`, `strain[1]`, and `strain[2]` when needed.
+- If you want users to filter atoms, color by a numeric property, or inspect analysis values in the particles table, this is the key to use.
+
+## Using `AtomisticExporter`
+
+Use **AtomisticExporter** when your result is a set of atoms or points that should come back into the viewer as a GLB artifact.
+
+In the **Export** node:
+
+- choose **AtomisticExporter**,
+- choose export type **glb**,
+- connect that export node to the exposure that will contain the atom payload.
+
+Then write the export payload inside the same MessagePack file under `export`.
+
+### Single-object export format
+
+```json
+{
+  "export": {
+    "AtomisticExporter": {
+      "FCC": [
+        { "id": 1, "pos": [0.0, 0.0, 0.0] },
+        { "id": 2, "pos": [0.5, 0.5, 0.0] }
+      ],
+      "HCP": [
+        { "id": 3, "pos": [1.0, 0.0, 0.0] }
+      ],
+      "Other": [
+        { "id": 4, "pos": [1.5, 0.5, 0.0] }
+      ]
+    }
+  }
+}
+```
+
+### Array export format
+
+```json
+{
+  "export": [
+    {
+      "AtomisticExporter": {
+        "FCC": [
+          { "id": 1, "pos": [0.0, 0.0, 0.0] }
+        ]
+      }
+    },
+    {
+      "AtomisticExporter": {
+        "Defects": [
+          { "id": 9, "pos": [2.0, 0.0, 0.0] }
+        ]
+      }
+    }
+  ]
+}
+```
+
+Important details:
+
+- VOLT accepts both envelopes: one exporter object, or an array of exporter objects.
+- In the single-object form, the payload is a grouped object where each key is a group name.
+- Those group names drive the colouring in the viewer.
+- Names like `FCC`, `BCC`, `HCP`, `Other`, or `Cluster 7` are especially useful because they map naturally to the existing palettes.
+- For each atom, `pos` is the required field.
+- If you use the array form, ClusterDaemon generates one artifact per array entry.
+
+This is the exporter to study first if you want to reproduce outputs like Structure Identification or coherent crystalline region overlays.
+
+## One exposure can do more than one thing
+
+You do not need separate files for every kind of result.
+
+For example, one exposure can return:
+
+- a summary in `main_listing`,
+- atom-attached values in `per-atom-properties`,
+- and a 3D overlay in `export`.
+
+```json
+{
+  "main_listing": {
+    "identified_atoms": 9211,
+    "defect_atoms": 314
+  },
+  "per-atom-properties": [
+    { "id": 1, "structure_type": 2 },
+    { "id": 2, "structure_type": 0 }
+  ],
+  "export": {
+    "AtomisticExporter": {
+      "FCC": [
+        { "id": 1, "pos": [0, 0, 0] }
+      ],
+      "Other": [
+        { "id": 2, "pos": [1, 0, 0] }
+      ]
+    }
+  }
+}
+```
+
+That pattern is often the most useful one: one exposure file, several ways for the user to inspect the same analysis.
+
+## Downloadable example plugins
+
+These ZIP files are meant to be used as the smallest possible entrypoint examples.
+
+They only contain the plugin code. The workflow itself is still something you configure from the UI with nodes.
+
+Included examples:
+
+- [hello-world-plugin.zip](/assets/plugins/examples/hello-world-plugin.zip)
+- [arguments-example.zip](/assets/plugins/examples/arguments-example.zip)
+- [listing-example.zip](/assets/plugins/examples/listing-example.zip)
+- [per-atom-properties.zip](/assets/plugins/examples/per-atom-properties.zip)
+
+### `hello-world-plugin`
+
+- Download: [hello-world-plugin.zip](/assets/plugins/examples/hello-world-plugin.zip)
+- This is the smallest possible example of an **Entrypoint** node.
+- Its purpose is to show that VOLT executes your script and that anything you `print(...)` appears in the execution log.
+- It does not write an exposure file. You use it to understand entrypoint execution first, before adding `Exposure` outputs.
+
+**Flow in the builder**
+
+`Modifier -> Arguments -> Context -> ForEach -> Entrypoint`
+
+For this example, the **Arguments** node can stay empty. The goal is to understand the smallest possible workflow that still executes code.
+
+The first image shows the full workflow in the builder. This matters because it makes clear that the example stops at **Entrypoint** and does not add an **Exposure** node.
+
+![Hello World workflow](/assets/plugins/hello-world-example-workflow.png)
+
+The next image shows the **Entrypoint** node configuration. This is where the ZIP is uploaded and where VOLT is told how to execute the Python script inside it.
+
+![Hello World entrypoint configuration](/assets/plugins/hello-world-example-entrypoint.png)
+
+The Python code inside the ZIP is intentionally minimal. Its only job is to print information so you can verify that execution happened.
+
+```python
+import sys
+
+print('Hello world VOLT!')
+
+# VOLT first-argument correspond to the input file.
+input_file = sys.argv[1]
+
+print(f'Input file: {input_file}')
+```
+
+The last image shows the execution log. This is the expected result of the example: the `print(...)` output appears in the log after the **Entrypoint** node runs.
+
+![Hello World execution log](/assets/plugins/hello-world-example-log.png)
+
+### `arguments-example`
+
+- Download: [arguments-example.zip](/assets/plugins/examples/arguments-example.zip)
+- This example shows exactly what the **Entrypoint** node passes into your script through `sys.argv`.
+- Its purpose is to help you inspect the real runtime arguments from the execution log.
+- It is the fastest way to understand how the input file path, output base path, and any UI-configured arguments arrive in Python.
+
+**Flow in the builder**
+
+`Modifier -> Arguments -> Context -> ForEach -> Entrypoint`
+
+This is the example to use when you want to understand the **Arguments** node better, because it makes the program print the received arguments directly to the execution log.
+
+The image below shows the full picture for this example. At the top, you can see the user-facing arguments as friendly inputs. In the center, you can see the workflow itself. At the bottom, you can see the `Arguments` node configuration that defines those same inputs for the program.
+
+![Arguments plugin example](/assets/plugins/arguments-pugin-example.png)
+
+The Python code inside `arguments-example.zip` is intentionally minimal. It only prints the received arguments so you can inspect exactly what VOLT passed into the script.
+
+```python
+import sys
+
+print('sys.argv:')
+for idx, arg in enumerate(sys.argv):
+    print(idx, arg)
+```
+
+The next image shows the execution log for this example. This is the expected result: the script lists the received arguments one by one, which makes it easy to verify the final runtime values.
+
+![Arguments plugin example log](/assets/plugins/arguments-plugin-example-log.png)
+
+### `listing-example`
+
+- Download: [listing-example.zip](/assets/plugins/examples/listing-example.zip)
+- This example shows how an **Exposure** node can return `main_listing` and `sub_listings`.
+- Its purpose is to teach the result shape VOLT reads to render summary values and result tables.
+- If the Exposure node uses `example.msgpack` as its results suffix, this script writes the correct file: `{outputBase}_example.msgpack`.
+- Once the run finishes, the output is visible through the exposure result in VOLT rather than only in the execution log.
+
+**Flow in the builder**
+
+`Modifier -> Arguments -> Context -> ForEach -> Entrypoint -> Exposure`
+
+Here the important node is **Exposure**, because it tells VOLT to ingest the MessagePack file written by the program and render the listing output in the UI.
+
+The first image shows the full workflow. The important part is the last node: **Exposure**. That is the node that reads the file exported by the code.
+
+![Listing Example workflow](/assets/plugins/listing-example-workflow.png)
+
+The next image shows the **Exposure** node configuration used by this example. This is where the results file suffix is defined, so it must match the filename written by the Python code.
+
+![Listing Example exposure configuration](/assets/plugins/listing-example-exposure-config.png)
+
+The Python code below writes the MessagePack file consumed by that **Exposure** node.
+
+```python
+import msgpack
+import sys
+
+# Each key in main_listing and sub_listings becomes a column name in VOLT.
+payload = {
+    'main_listing': {
+        'average_segment_length': 8.856480893829213,
+        'max_segment_length': 15.068283281607219,
+        'min_segment_length': 0.0004022584697172903,
+        'total_length': 2825.2174051315187,
+        'total_points': 1145,
+        'dislocations': 319
+    },
+    'sub_listings': {
+        'circuit_information': [
+            {
+                'average_edge_count': 5.155642023346304,
+                'dangling_circuits': 0,
+                'total_circuits': 514
+            }
+        ],
+        'dislocation_segments': [
+            {
+                'burgers_vector': [-0.16666666666666669, -0.16666666666666666, -0.3333333333333333],
+                'length': 11.45334956118728,
+                'magnitude': 0.408248290463863,
+                'segment_id': 0
+            },
+            {
+                'burgers_vector': [-0.3333333333333333, 0.16666666666666652, 0.16666666666666674],
+                'length': 10.363263816655667,
+                'magnitude': 0.40824829046386296,
+                'segment_id': 1
+            }
+        ]
+    }
+}
+
+output_base = sys.argv[2]
+with open(f'{output_base}_example.msgpack', 'wb') as f:
+    f.write(msgpack.packb(payload, use_bin_type=True))
+
+print(f'Wrote {output_base}_example.msgpack')
+```
+
+### `per-atom-properties`
+
+- Download: [per-atom-properties.zip](/assets/plugins/examples/per-atom-properties.zip)
+- This example shows how to return `per-atom-properties` from an **Exposure** node.
+- Its purpose is to attach derived values back to atoms by `id`.
+- Those values can then be used in the particles table, filters, and color coding workflows.
+- It does not create a GLB by itself. It teaches the per-atom data contract, not a 3D exporter.
+
+**Flow in the builder**
+
+`Modifier -> Arguments -> Context -> ForEach -> Entrypoint -> Exposure`
+
+This flow looks similar to the listing example, but the exposure payload is different: instead of `main_listing` / `sub_listings`, it returns `per-atom-properties` keyed by atom `id`.
+
+```python
+import math
+import msgpack
+import sys
+
+with open(sys.argv[1]) as f:
+    lines = f.read().splitlines()
+
+cols_idx = next(
+    idx for idx, line in enumerate(lines)
+    if line.startswith('ITEM: ATOMS')
+)
+
+cols = lines[cols_idx].split()[2:]
+id_idx = cols.index('id')
+x_idx = cols.index('x') if 'x' in cols else None
+y_idx = cols.index('y') if 'y' in cols else None
+z_idx = cols.index('z') if 'z' in cols else None
+
+rows = []
+for raw_line in lines[cols_idx + 1:]:
+    values = raw_line.split()
+    atom_id = int(values[id_idx])
+
+    position = None
+    if x_idx is not None and y_idx is not None and z_idx is not None:
+        position = [
+            float(values[x_idx]),
+            float(values[y_idx]),
+            float(values[z_idx])
+        ]
+
+    rows.append({
+        'id': atom_id,
+        'structure_type': atom_id % 4,
+        'coordination': 12 if atom_id % 2 == 0 else 11,
+        'distance_from_origin': math.sqrt(sum(component * component for component in position)) if position else 0.0,
+        'position_copy': position or [0.0, 0.0, 0.0]
+    })
+
+payload = {
+    'per-atom-properties': rows
+}
+
+output_base = sys.argv[2]
+with open(f'{output_base}_example.msgpack', 'wb') as f:
+    f.write(msgpack.packb(payload, use_bin_type=True))
+
+print(f'Wrote {output_base}_example.msgpack')
+```

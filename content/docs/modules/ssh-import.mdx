@@ -51,12 +51,6 @@ That is the important shift: SSH Import is not just a downloader. It is an alter
 
 The runtime is built around LAMMPS-oriented inputs such as dump files, data files, and archives that contain them. If the selected input expands into multiple valid simulation files, the daemon processes them as part of the same import workflow.
 
-## Current product reality
-
-One thing worth knowing is that the remote-browsing and connection-management experience is more visible in the current UI than the import action itself. The backend and daemon runtime clearly support queue-based trajectory import over SSH, but the workflow may feel more operational than polished depending on which part of the product you are using.
-
-That does not make the module less valuable. It just means it helps to think of SSH Import as a runtime capability first and a UI surface second.
-
 ## Why teams use it
 
 SSH Import is most useful when your cluster-side workflow already lives near a remote machine. It avoids the common pattern of pulling huge files down to a laptop just to push them back into another system moments later.

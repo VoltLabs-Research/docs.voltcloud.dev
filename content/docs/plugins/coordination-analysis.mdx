@@ -3,24 +3,12 @@ title: Coordination Analysis
 description: Count neighbors within a cutoff and compute a radial distribution function for the frame.
 ---
 
-## Overview
-
-Coordination Analysis is one of the simplest and most useful baseline plugins in the catalog. It counts how many neighbors each atom has inside a chosen cutoff and, at the same time, computes a radial distribution function for the full system.
-
-That makes it a good first pass when you want a quick read on local environment and global pair structure without jumping immediately into a heavier structural workflow.
-
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `cutoff` | `float` | `3.2` | Cutoff radius for neighbor search. |
 | `rdfBins` | `int` | `500` | Number of bins for RDF calculation. |
-
-## Practical notes
-
-- The plugin reports coordination counts and a global RDF. It does not separately label atoms as under-coordinated or over-coordinated for you.
-- This is a strong quick-look tool, but a deliberately lightweight one.
-- The RDF is normalized using the simulation-cell volume, so sensible cell metadata matters.
 
 ## Output
 

@@ -3,12 +3,6 @@ title: Grain Segmentation
 description: Segment polycrystalline regions by grouping atoms with compatible orientations.
 ---
 
-## Overview
-
-Grain Segmentation is best understood as an orientation-based grouping workflow. It uses PTM-derived orientation information to separate crystalline domains that belong to different grains, then reports grain-level properties such as size, centroid, and representative orientation.
-
-This makes it especially useful in polycrystalline systems, coherent-interface problems, and workflows where you want to move from atom-level structure labels to grain-level organization.
-
 ## Parameters
 
 | Parameter | Type | Default | Description |
@@ -18,12 +12,6 @@ This makes it especially useful in polycrystalline systems, coherent-interface p
 | `adoptOrphanAtoms` | `bool` | `true` | Exposed in the interface, but the current implementation does not visibly perform a dedicated orphan-adoption phase. |
 | `handleCoherentInterfaces` | `bool` | `true` | Handle coherent interfaces between compatible structures. |
 | `outputBonds` | `bool` | `false` | Exposed parameter; bond output is not currently surfaced as a documented result file. |
-
-## Practical notes
-
-- This plugin depends strongly on PTM-style orientation information.
-- It is closer to "separate differently oriented crystalline regions" than to "detect all grain boundaries geometrically."
-- In addition to grain listings, the implementation also exports grouped atoms data.
 
 ## Output
 

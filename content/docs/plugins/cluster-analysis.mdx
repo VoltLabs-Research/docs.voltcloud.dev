@@ -3,12 +3,6 @@ title: Cluster Analysis
 description: Find connected particle clusters using a distance cutoff.
 ---
 
-## Overview
-
-Cluster Analysis groups atoms into connected components using a cutoff-based neighbor graph. In practical terms, it answers a simple question: which atoms belong to the same connected aggregate under the distance rule you chose?
-
-That makes it useful for precipitates, fragments, void-related shells, molecular aggregates, and any workflow where connectivity matters more than crystal identity.
-
 ## Parameters
 
 | Parameter | Type | Default | Description |
@@ -18,12 +12,6 @@ That makes it useful for precipitates, fragments, void-related shells, molecular
 | `unwrap` | `bool` | `false` | Unwrap particle coordinates inside each cluster. |
 | `centersOfMass` | `bool` | `false` | Compute cluster centers with uniform weights. |
 | `radiusOfGyration` | `bool` | `false` | Compute radii and tensors of gyration with uniform weights. |
-
-## Practical notes
-
-- The current implementation is cutoff-based. Bond-topology mode is not available in the runtime path used by this plugin.
-- Center-of-mass and gyration outputs are purely geometric here; they do not use atom-type-specific masses.
-- When enabled, unwrapped positions are reported per atom so you can inspect cluster geometry across periodic boundaries.
 
 ## Output
 

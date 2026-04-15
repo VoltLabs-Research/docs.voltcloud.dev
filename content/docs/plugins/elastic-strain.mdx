@@ -3,12 +3,6 @@ title: Elastic Strain
 description: Compute crystal-referenced elastic strain by mapping local environments to an ideal lattice.
 ---
 
-## Overview
-
-Elastic Strain is the right tool when your system can still be meaningfully compared to an ideal crystal lattice. Instead of comparing a frame to an arbitrary reference configuration, it tries to map local environments onto a chosen crystal structure and then computes elastic strain measures from that mapping.
-
-That makes it a better fit for lattice-referenced deformation analysis than for fully general plastic or highly disordered systems.
-
 ## Parameters
 
 | Parameter | Type | Default | Description |
@@ -21,12 +15,6 @@ That makes it a better fit for lattice-referenced deformation analysis than for 
 | `calcStrainTensors` | `bool` | `true` | Compute strain tensors. |
 | `identificationMode` | `string` | `PTM` | Structure identification mode. Options: `CNA`, `PTM`. |
 | `rmsd` | `float` | `0.10` | RMSD cutoff for PTM classification. |
-
-## Practical notes
-
-- `latticeConstant` is mandatory in practice, not just conceptually important.
-- Atoms that cannot be mapped cleanly to the expected crystal context are emitted with zero-valued strain properties.
-- This plugin does not perform a full elastic-versus-plastic decomposition in the broad continuum-mechanics sense. It computes elastic strain relative to an ideal lattice when that mapping is possible.
 
 ## Output
 
