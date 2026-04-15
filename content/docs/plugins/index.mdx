@@ -9,7 +9,7 @@ description: Build plugins from the UI, choose the right entrypoint runtime, and
 
 ## Build a plugin
 
-You do not write a `plugin.json` by hand. You build the workflow in the UI.
+You do not write a `plugin.json` by hand. You build the workflow in the UI from [https://app.voltcloud.dev/dashboard/plugins/list](https://app.voltcloud.dev/dashboard/plugins/list).
 
 For most plugins, the authoring flow is:
 
@@ -32,6 +32,27 @@ The mental model is still simple:
 - the **Entrypoint** node runs your uploaded code,
 - the **Exposure** node tells VOLT which output file to ingest,
 - the **Export** node tells VOLT how to turn the `export` payload into a GLB or chart.
+
+## Plugin right-click menu
+
+Once a plugin exists, you can manage it from the right-click menu.
+
+The image below shows the available actions:
+
+![Plugin right click menu](/assets/plugins/plugin-right-click-menu.png)
+
+Those options are:
+
+- **Edit**: open the plugin builder and modify the workflow.
+- **Clone**: create a copy of the plugin.
+- **Export**: export the plugin so it can be reused or imported elsewhere.
+- **Publish**: make the plugin available in the canvas.
+- **Set as Draft**: move the plugin back to draft state so it is no longer visible in the canvas.
+- **Delete**: remove the plugin.
+
+<Callout type="info">
+When you create a new plugin, make sure it is **published**. If the plugin stays in **draft**, it will not be visible in the canvas.
+</Callout>
 
 ## Node-by-node configuration guide
 
@@ -678,6 +699,62 @@ with open(f'{output_base}_example.msgpack', 'wb') as f:
 
 print(f'Wrote {output_base}_example.msgpack')
 ```
+
+## Running plugins in the canvas
+
+Once the plugin is created and **published**, it becomes available in the trajectory canvas.
+
+The image below shows `hello-world-plugin` selected in the canvas. Two runtime inputs appear by default:
+
+- **Cluster**: the cluster where the plugin will run.
+- **Selected timesteps**: the timesteps that will be executed.
+
+![Canvas plugin arguments](/assets/plugins/canvas-plugin-arguments.png)
+
+<Callout type="warning">
+If you are testing a plugin on a trajectory, it is usually better to select a specific timestep first. If you leave the execution on the default full range and the plugin is misconfigured, the analysis will fail for all timesteps.
+</Callout>
+
+When a plugin starts executing, its status is updated in real time:
+
+- `queue`
+- `running`
+- `success`
+
+After a plugin has executed, you can open its right-click menu in the canvas. The image below shows the available actions for an executed plugin:
+
+- **Select**
+- **Download**
+- **Delete**
+
+![Executed plugin right click menu](/assets/plugins/canvas-executed-plugin-right-click-menu.png)
+
+When a plugin has execution output, the canvas timeline enables a new tab named **Log**. That tab shows the execution output for the currently selected timestep.
+
+![Canvas plugin log](/assets/plugins/canvas-plugin-log.png)
+
+If the plugin returns an exposure with `main_listing`, the canvas also enables a new tab named after that exposure. In the `listing-example`, that tab corresponds to the exposure we already configured earlier in the workflow.
+
+The image below shows the listing output for the selected timestep. Because the example uses hardcoded values, every timestep shows the same `main_listing` rows.
+
+![Canvas plugin example listing](/assets/plugins/canvas-plugin-example-listing.png)
+
+Each `main_listing` row also has its own right-click menu. The image below shows the available actions:
+
+- **View inspect atoms**
+- **Delete**
+- `View <sub_listing_name>` for each exported sub-listing
+
+In this example, the code exports two sub-listings:
+
+- `circuit_information`
+- `dislocation_segments`
+
+![Canvas plugin main listing row right click menu](/assets/plugins/canvas-plugin-main-listing-row-right-click-menu.png)
+
+The last image shows one of those sub-listings, in this case `circuit_information`, for the selected timestep.
+
+![Canvas plugin sub listing example](/assets/plugins/canvas-plugin-sub-listing-example.png)
 
 ### `per-atom-properties`
 
