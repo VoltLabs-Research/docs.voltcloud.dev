@@ -7,31 +7,137 @@ description: Build plugins from the UI, choose the right entrypoint runtime, and
 **TL;DR** -- You create the workflow in the UI with nodes. Your code only needs to respect two contracts: write the file declared by the **Exposure** node, and shape the MessagePack payload with the keys VOLT understands.
 </Callout>
 
+If you open the resulting export in VOLT, each top-level key inside `AtomisticExporter` becomes a separate colored group in the viewer, and `cluster_id` is also available as a per-atom property.
+
 ## Build a plugin
 
 You do not write a `plugin.json` by hand. You build the workflow in the UI from [https://app.voltcloud.dev/dashboard/plugins/list](https://app.voltcloud.dev/dashboard/plugins/list).
 
-For most plugins, the authoring flow is:
+For most plugins, the workflow starts with `Modifier`, `Arguments`, `Context`, `ForEach`, and `Entrypoint`. Once that execution path exists, you add one **Exposure** node for each result file that VOLT should ingest. If any of those results should become a 3D artifact, you then connect an **Export** node to that exposure. From that point on, your code only has to write the file that the exposure expects.
 
-1. add your `modifier`, `arguments`, `context`, `forEach`, and `entrypoint` nodes,
-2. add one **Exposure** node for each result file you want VOLT to ingest,
-3. if one of those results should become a 3D artifact, connect an **Export** node to that exposure,
-4. make your script or binary write the expected MessagePack file.
+Each node has a narrow responsibility. **Modifier** defines how the plugin appears in the UI, **Arguments** defines the parameters the user can configure before execution, and **Context** plus **ForEach** define which trajectory data is being iterated. **Entrypoint** defines the runtime and the uploaded payload that will be executed, **Exposure** tells VOLT which output file to read after execution, and **Export** tells VOLT how to interpret any geometry or chart data that comes back from that exposure.
 
-In practice, each node answers one question:
+That is the main mental model to keep in mind while building plugins: the **Entrypoint** runs your code, the **Exposure** reads the file your code produced, and the **Export** node turns the `export` payload inside that file into a GLB or another artifact that VOLT can render.
 
-- **Modifier**: what is this plugin called and how should it appear in the UI?
-- **Arguments**: which parameters should the user configure before execution?
-- **Context** and **ForEach**: which trajectory data is the plugin iterating over?
-- **Entrypoint**: what runtime should execute the payload you uploaded?
-- **Exposure**: which output file should VOLT read after execution?
-- **Export**: if that exposure contains geometry or chart data, how should VOLT render it?
 
-The mental model is still simple:
+## What a plugin looks like inside
 
-- the **Entrypoint** node runs your uploaded code,
-- the **Exposure** node tells VOLT which output file to ingest,
-- the **Export** node tells VOLT how to turn the `export` payload into a GLB or chart.
+You can download the complete example plugin here: [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip). This example shows how to export grouped atoms using `AtomisticExporter`, and the ZIP is already packaged as an importable plugin with its own `plugin.json` plus the binary ZIP expected by the `Entrypoint` node.
+
+The script reads atom positions from the current dump and groups them into `Cluster 0`, `Cluster 1`, and `Cluster 2`. Those keys are the same groups VOLT uses to color the atoms in the viewer. The same exposure also exports a per-atom property named `cluster_id`. The grouping rule is intentionally simple and uses `atom_id % 3` only to demonstrate the output format, so you can replace that part with your real clustering logic later.
+
+The image below shows the result of this example in the canvas, with atoms grouped and colored by the keys exported through `AtomisticExporter`.
+
+![Atomistic exporter canvas example](/assets/plugins/atomistic-exporter-canvas-example.png)
+
+![Atomistic exporter example workflow](/assets/plugins/atomistic-exporter-example-workflow.png)
+
+The next image explains how the `Exposure` and `Export` nodes should be configured for this workflow.
+
+![Atomistic exporter workflow explanation](/assets/plugins/atomistic-exporter-workflow-explanation.svg)
+
+![Atomistic exporter workflow explanation 2](/assets/plugins/atomistic-exporter-workflow-explanation-2.svg)
+
+The Python code below writes a MessagePack file with `main_listing`, `sub_listings`, `per-atom-properties`, and a grouped `AtomisticExporter` payload. The keys `Cluster 0`, `Cluster 1`, and `Cluster 2` are the grouped export object consumed by VOLT, while `cluster_id` is attached back to each atom as a per-atom property.
+
+```python
+import msgpack
+import sys
+
+with open(sys.argv[1]) as f:
+    lines = f.read().splitlines()
+
+cols_idx = next(
+    idx for idx, line in enumerate(lines)
+    if line.startswith('ITEM: ATOMS')
+)
+
+cols = lines[cols_idx].split()[2:]
+required_cols = ('id', 'x', 'y', 'z')
+missing_cols = [column for column in required_cols if column not in cols]
+if missing_cols:
+    raise ValueError(f'Missing required columns: {", ".join(missing_cols)}')
+
+id_idx = cols.index('id')
+x_idx = cols.index('x')
+y_idx = cols.index('y')
+z_idx = cols.index('z')
+
+# This is only an example grouping strategy.
+# Replace atom_id % cluster_count with your real cluster assignment logic.
+cluster_count = 3
+cluster_labels = [f'Cluster {index}' for index in range(cluster_count)]
+grouped_atoms = {label: [] for label in cluster_labels}
+per_atom_properties = []
+
+for raw_line in lines[cols_idx + 1:]:
+    values = raw_line.split()
+    atom_id = int(values[id_idx])
+    position = [
+        float(values[x_idx]),
+        float(values[y_idx]),
+        float(values[z_idx])
+    ]
+
+    cluster_id = atom_id % cluster_count
+    cluster_label = cluster_labels[cluster_id]
+    grouped_atoms[cluster_label].append({
+        'id': atom_id,
+        'pos': position
+    })
+    per_atom_properties.append({
+        'id': atom_id,
+        'cluster_id': cluster_id
+    })
+
+export_groups = {
+    label: atoms
+    for label, atoms in grouped_atoms.items()
+    if atoms
+}
+
+cluster_rows = [
+    {
+        'cluster': label,
+        'atoms': len(atoms)
+    }
+    for label, atoms in export_groups.items()
+]
+
+payload = {
+    'main_listing': {
+        'cluster_count': len(export_groups),
+        'exported_atoms': sum(len(atoms) for atoms in export_groups.values())
+    },
+    'sub_listings': {
+        'clusters': cluster_rows
+    },
+    'per-atom-properties': per_atom_properties,
+    'export': {
+        'AtomisticExporter': export_groups
+    }
+}
+
+output_base = sys.argv[2]
+with open(f'{output_base}_example.msgpack', 'wb') as f:
+    f.write(msgpack.packb(payload, use_bin_type=True))
+
+print(f'Wrote {output_base}_example.msgpack with {len(export_groups)} atom groups')
+```
+
+All listings exported by plugin analyses are also visible in the dashboard. To find them, go through the sidebar using `Analysis > Plugin Name > Exposure Name`.
+
+The results exported after running the plugin are also visible through the Dashboard:
+
+![Atomistic exporter workflow data dashboard](/assets/plugins/atomistic-exporter-workflow-data-dashboard.png)
+
+You can also reproduce the same visual effect without relying on `AtomisticExporter` groups directly. Since this example also exports the per-atom property `cluster_id`, you can use color coding based on that property and obtain the same cluster-based coloring. In other words, `AtomisticExporter` groups and `color coding + cluster_id` are two ways of expressing the same grouping logic.
+
+![Atomistic exporter color coding comparison](/assets/plugins/atomistic-exporter-color-coding-comparison.svg)
+
+The scene can also contain multiple models at the same time. This is useful when you want to compare several exported artifacts together, or when the plugin contributes an additional model on top of the base trajectory visualization.
+
+![Multiple models in scene](/assets/plugins/multiple-models-in-scene.svg)
 
 ## Plugin right-click menu
 
@@ -550,9 +656,9 @@ That pattern is often the most useful one: one exposure file, several ways for t
 
 ## Downloadable example plugins
 
-These ZIP files are meant to be used as the smallest possible entrypoint examples.
+Most ZIP files below are meant to be used as small entrypoint examples.
 
-They only contain the plugin code. The workflow itself is still something you configure from the UI with nodes.
+Those entrypoint-only examples contain the plugin code, while the workflow itself is still something you configure from the UI with nodes.
 
 Included examples:
 
@@ -700,107 +806,6 @@ with open(f'{output_base}_example.msgpack', 'wb') as f:
 
 print(f'Wrote {output_base}_example.msgpack')
 ```
-
-### `atomistic-exporter-clusters`
-
-- Download: [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip)
-- This example shows how to export grouped atoms using `AtomisticExporter`.
-- It reads atom positions from the current dump and groups them into `Cluster 0`, `Cluster 1`, and `Cluster 2`.
-- Those keys are the groups VOLT uses to color the atoms in the viewer.
-- The grouping rule is intentionally simple: it uses `atom_id % 3` only to demonstrate the output format. Replace that part with your real clustering logic later.
-
-**Flow in the builder**
-
-`Modifier -> Arguments -> Context -> ForEach -> Entrypoint -> Exposure -> Export`
-
-To configure this workflow:
-
-- set the **Exposure** results file suffix to `example.msgpack`,
-- connect an **Export** node to that exposure,
-- choose **AtomisticExporter** as the exporter,
-- set the export type to `glb`.
-
-The Python code below writes a MessagePack file with `main_listing`, `sub_listings`, and a grouped `AtomisticExporter` payload. The keys `Cluster 0`, `Cluster 1`, and `Cluster 2` are the grouped export object consumed by VOLT.
-
-```python
-import msgpack
-import sys
-
-with open(sys.argv[1]) as f:
-    lines = f.read().splitlines()
-
-cols_idx = next(
-    idx for idx, line in enumerate(lines)
-    if line.startswith('ITEM: ATOMS')
-)
-
-cols = lines[cols_idx].split()[2:]
-required_cols = ('id', 'x', 'y', 'z')
-missing_cols = [column for column in required_cols if column not in cols]
-if missing_cols:
-    raise ValueError(f'Missing required columns: {", ".join(missing_cols)}')
-
-id_idx = cols.index('id')
-x_idx = cols.index('x')
-y_idx = cols.index('y')
-z_idx = cols.index('z')
-
-# This is only an example grouping strategy.
-# Replace atom_id % cluster_count with your real cluster assignment logic.
-cluster_count = 3
-cluster_labels = [f'Cluster {index}' for index in range(cluster_count)]
-grouped_atoms = {label: [] for label in cluster_labels}
-
-for raw_line in lines[cols_idx + 1:]:
-    values = raw_line.split()
-    atom_id = int(values[id_idx])
-    position = [
-        float(values[x_idx]),
-        float(values[y_idx]),
-        float(values[z_idx])
-    ]
-
-    cluster_label = cluster_labels[atom_id % cluster_count]
-    grouped_atoms[cluster_label].append({
-        'id': atom_id,
-        'pos': position
-    })
-
-export_groups = {
-    label: atoms
-    for label, atoms in grouped_atoms.items()
-    if atoms
-}
-
-cluster_rows = [
-    {
-        'cluster': label,
-        'atoms': len(atoms)
-    }
-    for label, atoms in export_groups.items()
-]
-
-payload = {
-    'main_listing': {
-        'cluster_count': len(export_groups),
-        'exported_atoms': sum(len(atoms) for atoms in export_groups.values())
-    },
-    'sub_listings': {
-        'clusters': cluster_rows
-    },
-    'export': {
-        'AtomisticExporter': export_groups
-    }
-}
-
-output_base = sys.argv[2]
-with open(f'{output_base}_example.msgpack', 'wb') as f:
-    f.write(msgpack.packb(payload, use_bin_type=True))
-
-print(f'Wrote {output_base}_example.msgpack with {len(export_groups)} atom groups')
-```
-
-If you open the resulting export in VOLT, each top-level key inside `AtomisticExporter` becomes a separate colored group in the viewer.
 
 ## Running plugins in the canvas
 
