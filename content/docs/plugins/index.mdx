@@ -29,30 +29,32 @@ Plugin workflow:
 ![Atomistic exporter example workflow](/assets/plugins/atomistic-exporter-example-workflow.png)
 
 
-The Python code below writes a MessagePack file with `main_listing`, `sub_listings`, `per-atom-properties`, and a grouped `AtomisticExporter` payload. The keys `Cluster 0`, `Cluster 1`, and `Cluster 2` are the grouped export object consumed by VOLT, while `cluster_id` is attached back to each atom as a per-atom property.
+The easiest way to read this script is in four phases: first it reads the current dump and finds the `ITEM: ATOMS` section, then it validates that the required columns exist, then it assigns each atom to an example cluster, and finally it builds a single MessagePack payload containing listings, `per-atom-properties`, and the grouped `AtomisticExporter` data.
 
 ```python
 import msgpack
 import sys
 
-with open(sys.argv[1]) as f:
+# From "arguments" in Entrypoint node configuration.
+input_dump_path = sys.argv[1]
+output_base = sys.argv[2]
+
+# Read the current trajectory dump and find the ATOMS section.
+with open(input_dump_path) as f:
     lines = f.read().splitlines()
 
-cols_idx = next(
+atoms_header_idx = next(
     idx for idx, line in enumerate(lines)
     if line.startswith('ITEM: ATOMS')
 )
 
-cols = lines[cols_idx].split()[2:]
-required_cols = ('id', 'x', 'y', 'z')
-missing_cols = [column for column in required_cols if column not in cols]
-if missing_cols:
-    raise ValueError(f'Missing required columns: {", ".join(missing_cols)}')
+# The AtomisticExporter needs atom id + position.
+atom_columns = lines[atoms_header_idx].split()[2:]
 
-id_idx = cols.index('id')
-x_idx = cols.index('x')
-y_idx = cols.index('y')
-z_idx = cols.index('z')
+id_idx = atom_columns.index('id')
+x_idx = atom_columns.index('x')
+y_idx = atom_columns.index('y')
+z_idx = atom_columns.index('z')
 
 # This is only an example grouping strategy.
 # Replace atom_id % cluster_count with your real cluster assignment logic.
@@ -61,7 +63,10 @@ cluster_labels = [f'Cluster {index}' for index in range(cluster_count)]
 grouped_atoms = {label: [] for label in cluster_labels}
 per_atom_properties = []
 
-for raw_line in lines[cols_idx + 1:]:
+# Build both outputs at the same time:
+# 1. grouped atoms for AtomisticExporter
+# 2. per-atom properties so cluster_id is also available in VOLT tables/filters
+for raw_line in lines[atoms_header_idx + 1:]:
     values = raw_line.split()
     atom_id = int(values[id_idx])
     position = [
@@ -70,6 +75,7 @@ for raw_line in lines[cols_idx + 1:]:
         float(values[z_idx])
     ]
 
+    # cluster_id is the numeric property, cluster_label is the export group name.
     cluster_id = atom_id % cluster_count
     cluster_label = cluster_labels[cluster_id]
     grouped_atoms[cluster_label].append({
@@ -87,6 +93,7 @@ export_groups = {
     if atoms
 }
 
+# sub-listing
 cluster_rows = [
     {
         'cluster': label,
@@ -95,6 +102,7 @@ cluster_rows = [
     for label, atoms in export_groups.items()
 ]
 
+# One exposure file can include listings, per-atom properties, and 3D export data.
 payload = {
     'main_listing': {
         'cluster_count': len(export_groups),
@@ -109,7 +117,7 @@ payload = {
     }
 }
 
-output_base = sys.argv[2]
+# The Exposure node expects: {output_base}_example.msgpack
 with open(f'{output_base}_example.msgpack', 'wb') as f:
     f.write(msgpack.packb(payload, use_bin_type=True))
 
