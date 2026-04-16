@@ -1,42 +1,33 @@
 ---
 title: Plugin System
-description: Build plugins from the UI, choose the right entrypoint runtime, and return listings, per-atom properties, and 3D exports.
 ---
 
 <Callout type="info">
 **TL;DR** -- You create the workflow in the UI with nodes. Your code only needs to respect two contracts: write the file declared by the **Exposure** node, and shape the MessagePack payload with the keys VOLT understands.
 </Callout>
 
-If you open the resulting export in VOLT, each top-level key inside `AtomisticExporter` becomes a separate colored group in the viewer, and `cluster_id` is also available as a per-atom property.
-
 ## Build a plugin
 
-You do not write a `plugin.json` by hand. You build the workflow in the UI from [https://app.voltcloud.dev/dashboard/plugins/list](https://app.voltcloud.dev/dashboard/plugins/list).
+You should build the plugin workflow in the UI from [https://app.voltcloud.dev/dashboard/plugins/list](https://app.voltcloud.dev/dashboard/plugins/list).
 
 For most plugins, the workflow starts with `Modifier`, `Arguments`, `Context`, `ForEach`, and `Entrypoint`. Once that execution path exists, you add one **Exposure** node for each result file that VOLT should ingest. If any of those results should become a 3D artifact, you then connect an **Export** node to that exposure. From that point on, your code only has to write the file that the exposure expects.
 
-Each node has a narrow responsibility. **Modifier** defines how the plugin appears in the UI, **Arguments** defines the parameters the user can configure before execution, and **Context** plus **ForEach** define which trajectory data is being iterated. **Entrypoint** defines the runtime and the uploaded payload that will be executed, **Exposure** tells VOLT which output file to read after execution, and **Export** tells VOLT how to interpret any geometry or chart data that comes back from that exposure.
+Each node has a narrow responsibility. **Modifier** defines how the plugin appears in the UI, **Arguments** defines the parameters the user can configure before execution, and **Context** + **ForEach** define which trajectory data is being iterated. **Entrypoint** defines the runtime and the uploaded payload that will be executed, **Exposure** tells VOLT which output file to read after execution, and **Export** tells VOLT how to interpret any geometry or chart data that comes back from that exposure.
 
 That is the main mental model to keep in mind while building plugins: the **Entrypoint** runs your code, the **Exposure** reads the file your code produced, and the **Export** node turns the `export` payload inside that file into a GLB or another artifact that VOLT can render.
 
 
 ## What a plugin looks like inside
 
-You can download the complete example plugin here: [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip). This example shows how to export grouped atoms using `AtomisticExporter`, and the ZIP is already packaged as an importable plugin with its own `plugin.json` plus the binary ZIP expected by the `Entrypoint` node.
+You can download the complete example plugin here: [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip). This example shows how to export grouped atoms using `AtomisticExporter`, and the ZIP is already packaged as an importable plugin with its own `plugin.json` + the binary ZIP expected by the `Entrypoint` node.
 
 The script reads atom positions from the current dump and groups them into `Cluster 0`, `Cluster 1`, and `Cluster 2`. Those keys are the same groups VOLT uses to color the atoms in the viewer. The same exposure also exports a per-atom property named `cluster_id`. The grouping rule is intentionally simple and uses `atom_id % 3` only to demonstrate the output format, so you can replace that part with your real clustering logic later.
 
 The image below shows the result of this example in the canvas, with atoms grouped and colored by the keys exported through `AtomisticExporter`.
 
-![Atomistic exporter canvas example](/assets/plugins/atomistic-exporter-canvas-example.png)
-
+Plugin workflow:
 ![Atomistic exporter example workflow](/assets/plugins/atomistic-exporter-example-workflow.png)
 
-The next image explains how the `Exposure` and `Export` nodes should be configured for this workflow.
-
-![Atomistic exporter workflow explanation](/assets/plugins/atomistic-exporter-workflow-explanation.svg)
-
-![Atomistic exporter workflow explanation 2](/assets/plugins/atomistic-exporter-workflow-explanation-2.svg)
 
 The Python code below writes a MessagePack file with `main_listing`, `sub_listings`, `per-atom-properties`, and a grouped `AtomisticExporter` payload. The keys `Cluster 0`, `Cluster 1`, and `Cluster 2` are the grouped export object consumed by VOLT, while `cluster_id` is attached back to each atom as a per-atom property.
 
@@ -124,6 +115,12 @@ with open(f'{output_base}_example.msgpack', 'wb') as f:
 
 print(f'Wrote {output_base}_example.msgpack with {len(export_groups)} atom groups')
 ```
+
+![Atomistic exporter canvas example](/assets/plugins/atomistic-exporter-canvas-example.png)
+
+![Atomistic exporter workflow explanation](/assets/plugins/atomistic-exporter-workflow-explanation.svg)
+
+![Atomistic exporter workflow explanation 2](/assets/plugins/atomistic-exporter-workflow-explanation-2.svg)
 
 All listings exported by plugin analyses are also visible in the dashboard. To find them, go through the sidebar using `Analysis > Plugin Name > Exposure Name`.
 
