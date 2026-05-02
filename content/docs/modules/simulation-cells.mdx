@@ -3,11 +3,7 @@ title: Simulation Cells
 description: Inspect the derived box geometry and periodic boundary data extracted from trajectories.
 ---
 
-## Overview
-
-Simulation cells are created automatically while trajectories are being processed. You do not upload or edit them directly. Instead, VOLT derives them from each timestep so the rest of the platform can reason about the geometry of the system in a consistent way.
-
-That includes the viewer, analysis plugins, scripting workflows, and any tool that needs to know the box dimensions or periodic boundary conditions for a frame.
+Simulation cells are derived automatically during trajectory processing. They are read-only: VOLT extracts them from each timestep and uses them across the viewer, analysis plugins, and scripting workflows for box dimensions and periodic boundary conditions.
 
 ![Simulation Cells Overview](/assets/overviews/overviews_simulation-cells.png)
 
@@ -24,22 +20,10 @@ Each record stores the spatial context for a specific timestep.
 | **Timestep** | The frame this cell belongs to |
 | **Trajectory** | The parent trajectory that produced the record |
 
-## Why this module exists
-
-Most of the time, simulation-cell data is something you notice indirectly. You see it as the wireframe box in the viewer, or as an assumption built into a spatial analysis. This module gives you a direct way to inspect that derived data instead of treating it as a hidden implementation detail.
-
-That is particularly useful when you want to verify that a trajectory was parsed correctly or understand how a plugin is interpreting periodicity.
-
 ## Listing and inspection
 
-The listing groups simulation-cell records by team and lets you focus on a particular trajectory. From there, you can inspect the timestep, dimensions, and periodic axes for each record.
-
-Because these records are derived during trajectory processing, they behave more like indexed metadata than editable workspace objects.
+The listing groups simulation-cell records by team and supports filtering by trajectory. Each record exposes the timestep, dimensions, and periodic axes.
 
 ## Relationship to trajectory processing
 
-When VOLT parses a dump or data file, it extracts the box information frame by frame and stores it alongside the rest of the processed trajectory metadata. That means simulation cells are only as current as the trajectory they came from. If you replace the underlying data, the normal path is to reprocess the trajectory rather than manually patch the cell records.
-
-<Callout type="info">
-Simulation cells are a good example of how VOLT turns raw simulation data into reusable workspace objects. They are small on their own, but they make downstream visualization, filtering, and analysis much more predictable.
-</Callout>
+VOLT extracts box information frame by frame during dump or data file parsing and stores it alongside the rest of the processed trajectory metadata. Simulation cells reflect the current state of their parent trajectory; replacing the underlying data requires reprocessing the trajectory.

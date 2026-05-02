@@ -1,28 +1,24 @@
 ---
-title: Modules Overview
-description: A guided map of the modules that make up the VOLT workspace.
+title: Documentation
 ---
 
-<Callout type="info">
-**TL;DR** -- VOLT is organized by workflow, not by product tier. You move from trajectories and analyses to clusters, notebooks, papers, and collaboration without leaving the same team workspace.
-</Callout>
-
-The sidebar is easier to understand once you stop reading it as a menu of isolated features. Most modules are different faces of the same workflow: data comes in through trajectories or SSH import, processing runs on clusters, results appear in analysis and jobs, and the surrounding modules help you automate, inspect, discuss, and publish the work.
+<Cards>
+  <Card title="Getting Started" href="/docs/getting-started" description="Create your VoltID, set up your first team, and connect a cluster." />
+  <Card title="Architecture" href="/docs/architecture" description="Understand how the app, the daemon, storage, and the runtime layers fit together." />
+  <Card title="Plugin System" href="/docs/plugins" description="Learn how analysis workflows, binaries, exposures, and exports work." />
+  <Card title="Open Source Ecosystem" href="/docs/open-source" description="Explore the tools, SDKs, and scientific repositories behind VOLT." />
+  <Card title="Self-Hosting" href="/docs/self-hosting" description="Run the stack on your own infrastructure and understand the moving parts." />
+</Cards>
 
 ## Core Workflow
 
-This is where most teams spend their time. You start with the dashboard, work with trajectories, inspect derived simulation metadata, and run analyses that fan out across your cluster.
-
 <Cards>
-  <Card title="Dashboard" href="/docs/modules/dashboard" description="Your operational home: metrics, quick actions, live activity, jobs, search, and team presence." />
   <Card title="Trajectories" href="/docs/modules/trajectories" description="Upload simulations, track processing, open the 3D viewer, and work with scene artifacts and public sharing." />
   <Card title="Analysis & Jobs" href="/docs/modules/analysis" description="Run plugin workflows, follow progress frame by frame, and inspect the result model behind analyses." />
   <Card title="Simulation Cells" href="/docs/modules/simulation-cells" description="Review the derived box geometry and periodic boundary data created during trajectory processing." />
 </Cards>
 
 ## Compute & Infrastructure
-
-These modules are what make VOLT feel like an actual workspace instead of a thin web front end. They connect your hardware, expose remote services safely, and give the team places to run custom workloads.
 
 <Cards>
   <Card title="Clusters" href="/docs/modules/clusters" description="Enroll machines, watch heartbeats and health metrics, and open remote access sessions into the services backing your team." />
@@ -32,16 +28,12 @@ These modules are what make VOLT feel like an actual workspace instead of a thin
 
 ## Scripting & AI
 
-When the built-in workflows are not enough, VOLT gives you two different extension points. Scripting is for custom notebook-driven work. Volt AI is for natural-language control across the rest of the platform.
-
 <Cards>
   <Card title="Scripting" href="/docs/modules/scripting" description="Open Jupyter sessions on your cluster, work with trajectory-linked notebooks, and build custom post-processing flows." />
   <Card title="Volt AI" href="/docs/modules/volt-ai" description="Use team-scoped AI providers and tool-calling workflows to operate on trajectories, analyses, documents, and infrastructure." />
 </Cards>
 
 ## Collaboration
-
-The collaboration modules are not bolted on. They share the same team context, permissions, notifications, and real-time layer as the scientific workflow.
 
 <Cards>
   <Card title="Teams" href="/docs/modules/teams" description="Manage members, roles, invitations, secret keys, and AI provider integrations for a workspace." />

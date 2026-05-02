@@ -3,7 +3,6 @@
   "pages": [
     "index",
     "---Core Workflow---",
-    "dashboard",
     "trajectories",
     "analysis",
     "simulation-cells",

@@ -3,74 +3,60 @@ title: Analysis & Jobs
 description: Run plugin workflows on trajectories and follow the execution model behind them.
 ---
 
-<Callout type="info">
-**TL;DR** -- An analysis in VOLT is a persisted run of a plugin workflow against a trajectory. The jobs system is the runtime layer underneath it, tracking frame-level work across your connected cluster.
-</Callout>
-
-## Overview
-
-The Analysis page is where plugin execution becomes something you can inspect and revisit. It is not just a button that launches work once. Every run is stored as an analysis record with linked trajectory context, status, progress, and result exposures.
-
-That distinction matters because analysis in VOLT is designed to be part of a longer workflow. You often come back later to compare runs, retry failed frames, inspect listings, or load a generated 3D artifact back into the viewer.
+An analysis is a persisted run of a plugin workflow against a trajectory. Every run is stored as a record with linked trajectory context, status, progress, and result exposures. Runs can be revisited to compare results, retry failed frames, inspect listings, or load a generated 3D artifact into the viewer.
 
 ![Analysis & Jobs Overview](/assets/overviews/overviews_analysis-and-jobs.png)
 
 ## Starting a run
 
-The usual path starts inside a trajectory. You open the analysis tab, choose a plugin, adjust its parameters, and launch the run.
+The analysis tab inside a trajectory selects a plugin, configures parameters, and launches the run. Execution is dispatched to the cluster runtime: the workflow is planned, frame work is queued, and progress streams back into the UI.
 
-From there, VOLT hands execution off to the cluster runtime. The workflow is planned, frame work is queued, and progress begins streaming back into the UI.
+## Listing
 
-## What the listing actually shows
+The analysis listing is a history of executions, not a library of templates. Each row reports the plugin, the target trajectory, the progress, and the final state.
 
-The analysis listing is a history of real executions, not a library of analysis templates. Each row tells you which plugin ran, which trajectory it ran against, how far it got, and whether it finished cleanly.
-
-| Status | What It Means |
+| Status | Meaning |
 |---|---|
-| **Queued** | The analysis exists, but workers have not started processing its frame work yet |
+| **Queued** | The analysis exists, but workers have not started processing its frame work |
 | **Running** | One or more frames are actively being processed |
 | **Completed** | The full run finished successfully |
-| **Failed** | Some frame work failed and can usually be retried selectively |
+| **Failed** | Some frame work failed and can be retried selectively |
 
-## Progress is frame-based
+## Frame-based progress
 
-Most analyses in VOLT are easiest to understand as frame-aware workloads. A run may represent many individual frame jobs, and the progress bar reflects that breakdown. This is why a partially successful run can still be useful, and why retrying only the failed part is often enough.
+Most analyses are frame-aware workloads. A run can represent many individual frame jobs, and the progress bar reflects that breakdown. A partially successful run is still useful: only the failed portion needs to be retried.
 
-Real-time updates arrive over the same event-driven layer the rest of the platform uses, so the page behaves more like a live operations view than a static report.
+Real-time updates arrive over the same event-driven layer used by the rest of VOLT.
 
 ## Retrying failed frames
 
-When a run fails, you usually do not need to throw everything away and start over. VOLT can requeue only the failed frames for a given analysis.
-
-That is especially helpful with heavier plugins, where most of the work may already be complete and only a small subset needs another pass.
+VOLT requeues only the failed frames for a given analysis. This avoids re-running already-completed frame work for heavier plugins.
 
 ## Results, exposures, and exports
 
-Completed analyses write their results into cluster storage and then project them back into the product in a few different ways.
+Completed analyses write results into cluster storage and project them into VOLT in several forms:
 
-- **Listings** give you structured tabular views of the output.
-- **Sub-listings** break a larger result into more focused slices.
-- **Charts** provide ready-made visual summaries when the plugin exports them.
-- **3D artifacts** let the result come back into the trajectory viewer as an overlay.
+| Form | Description |
+|---|---|
+| **Listings** | Structured tabular views of the output |
+| **Sub-listings** | Focused slices of a larger result |
+| **Charts** | Visual summaries exported by the plugin |
+| **3D artifacts** | Overlays loaded back into the trajectory viewer |
 
-Under the hood, most of this starts as MessagePack data and is then transformed into whatever representation the UI needs.
+Most of these start as MessagePack data and are transformed into the representation the UI requires.
 
-## The jobs layer underneath
+## Jobs layer
 
-The Jobs system is the operational side of analysis. It tracks work across the team and gives you a separate place to monitor queue activity, running jobs, and retries.
+The Jobs system is the operational side of analysis. It tracks work across the team and provides a dedicated view for queue activity, running jobs, and retries.
 
-The hierarchy is roughly:
+The hierarchy is:
 
-- a top-level analysis session,
-- grouped work tied to a trajectory,
-- and frame-level jobs doing the actual processing.
+1. A top-level analysis session.
+2. Grouped work tied to a trajectory.
+3. Frame-level jobs performing the processing.
 
-That is why the Jobs panel feels broader than a single analysis page. It is team-wide, live, and useful even when you are watching several runs at once.
+The Jobs panel is team-wide and reports queue activity across all workspace members in real time.
 
 ## Team-wide job actions
 
-The jobs interface also exposes maintenance actions for the queue history, including clearing history, retrying failed work, and removing stale running jobs. Those actions are operational tools, so they matter most when you are supporting an active team workspace rather than running a one-off analysis by yourself.
-
-<Callout type="info">
-Analysis execution depends on the plugin runtime, the cluster daemon, and the workflow engine beneath it. If you want the full picture of how node-based plugins become jobs and exposures, continue with [Plugin System](/docs/plugins) and [Architecture](/docs/architecture).
-</Callout>
+The jobs interface exposes maintenance actions for queue history: clearing history, retrying failed work, and removing stale running jobs.

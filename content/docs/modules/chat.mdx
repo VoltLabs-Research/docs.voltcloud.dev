@@ -3,44 +3,22 @@ title: Chat
 description: Real-time messaging for team conversations, group coordination, and shared files.
 ---
 
-<Callout type="info">
-**TL;DR** -- Chat keeps discussions inside the same team workspace where the trajectories, notebooks, and documents already live. It supports direct messages, group chats, presence, file sharing, reactions, and live updates.
-</Callout>
-
-## Overview
-
-The point of Chat is simple: keep team communication close to the work instead of pushing it into another app.
-
-That matters more than it sounds. In VOLT, conversations happen in the same workspace context as clusters, analyses, documents, and trajectories, which makes it easier to move from talking about something to opening it.
+Chat operates in the same team workspace as clusters, analyses, documents, and trajectories. It supports direct messages, group chats, presence, file sharing, reactions, and live updates.
 
 ![Chat Overview](/assets/overviews/overviews_chat.png)
 
 ## Sidebar and conversation flow
 
-The sidebar organizes direct messages and group chats by recent activity, so the conversation that just moved is usually the one closest at hand.
-
-From there, the flow is natural. You either open an existing thread or start a new one. If a direct conversation with the selected teammate already exists, VOLT reuses it instead of creating duplicates.
+The sidebar organizes direct messages and group chats by recent activity. Opening a teammate's profile reuses the existing direct conversation if one exists, rather than creating a duplicate.
 
 ## Group chats
 
-Group chats are useful when the conversation belongs to a project or a recurring topic rather than a single person-to-person exchange.
-
-Admins inside the group can manage membership, update the group details, and assign other admins. Members can leave when the conversation is no longer relevant to them.
+Group chats hold conversations scoped to a project or recurring topic. Admins manage membership, update group details, and assign other admins. Members can leave a group at any time.
 
 ## The real-time layer
 
-What makes the module feel alive is not just message delivery. Presence, typing indicators, unread state, reactions, and last-message updates all move through the same real-time layer.
-
-That means the page behaves more like a live workspace than a mailbox. When someone starts typing or a file arrives, the sidebar and the active thread both update in context.
+The real-time layer synchronizes presence, typing indicators, unread state, reactions, and last-message updates across the sidebar and the active thread.
 
 ## Shared files and conversation context
 
-Chat also carries files, which is useful when a discussion depends on an image, a document, or a small supporting artifact. The shared-files view gives you a way to return to that material without scrolling through the whole conversation history.
-
-## Why Chat belongs in VOLT
-
-There are plenty of good chat tools in the world. What makes VOLT Chat worth having is that it shares team scope, permissions, and runtime context with the rest of the platform. If you are discussing a trajectory, an analysis result, or a LaTeX draft, you are already in the same system that owns the resource.
-
-<Callout type="info">
-Presence and conversation state are team-scoped. When you switch teams, Chat follows that boundary and loads the conversation graph for the new workspace.
-</Callout>
+Chat carries files alongside messages. The shared-files view collects every file exchanged in a conversation in one place, independent of the message history.

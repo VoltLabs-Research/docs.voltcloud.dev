@@ -3,17 +3,9 @@ title: Clusters
 description: Connect machines to a team and use them as the storage and execution layer behind VOLT.
 ---
 
-<Callout type="info">
-**TL;DR** -- A team cluster is the machine that stores your data and runs the heavy work. VOLT coordinates the workspace, but the cluster daemon and local services are what make uploads, analyses, notebooks, and remote access actually work.
-</Callout>
-
-## Overview
-
-Clusters are the infrastructure backbone of a team. When you connect one, you are not just registering a hostname. You are enrolling a machine into the workspace so it can run the daemon, maintain local services, store trajectory and analysis data, execute jobs, and expose selected capabilities back to the product.
+A cluster is a machine enrolled into a team workspace to run the daemon, maintain local services, store trajectory and analysis data, execute jobs, and expose selected capabilities back to VOLT. A team requires at least one connected cluster to process or store data.
 
 ![Clusters Overview](/assets/overviews/overviews_clusters.png)
-
-This is why cluster setup is one of the first things VOLT asks for during onboarding. Without at least one connected cluster, the team has nowhere to process or store its scientific workload.
 
 ## What lives on a cluster
 
@@ -26,19 +18,23 @@ The default setup brings together four major services:
 | **Redis** | Handles queue state, caching, and several real-time runtime concerns |
 | **ClusterDaemon** | Maintains the connection to VOLT and orchestrates processing, notebooks, remote access, and job execution |
 
-Those pieces work together locally. The cloud side of VOLT is mostly coordinating and routing, while the cluster side is where the actual workload happens.
+The cloud side of VOLT coordinates and routes; the cluster side runs the workload.
 
 ## Enrollment and lifecycle
 
-Connecting a cluster starts with an enrollment flow. VOLT creates a cluster record, issues an enrollment token, and gives you an install command to run on the target machine.
+Enrolling a cluster:
 
-Once the daemon comes online and begins sending heartbeats, the cluster moves from waiting to connected. Later on, the same lifecycle layer also supports updates, credential reveal, remote-access sessions, and deletion.
+1. VOLT creates a cluster record.
+2. An enrollment token is issued.
+3. An install command is provided for the target machine.
+4. The daemon starts and sends heartbeats.
+5. The cluster transitions from waiting to connected.
 
-One subtle but important detail is that install commands and enrollment tokens are not permanent setup notes. They are part of an active lifecycle flow and can be regenerated when needed.
+The lifecycle layer also supports updates, credential reveal, remote-access sessions, and deletion. Install commands and enrollment tokens can be regenerated.
 
-## Reading the cluster listing
+## Status values
 
-The listing tells you both whether a machine is reachable and where it sits in its lifecycle.
+The listing reports cluster reachability and lifecycle state.
 
 | Status | Meaning |
 |---|---|
@@ -52,27 +48,17 @@ The listing tells you both whether a machine is reachable and where it sits in i
 
 ## Monitoring and health
 
-The monitoring view is where the cluster starts to feel like an operational system rather than a black box. You can see resource usage, connection quality, and service behavior in real time.
+The monitoring view reports resource usage, connection quality, and service behavior in real time, including:
 
-That makes it easier to answer questions like:
-
-- is the daemon still connected,
-- is the machine short on memory,
-- is storage filling up,
-- or is the team simply waiting for a worker to become available?
+- daemon connection state,
+- memory pressure,
+- storage utilization,
+- and worker availability.
 
 ## Remote access and data explorers
 
-Clusters also expose a set of controlled diagnostic and remote-access tools through VOLT. Depending on the action, that can include host terminal access as well as explorer-style views into Redis, MongoDB, and MinIO.
+Clusters expose diagnostic and remote-access tools, including host terminal access and explorer-style views into Redis, MongoDB, and MinIO. These views are scoped to support, debugging, and verification, and provide narrower functionality than the native tooling.
 
-These views are meant to help with support, debugging, and verification. They are intentionally narrower than being dropped into each service with full native tooling.
+## Cluster health and platform impact
 
-## Why clusters matter so much in VOLT
-
-Clusters are the reason the platform can stay team-centric without becoming a centralized data silo. Your trajectories, plugin results, notebook runtimes, and many collaboration artifacts live on infrastructure your team controls.
-
-That design also explains why cluster health affects so many other modules. If the cluster is disconnected, uploads, analyses, notebook sessions, container operations, and several remote features will either pause or fail.
-
-<Callout type="info">
-If you want the internal picture of what the daemon is doing once a cluster connects, see [Architecture](/docs/architecture). If you want deployment guidance, continue with [Self-Hosting](/docs/self-hosting).
-</Callout>
+If the cluster is disconnected, uploads, analyses, notebook sessions, container operations, and remote features either pause or fail.

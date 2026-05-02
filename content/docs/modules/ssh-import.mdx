@@ -3,15 +3,7 @@ title: SSH Import
 description: Connect to remote machines over SSH and bring trajectory data closer to your team workspace.
 ---
 
-<Callout type="info">
-**TL;DR** -- SSH Import stores reusable SSH connections for your team and lets you browse remote directories from VOLT. The import runtime is built to pull simulation data into the cluster-side processing pipeline instead of making you download and re-upload files manually.
-</Callout>
-
-## Overview
-
-SSH Import is meant for the common case where the data you need is already sitting on another machine: an HPC cluster, a lab server, or a workstation with large dumps you do not want to move by hand.
-
-Instead of treating that remote machine as a separate workflow, VOLT lets you save the connection details once, test them, and explore the remote filesystem from inside the workspace.
+SSH Import handles trajectory data stored on remote machines such as HPC clusters, lab servers, or workstations. Connections are saved once, tested, and used to browse the remote filesystem from within VOLT. The import runtime feeds the cluster-side processing pipeline directly, without manual download and re-upload.
 
 ![SSH Import Overview](/assets/overviews/overviews_ssh-import.png)
 
@@ -23,38 +15,24 @@ Each saved connection stores the basic credentials needed to open an SSH and SFT
 |---|---|
 | **Name** | A label the team can recognize later |
 | **Host** | Remote hostname or IP address |
-| **Port** | SSH port, usually `22` |
+| **Port** | SSH port (default `22`) |
 | **Username** | Remote login name |
 | **Password** | Stored encrypted and used by the import runtime |
 
 ![Add Connection](/assets/modules/ssh-import/add-connection.png)
 
-<Callout type="info">
-The platform stores SSH passwords in encrypted form, and the daemon needs the server-side encryption key to decrypt them when an import job runs.
-</Callout>
+SSH passwords are stored encrypted; the daemon decrypts them at import time using the server-side encryption key.
 
 ## Testing and browsing
 
-After saving a connection, the first useful step is usually to test it. That confirms the credentials and the basic network path before you commit to an import.
-
-From there, the file explorer lets you navigate directories and inspect what is available remotely.
-
-Today, this explorer is best thought of as a browsing surface rather than a full remote file manager. It is there to help you locate the data and verify the path.
+Test the connection to confirm credentials and the network path before launching an import. The file explorer then enables directory browsing and file path verification on the remote host.
 
 ## How the import pipeline works
 
 Once an import job is triggered, the daemon on your team cluster takes over. It opens the remote session, downloads the selected file or directory into temporary workspace storage, extracts archives when needed, parses the trajectory metadata, compresses and uploads the resulting dumps into MinIO, and kicks off GLB preprocessing so the trajectory can become viewable inside VOLT.
 
-That is the important shift: SSH Import is not just a downloader. It is an alternate front door into the same trajectory pipeline used by normal uploads.
+SSH Import feeds the same trajectory pipeline used by direct uploads.
 
 ## Supported data shapes
 
-The runtime is built around LAMMPS-oriented inputs such as dump files, data files, and archives that contain them. If the selected input expands into multiple valid simulation files, the daemon processes them as part of the same import workflow.
-
-## Why teams use it
-
-SSH Import is most useful when your cluster-side workflow already lives near a remote machine. It avoids the common pattern of pulling huge files down to a laptop just to push them back into another system moments later.
-
-<Callout type="info">
-Imported trajectories still end up in the normal [Trajectories](/docs/modules/trajectories) and [Analysis & Jobs](/docs/modules/analysis) flow once processing finishes.
-</Callout>
+The runtime supports LAMMPS-oriented inputs: dump files, data files, and archives containing them. If the selected input expands into multiple valid simulation files, the daemon processes them as part of the same import workflow.

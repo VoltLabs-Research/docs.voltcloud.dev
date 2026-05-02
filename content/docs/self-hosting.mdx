@@ -1,22 +1,14 @@
 ---
 title: Self-Hosting
-description: Run VOLT on your own infrastructure and understand the operational pieces behind it.
+description: "Operating VOLT on your own infrastructure: app deployment, cluster setup, storage, and runbooks."
 ---
 
-<Callout type="info">
-**TL;DR** -- Self-hosting VOLT means operating two application layers and several supporting services: the main app, one or more team clusters running ClusterDaemon, and the local MongoDB, Redis, MinIO, Docker, and proxying setup that make those clusters useful.
-</Callout>
-
-## Overview
-
-Self-hosting VOLT is a good fit when you want the collaboration and orchestration model of the platform while keeping the data plane under your own control.
-
-The key thing to understand up front is that there are really two deployments to think about:
+A self-hosted VOLT deployment has two operational layers:
 
 - the **main application deployment** that handles users, teams, APIs, auth, and the browser experience,
 - and the **cluster deployment** that handles storage, runtime execution, notebooks, trajectory preprocessing, plugin jobs, and remote operations.
 
-If you only prepare the app and ignore the cluster side, the product will load but most of the interesting work will have nowhere to run.
+Both layers must be operational for VOLT to function end-to-end.
 
 ## What the app layer needs
 
@@ -33,9 +25,7 @@ Those services support the workspace layer: auth, metadata, object storage, queu
 
 ## What the cluster layer needs
 
-Each team cluster is a separate operational concern. A connected cluster is expected to run the daemon plus the local services it depends on, and to have working Docker support because containers and notebooks rely on it.
-
-In practice, a healthy cluster deployment also needs:
+Each team cluster runs the daemon plus the local services it depends on and requires working Docker support for containers and notebooks. A healthy cluster deployment requires:
 
 - valid cloud connection settings,
 - a working daemon password and enrollment flow,
@@ -114,14 +104,14 @@ cp server/.env.example server/.env
 cp client/.env.example client/.env
 ```
 
-Then configure the environment files with the right MongoDB, Redis, MinIO, server URL, client URL, secret-key, and SSH encryption settings.
+Configure the environment files with the MongoDB, Redis, MinIO, server URL, client URL, secret-key, and SSH encryption settings.
 
-The two values that tend to matter most operationally are:
+Two values are operationally critical:
 
-- `SECRET_KEY`, which signs sensitive server-side tokens,
-- and `SSH_ENCRYPTION_KEY`, which protects stored SSH credentials used by import flows.
+- `SECRET_KEY` signs sensitive server-side tokens.
+- `SSH_ENCRYPTION_KEY` protects stored SSH credentials used by import flows.
 
-After that:
+Then build:
 
 ```bash
 cd server && npm install && npm run build
@@ -167,15 +157,15 @@ server {
 }
 ```
 
-## Cluster deployment matters just as much
+## Cluster deployment
 
-Once the app is online, the next milestone is connecting an actual team cluster. The official installer bootstraps Docker support, writes daemon configuration, and waits for the daemon to come online and begin heartbeating.
+Once the app is online, the next step is connecting a team cluster. The installer bootstraps Docker support, writes daemon configuration, and waits for the daemon to come online and begin heartbeating.
 
-This is where many self-hosted setups either become fully usable or stall out. A healthy app with no healthy cluster means trajectory uploads, analysis runs, notebooks, container operations, and SSH imports will not have an execution target.
+A healthy app without a healthy cluster has no execution target: trajectory uploads, analysis runs, notebooks, container operations, and SSH imports all fail.
 
-## Operational checks that are worth doing
+## Verification
 
-After the stack is up, verify the system as a workflow rather than as isolated services.
+Verify the system as a workflow rather than as isolated services:
 
 1. open the app and confirm sign-in works,
 2. connect a cluster and wait for a clean heartbeat,
@@ -183,8 +173,6 @@ After the stack is up, verify the system as a workflow rather than as isolated s
 4. make sure it reaches a completed state,
 5. run a lightweight analysis,
 6. open the result and verify the full round-trip.
-
-That end-to-end test tells you far more than checking each container individually.
 
 ## Recommended runbooks
 
@@ -196,15 +184,13 @@ When you connect a new cluster, verify the full bootstrap path instead of stoppi
 2. verify the local services are up,
 3. check that the daemon reached its startup log cleanly,
 4. confirm the team cluster moved from waiting to connected,
-5. and make sure a fresh heartbeat is visible from the product side.
+5. confirm a fresh heartbeat is visible from the server side.
 
 If the cluster never leaves the waiting state, the issue is often not the installer itself but the daemon's ability to reach the control plane afterward.
 
 ### Analysis end-to-end runbook
 
-After provisioning, run a tiny analysis on a small trajectory.
-
-That single check exercises most of the system at once: upload, storage, queueing, daemon connectivity, plugin execution, result processing, and UI visibility. It is a much better confidence test than validating MongoDB, Redis, and MinIO separately.
+After provisioning, run a small analysis on a small trajectory. This exercises upload, storage, queueing, daemon connectivity, plugin execution, result processing, and UI visibility in one check.
 
 ### Notebook runbook
 
@@ -232,40 +218,36 @@ If your deployment uses containerized services, VNC-capable images, or internal 
 
 ### Cluster stays in waiting-for-connection
 
-This usually means bootstrap got far enough to register intent, but the daemon never completed a healthy control-plane connection. Start by checking the daemon logs, the VoltCloud URL settings, and whether the machine can actually reach the server over the expected network path.
+Bootstrap completed but the daemon never reached a healthy control-plane connection. Check daemon logs, VoltCloud URL settings, and network reachability between the machine and the server.
 
 ### Cluster becomes disconnected after working earlier
 
-In that case, think heartbeat and control-plane health before anything else. The cluster may still have local services running, but if the daemon stops sending heartbeats or the reverse channel drops for long enough, the product will treat the machine as unavailable.
+The local services may still run, but the daemon has stopped sending heartbeats or the reverse channel has dropped. Check daemon health and network path.
 
 ### Jobs remain queued or delayed
 
-It is tempting to blame Redis immediately, but a healthy queue can still stall if the daemon is under memory pressure. Some workers intentionally delay or requeue work when the process is too stressed to continue safely.
+A healthy queue can stall if the daemon is under memory pressure. Workers intentionally delay or requeue work when the process is stressed.
 
 ### Jupyter stays in starting
 
-Notebook startup can fail for reasons that have nothing to do with Jupyter itself: no free host ports, Docker problems, bad public-base-path assumptions, or a runtime container that exists but has not reached readiness yet.
+Common causes: no free host ports, Docker problems, incorrect public-base-path settings, or a runtime container that has not reached readiness.
 
 ### VNC or proxied services never appear
 
-If a container should expose a service but VOLT does not show it, check the container state, the expected labels, and whether the daemon's exposure registry is actually publishing snapshots. This is often a discovery issue, not an application issue.
+Check the container state, the expected labels, and whether the daemon's exposure registry is publishing snapshots. This is typically a discovery issue.
 
-### Update succeeds conceptually but the cluster never comes back
+### Update succeeds but the cluster never comes back
 
-Managed update flows depend on the installation mode and on the daemon being able to replace itself cleanly. If the deployment was not created in the expected image-driven way, the control plane may accept the request while the runtime-side update path still fails.
+Managed update flows depend on the installation mode and on the daemon being able to replace itself. If the deployment was not created in the expected image-driven way, the control plane accepts the request while the runtime-side update path fails.
 
 ### Delete gets stuck halfway
 
-Cluster deletion spans both the control plane and the runtime host. If remote cleanup does not complete, you can end up with a removed control-plane object but leftover local resources, or the opposite. Treat deletion as an operational workflow, not just a button click.
+Cluster deletion spans the control plane and the runtime host. If remote cleanup does not complete, the control-plane object may be removed while local resources remain, or vice versa.
 
 ## Deployment hygiene
 
-Two habits pay off quickly in self-hosted setups:
-
-- keep secrets and `.env` files out of version control,
-- and keep a short operator checklist for cluster connection, upload, analysis, and notebook validation.
-
-Those are the workflows that tell you whether VOLT is genuinely healthy, not just technically running.
+- Keep secrets and `.env` files out of version control.
+- Maintain an operator checklist covering cluster connection, upload, analysis, and notebook validation.
 
 ## Storage layout and buckets
 
@@ -281,11 +263,3 @@ MinIO is not just a generic object store in this architecture. Different buckets
 | `volt-avatars` | Public avatar images |
 | `volt-chat` | Chat attachments |
 | `volt-latex-assets` | LaTeX document assets |
-
-## Final advice
-
-Treat self-hosting VOLT as operating a coordinated system, not just a Node.js app with a database. The product, the daemon, storage, queues, native runtime, and proxying all matter, and most real issues show up at the boundaries between them.
-
-<Callout type="info">
-If you want the internal picture of how those boundaries work, read [Architecture](/docs/architecture) next. If you want the code-level ecosystem around the daemon and native tooling, continue with [Open Source Ecosystem](/docs/open-source).
-</Callout>

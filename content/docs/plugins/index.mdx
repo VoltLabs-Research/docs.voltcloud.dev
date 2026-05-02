@@ -2,34 +2,35 @@
 title: Plugin System
 ---
 
-<Callout type="info">
-**TL;DR** -- You create the workflow in the UI with nodes. Your code only needs to respect two contracts: write the file declared by the **Exposure** node, and shape the MessagePack payload with the keys VOLT understands.
-</Callout>
+## Plugin workflow structure
 
-## Build a plugin
+Plugin workflows are built in the UI at [https://app.voltcloud.dev/dashboard/plugins/list](https://app.voltcloud.dev/dashboard/plugins/list).
 
-You should build the plugin workflow in the UI from [https://app.voltcloud.dev/dashboard/plugins/list](https://app.voltcloud.dev/dashboard/plugins/list).
+A plugin starts with `Modifier`, `Arguments`, `Context`, `ForEach`, and `Entrypoint`. One **Exposure** node is added for each result file VOLT should ingest. To turn an exposure into a 3D artifact, an **Export** node is connected to it.
 
-For most plugins, the workflow starts with `Modifier`, `Arguments`, `Context`, `ForEach`, and `Entrypoint`. Once that execution path exists, you add one **Exposure** node for each result file that VOLT should ingest. If any of those results should become a 3D artifact, you then connect an **Export** node to that exposure. From that point on, your code only has to write the file that the exposure expects.
-
-Each node has a narrow responsibility. **Modifier** defines how the plugin appears in the UI, **Arguments** defines the parameters the user can configure before execution, and **Context** + **ForEach** define which trajectory data is being iterated. **Entrypoint** defines the runtime and the uploaded payload that will be executed, **Exposure** tells VOLT which output file to read after execution, and **Export** tells VOLT how to interpret any geometry or chart data that comes back from that exposure.
-
-That is the main mental model to keep in mind while building plugins: the **Entrypoint** runs your code, the **Exposure** reads the file your code produced, and the **Export** node turns the `export` payload inside that file into a GLB or another artifact that VOLT can render.
+| Node | Responsibility |
+|---|---|
+| **Modifier** | Defines how the plugin appears in the UI |
+| **Arguments** | Defines the parameters the user configures before execution |
+| **Context** + **ForEach** | Define which trajectory data is iterated |
+| **Entrypoint** | Defines the runtime and the uploaded payload to execute |
+| **Exposure** | Defines which output file VOLT reads after execution |
+| **Export** | Defines how VOLT interprets geometry or chart data from an exposure |
 
 
 ## What a plugin looks like inside
 
-You can download the complete example plugin here: [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip). This example shows how to export grouped atoms using `AtomisticExporter`, and the ZIP is already packaged as an importable plugin with its own `plugin.json` + the binary ZIP expected by the `Entrypoint` node.
+A complete example plugin is available at [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip). The ZIP is packaged as an importable plugin with its `plugin.json` and the binary ZIP expected by the `Entrypoint` node.
 
-The script reads atom positions from the current dump and groups them into `Cluster 0`, `Cluster 1`, and `Cluster 2`. Those keys are the same groups VOLT uses to color the atoms in the viewer. The same exposure also exports a per-atom property named `cluster_id`. The grouping rule is intentionally simple and uses `atom_id % 3` only to demonstrate the output format, so you can replace that part with your real clustering logic later.
+The script reads atom positions from the current dump and groups them into `Cluster 0`, `Cluster 1`, and `Cluster 2`. Those keys are the groups VOLT uses to color atoms in the viewer. The same exposure exports a per-atom property named `cluster_id`. The grouping rule uses `atom_id % 3` to demonstrate the output format and is meant to be replaced with real clustering logic.
 
-The image below shows the result of this example in the canvas, with atoms grouped and colored by the keys exported through `AtomisticExporter`.
+The image below shows the result in the canvas, with atoms grouped and colored by the keys exported through `AtomisticExporter`.
 
 Plugin workflow:
 ![Atomistic exporter example workflow](/assets/plugins/atomistic-exporter-example-workflow.png)
 
 
-The easiest way to read this script is in four phases: first it reads the current dump and finds the `ITEM: ATOMS` section, then it validates that the required columns exist, then it assigns each atom to an example cluster, and finally it builds a single MessagePack payload containing listings, `per-atom-properties`, and the grouped `AtomisticExporter` data.
+The script runs in four phases: it reads the current dump and finds the `ITEM: ATOMS` section, validates that the required columns exist, assigns each atom to an example cluster, and builds a single MessagePack payload containing listings, `per-atom-properties`, and the grouped `AtomisticExporter` data.
 
 ```python
 import msgpack
@@ -136,38 +137,34 @@ The results exported after running the plugin are also visible through the Dashb
 
 ![Atomistic exporter workflow data dashboard](/assets/plugins/atomistic-exporter-workflow-data-dashboard.png)
 
-You can also reproduce the same visual effect without relying on `AtomisticExporter` groups directly. Since this example also exports the per-atom property `cluster_id`, you can use color coding based on that property and obtain the same cluster-based coloring. In other words, `AtomisticExporter` groups and `color coding + cluster_id` are two ways of expressing the same grouping logic.
+The same visual effect is reproducible without `AtomisticExporter` groups: color coding on the exported `cluster_id` property produces the same cluster-based coloring. `AtomisticExporter` groups and `color coding + cluster_id` are equivalent expressions of the same grouping logic.
 
 ![Atomistic exporter color coding comparison](/assets/plugins/atomistic-exporter-color-coding-comparison.svg)
 
-The scene can also contain multiple models at the same time. This is useful when you want to compare several exported artifacts together, or when the plugin contributes an additional model on top of the base trajectory visualization.
+A scene can contain multiple models simultaneously, allowing comparison of several exported artifacts or addition of plugin-contributed models on top of the base trajectory.
 
 ![Multiple models in scene](/assets/plugins/multiple-models-in-scene.svg)
 
 ## Plugin right-click menu
 
-Once a plugin exists, you can manage it from the right-click menu.
-
-The image below shows the available actions:
+The right-click menu manages an existing plugin.
 
 ![Plugin right click menu](/assets/plugins/plugin-right-click-menu.png)
 
-Those options are:
-
-- **Edit**: open the plugin builder and modify the workflow.
-- **Clone**: create a copy of the plugin.
-- **Export**: export the plugin so it can be reused or imported elsewhere.
-- **Publish**: make the plugin available in the canvas.
-- **Set as Draft**: move the plugin back to draft state so it is no longer visible in the canvas.
-- **Delete**: remove the plugin.
+| Action | Effect |
+|---|---|
+| **Edit** | Open the plugin builder and modify the workflow |
+| **Clone** | Create a copy of the plugin |
+| **Export** | Export the plugin for reuse or import elsewhere |
+| **Publish** | Make the plugin available in the canvas |
+| **Set as Draft** | Return the plugin to draft state and hide it from the canvas |
+| **Delete** | Remove the plugin |
 
 <Callout type="info">
-When you create a new plugin, make sure it is **published**. If the plugin stays in **draft**, it will not be visible in the canvas.
+A new plugin must be **published** to appear in the canvas. Plugins in **draft** state remain hidden.
 </Callout>
 
-## Node-by-node configuration guide
-
-This is the shortest way to understand what each node does and how it should be configured.
+## Node-by-node configuration
 
 ### `Modifier`
 
@@ -183,8 +180,6 @@ Typical configuration:
 | **Author** | `Volt Labs` | Plugin author |
 | **Icon** | `TbPlugConnected` | Icon used in the plugin card/editor |
 
-That is usually enough for a first plugin.
-
 The image below shows a typical `Modifier` node configuration in the builder.
 
 ![Modifier node configuration](/assets/plugins/modifier-node-config.png)
@@ -195,7 +190,7 @@ The **Arguments** node defines the parameters that the program receives at runti
 
 If your **Entrypoint** arguments template contains `{{ plugin-arguments.as_str }}`, VOLT serializes the configured arguments and passes them to your program.
 
-For Python plugins, those values usually end up in `sys.argv` together with the input path and the output base path.
+For Python plugins, those values arrive in `sys.argv` together with the input path and the output base path.
 
 Example configuration:
 | Field | Example value | What it does |
@@ -215,13 +210,13 @@ The image below shows an `Arguments` node with several argument types configured
 
 The **Context** node defines where the workflow gets its runtime data from.
 
-For normal trajectory-based plugins, the configuration is usually simple:
+For trajectory-based plugins, the configuration is:
 
 | Field | Example value | What it does |
 |---|---|---|
 | **Source** | `trajectory_dumps` | Uses the trajectory frames generated by VOLT |
 
-This node is usually stable across plugins. Most analysis workflows use `trajectory_dumps`.
+Most analysis workflows use `trajectory_dumps`.
 
 The image below shows the `Context` node configured with `trajectory_dumps`.
 
@@ -243,7 +238,7 @@ The image below shows the `ForEach` node configured with `{{ trajectory-context.
 
 ![ForEach node configuration](/assets/plugins/foreach-node-config.png)
 
-The next image shows the autocomplete that appears while typing `{{ tra... }}`. This is useful because it makes clear that `trajectory_dumps` comes from the `Context` node and can be referenced directly from `ForEach`.
+The next image shows the autocomplete that appears while typing `{{ tra... }}`. The `trajectory_dumps` value comes from the `Context` node and is referenced directly from `ForEach`.
 
 ![ForEach trajectory dumps autocomplete](/assets/plugins/foreach-trajectory-dumps.png)
 
@@ -262,9 +257,9 @@ Main fields:
 | **Arguments** | `{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}` | Runtime argument template |
 | **Timeout** | `-1` | Optional execution timeout |
 
-Use this node to decide whether the payload is a Python ZIP, a single executable, or a packaged executable with extra runtime files.
+The Entrypoint node selects whether the payload is a Python ZIP, a single executable, or a packaged executable with extra runtime files.
 
-The first image below shows an `Entrypoint` node configured for a binary-style payload.
+The first image shows an `Entrypoint` node configured for a binary-style payload.
 
 ![Binary entrypoint node configuration](/assets/plugins/binary-entrypoint-node-config.png)
 
@@ -286,11 +281,11 @@ Typical configuration:
 | **Results File Suffix** | `atoms.msgpack` | File suffix your program must write |
 | **Icon** | `TbEye` | Optional result icon |
 
-The first image below shows one `Entrypoint` connected to several `Exposure` nodes. This is useful because a single execution can produce multiple result files, each with its own exposure.
+The first image shows one `Entrypoint` connected to several `Exposure` nodes — a single execution can produce multiple result files, each with its own exposure.
 
 ![Entrypoint with many exposures](/assets/plugins/entrypoint-with-many-exposures-example.png)
 
-The next image shows several `Exposure` node configurations together with the `Export` node configuration connected to each one. This is the pattern to follow when different result files from the same entrypoint need different exporters.
+The next image shows several `Exposure` node configurations together with the `Export` node configuration connected to each one. Use this pattern when different result files from the same entrypoint need different exporters.
 
 ![Exposure and export configuration examples](/assets/plugins/exposure-export-config.png)
 
@@ -306,11 +301,11 @@ Typical configuration:
 | **Type** | `glb` | Defines the artifact type |
 | **Options** | `{ "smoothIterations": 8 }` | Exporter-specific options |
 
-This node always depends on an **Exposure** node, because the exporter reads the `export` key from the exposure result file.
+An **Export** node requires a connected **Exposure** node: the exporter reads the `export` key from the exposure result file.
 
 ## Choosing the right Entrypoint type
 
-The most important decision in the workflow is usually the **Type** field in the **Entrypoint** node.
+The **Type** field in the **Entrypoint** node selects the runtime model.
 
 ### `Executable`
 
@@ -356,45 +351,43 @@ Use this when your plugin needs more than one file to run. A typical case is a p
 
 The **Arguments** field is the command template passed to the selected runtime.
 
-The most common values are:
+| Variable | Resolves to |
+|---|---|
+| `{{ foreach-trajectory-dumps.currentValue.path }}` | The current input dump path |
+| `{{ foreach-trajectory-dumps.outputPath }}` | The output base path used by exposures |
+| `{{ plugin-arguments.as_str }}` | All UI-configured plugin arguments serialized as CLI flags |
+| `{{ <entrypoint-node-id>.projectPath }}` | The extracted package directory (for packaged executables) |
 
-- `{{ foreach-trajectory-dumps.currentValue.path }}` → the current input dump path
-- `{{ foreach-trajectory-dumps.outputPath }}` → the output base path used by exposures
-- `{{ plugin-arguments.as_str }}` → all UI-configured plugin arguments serialized as CLI flags
-- `{{ <entrypoint-node-id>.projectPath }}` → the extracted package directory, useful for packaged executables
-
-For example, a Python ZIP usually looks like this:
+A Python ZIP typically uses:
 
 ```text
 {{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}
 ```
 
-And a packaged executable may need something like this:
+A packaged executable typically uses:
 
 ```text
 --library-path {{ opendxa-entrypoint.projectPath }}/lib {{ opendxa-entrypoint.projectPath }}/bin/opendxa {{ foreach-trajectory-dumps.outputPath }}_annotated.dump {{ foreach-trajectory-dumps.outputPath }}
 ```
 
 <Callout type="info">
-The upload button in the **Entrypoint** editor is only enabled after the plugin has been saved at least once. In other words: create the workflow, save it, then upload the binary or ZIP.
+The upload button in the **Entrypoint** editor is enabled only after the plugin has been saved at least once. Save the workflow before uploading the binary or ZIP.
 </Callout>
 
-## The one rule that matters most
+## Exposure file naming contract
 
-The **Exposure** node is a file contract.
-
-If the exposure says:
+The **Exposure** node defines a file contract. Given:
 
 | Field | Value |
 |---|---|
 | Exposure Name | `Structure Identification` |
 | Results File Suffix | `atoms.msgpack` |
 
-and the entrypoint receives `abc` as the output base, then your code must write:
+and an output base of `abc`, the plugin must write the file:
 
 `abc_atoms.msgpack`
 
-That is the first thing to get right. If the filename does not match, VOLT will not ingest the result even if the payload itself is valid.
+VOLT will not ingest the result if the filename does not match, even when the payload is valid.
 
 For example, if your entrypoint receives the output base in `sys.argv[2]`, the code can write the exposure file like this:
 
@@ -419,22 +412,20 @@ If `output_base` is `abc`, this writes `abc_atoms.msgpack`, which matches the `E
 
 ## What the Exposure node is for
 
-In practice, the fields you will use the most are:
+The two essential fields are:
 
 | Exposure field | What it means |
 |---|---|
 | **Exposure Name** | The label shown in VOLT for that result. |
-| **Results File Suffix** | The exact suffix your code must write after the output base, for example `atoms.msgpack`, `defect_mesh.msgpack`, or `dislocations.msgpack`. |
+| **Results File Suffix** | The exact suffix the plugin writes after the output base (e.g. `atoms.msgpack`, `defect_mesh.msgpack`, `dislocations.msgpack`). |
 
-The rest of the exposure settings are more advanced. For most first plugins, **name** plus **results suffix** is enough.
+## Entrypoint arguments
 
-## What your code should receive
-
-The exact entrypoint arguments depend on how you configured the node, but the common pattern is:
+The arguments delivered to the entrypoint depend on the node configuration. The common pattern is:
 
 - input dump path,
 - output base path,
-- and optional serialized parameters.
+- optional serialized parameters.
 
 For example:
 
@@ -455,11 +446,11 @@ with open(f"{output_base}_results.msgpack", "wb") as f:
     f.write(msgpack.packb(payload, use_bin_type=True))
 ```
 
-If your exposure suffix is `results.msgpack`, that file will be picked up correctly.
+When the exposure suffix is `results.msgpack`, this file is ingested correctly.
 
 ## What can go inside one exposure file
 
-An exposure file is usually a MessagePack object with one or more of these keys:
+An exposure file is a MessagePack object containing one or more of these keys:
 
 ```json
 {
@@ -618,17 +609,15 @@ Important details:
 - VOLT accepts both envelopes: one exporter object, or an array of exporter objects.
 - In the single-object form, the payload is a grouped object where each key is a group name.
 - Those group names drive the colouring in the viewer.
-- Names like `FCC`, `BCC`, `HCP`, `Other`, or `Cluster 7` are especially useful because they map naturally to the existing palettes.
-- For each atom, `pos` is the required field.
-- If you use the array form, ClusterDaemon generates one artifact per array entry.
+- Names like `FCC`, `BCC`, `HCP`, `Other`, or `Cluster 7` map directly to existing palettes.
+- The `pos` field is required for each atom.
+- The array form produces one artifact per array entry.
 
-This is the exporter to study first if you want to reproduce outputs like Structure Identification or coherent crystalline region overlays.
+This is the exporter used by Structure Identification and coherent crystalline region overlays.
 
-## One exposure can do more than one thing
+## Combining multiple result types in one exposure
 
-You do not need separate files for every kind of result.
-
-For example, one exposure can return:
+A single exposure can return:
 
 - a summary in `main_listing`,
 - atom-attached values in `per-atom-properties`,
@@ -678,15 +667,15 @@ Included examples:
 - Download: [hello-world-plugin.zip](/assets/plugins/examples/hello-world-plugin.zip)
 - This is the smallest possible example of an **Entrypoint** node.
 - Its purpose is to show that VOLT executes your script and that anything you `print(...)` appears in the execution log.
-- It does not write an exposure file. You use it to understand entrypoint execution first, before adding `Exposure` outputs.
+- Does not write an exposure file. Useful for verifying entrypoint execution before adding `Exposure` outputs.
 
 **Flow in the builder**
 
 `Modifier -> Arguments -> Context -> ForEach -> Entrypoint`
 
-For this example, the **Arguments** node can stay empty. The goal is to understand the smallest possible workflow that still executes code.
+The **Arguments** node can stay empty for this example.
 
-The first image shows the full workflow in the builder. This matters because it makes clear that the example stops at **Entrypoint** and does not add an **Exposure** node.
+The first image shows the full workflow in the builder. The example stops at **Entrypoint** and does not add an **Exposure** node.
 
 ![Hello World workflow](/assets/plugins/hello-world-example-workflow.png)
 
@@ -694,7 +683,7 @@ The next image shows the **Entrypoint** node configuration. This is where the ZI
 
 ![Hello World entrypoint configuration](/assets/plugins/hello-world-example-entrypoint.png)
 
-The Python code inside the ZIP is intentionally minimal. Its only job is to print information so you can verify that execution happened.
+The Python code inside the ZIP prints information to verify that execution happened.
 
 ```python
 import sys
@@ -714,21 +703,18 @@ The last image shows the execution log. This is the expected result of the examp
 ### `arguments-example`
 
 - Download: [arguments-example.zip](/assets/plugins/examples/arguments-example.zip)
-- This example shows exactly what the **Entrypoint** node passes into your script through `sys.argv`.
-- Its purpose is to help you inspect the real runtime arguments from the execution log.
-- It is the fastest way to understand how the input file path, output base path, and any UI-configured arguments arrive in Python.
+- Demonstrates what the **Entrypoint** node passes into the script through `sys.argv`.
+- Prints the runtime arguments to the execution log for inspection.
 
 **Flow in the builder**
 
 `Modifier -> Arguments -> Context -> ForEach -> Entrypoint`
 
-This is the example to use when you want to understand the **Arguments** node better, because it makes the program print the received arguments directly to the execution log.
-
-The image below shows the full picture for this example. At the top, you can see the user-facing arguments as friendly inputs. In the center, you can see the workflow itself. At the bottom, you can see the `Arguments` node configuration that defines those same inputs for the program.
+The image below shows the full example: user-facing arguments at the top, the workflow in the center, and the `Arguments` node configuration at the bottom.
 
 ![Arguments plugin example](/assets/plugins/arguments-pugin-example.png)
 
-The Python code inside `arguments-example.zip` is intentionally minimal. It only prints the received arguments so you can inspect exactly what VOLT passed into the script.
+The Python code inside `arguments-example.zip` prints the received arguments directly:
 
 ```python
 import sys
@@ -824,7 +810,7 @@ The image below shows `hello-world-plugin` selected in the canvas. Two runtime i
 ![Canvas plugin arguments](/assets/plugins/canvas-plugin-arguments.png)
 
 <Callout type="warning">
-If you are testing a plugin on a trajectory, it is usually better to select a specific timestep first. If you leave the execution on the default full range and the plugin is misconfigured, the analysis will fail for all timesteps.
+When testing a plugin on a trajectory, select a specific timestep first. Leaving the execution on the default full range will fail across all timesteps if the plugin is misconfigured.
 </Callout>
 
 When a plugin starts executing, its status is updated in real time:
@@ -833,7 +819,7 @@ When a plugin starts executing, its status is updated in real time:
 - `running`
 - `success`
 
-After a plugin has executed, you can open its right-click menu in the canvas. The image below shows the available actions for an executed plugin:
+An executed plugin exposes a right-click menu in the canvas with the following actions:
 
 - **Select**
 - **Download**

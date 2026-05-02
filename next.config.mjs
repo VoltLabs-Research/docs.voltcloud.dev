@@ -8,9 +8,19 @@ const config = {
   reactStrictMode: true,
   async rewrites() {
     return [
+
       {
         source: '/docs/:path*.mdx',
         destination: '/llms.mdx/docs/:path*',
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source: '/docs',
+        destination: '/docs/modules',
+        permanent: false,
       },
     ];
   },

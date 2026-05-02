@@ -3,57 +3,38 @@ title: Teams
 description: "Manage the workspace itself: members, roles, invitations, secret keys, and integrations."
 ---
 
-<Callout type="info">
-**TL;DR** -- A team is the real boundary inside VOLT. Data, permissions, AI integrations, secret keys, notebooks, analyses, and collaboration all live inside a team context.
-</Callout>
-
-## Overview
-
-Teams are where VOLT becomes multi-user and operational. A team is not just a list of members. It is the container for the workspace itself: trajectories, clusters, containers, notebooks, chats, LaTeX projects, AI providers, and permissions all belong to it.
-
-That is why switching teams changes so much at once. You are moving between isolated workspaces, not just changing a label in the sidebar.
+A team is the workspace boundary in VOLT. Trajectories, clusters, containers, notebooks, chats, LaTeX projects, AI providers, secret keys, and permissions all belong to a team. Switching teams swaps the entire workspace context.
 
 ## Creating and structuring workspaces
 
-You can create multiple teams for different labs, projects, collaborations, or client boundaries. Once a team exists, the next steps usually involve inviting members, assigning roles, and connecting infrastructure.
+A user can create multiple teams for different labs, projects, collaborations, or client boundaries. After creation, the next operations are inviting members, assigning roles, and connecting infrastructure.
 
-## Invitations and onboarding other people
+## Invitations
 
-VOLT supports two invitation styles: direct share by email and invitation codes.
+VOLT supports two invitation styles:
 
-Email invitations are useful when you want a traceable invite flow with pending status and cancellation controls. Invite codes work better when you need a faster, lower-friction way to bring someone into the workspace.
+- **Email invitations** provide a traceable flow with pending status and cancellation controls.
+- **Invite codes** provide a faster, lower-friction path.
 
-In practice, both lead to the same place: the new member joins the team and inherits whatever permissions their role allows.
+Both produce the same result: the new member joins the team and inherits the permissions assigned by their role.
 
 ## Roles and RBAC
 
-Permissions are not hard-coded to just owner versus everyone else. The team module includes a proper RBAC layer, so roles can map to specific resources and actions across the workspace.
+The team module includes an RBAC layer that maps roles to specific resources and actions.
 
 | Role Type | What It Means |
 |---|---|
 | **System roles** | Built-in roles such as owner, admin, and member |
-| **Custom roles** | Team-defined roles with more targeted permission sets |
-
-That makes teams especially useful in mixed environments where some people only need to run analyses, others need to manage infrastructure, and a smaller group should control invitations, roles, or destructive operations.
+| **Custom roles** | Team-defined roles with targeted permission sets |
 
 ## Secret keys and programmatic access
 
-Teams can also issue secret keys for API and SDK use. Those keys make it possible to access the workspace from scripts and integrations through tools such as `voltsdk` or `@voltstack/voltclient`.
-
-Because the key is only shown once at creation time, key management in VOLT follows the usual pattern: copy it immediately, store it safely, and revoke it when it is no longer needed.
+Teams issue secret keys for API and SDK access through tools such as `voltsdk` or `@voltstack/voltclient`. Keys are shown once at creation time and must be stored securely and revoked when no longer needed.
 
 <Callout type="warn">
-Team secret keys are powerful. Treat them like any other production credential: store them securely, rotate them when needed, and revoke them if you think they may have been exposed.
+Team secret keys grant programmatic access to the workspace. Store them securely, rotate them when needed, and revoke them on suspected exposure.
 </Callout>
 
-## AI integrations live here too
+## AI integrations
 
-One detail that is easy to miss at first is that Volt AI provider management is really part of team administration. Provider keys, model availability, and AI configuration all belong to the workspace, not to an individual user profile.
-
-That keeps AI behavior aligned with the same team boundary used everywhere else.
-
-## Why this module matters beyond admin work
-
-The Teams module may look administrative, but it has direct consequences for the scientific workflow. It decides who can run analyses, who can connect clusters, who can use AI providers, who can issue API keys, and who can change the shape of the workspace itself.
-
-In other words, team settings are not separate from the work. They govern how the work can happen.
+Volt AI provider management is part of team administration. Provider keys, model availability, and AI configuration belong to the team, not to individual user profiles.

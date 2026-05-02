@@ -3,13 +3,7 @@ title: LaTeX
 description: Write papers collaboratively with a multi-file editor, live PDF preview, and contextual AI help.
 ---
 
-<Callout type="info">
-**TL;DR** -- The LaTeX module gives your team a full document workspace inside VOLT: multi-file editing, project structure, assets, compile-to-preview flow, imports and exports, and AI assistance that understands the current document context.
-</Callout>
-
-## Overview
-
-LaTeX in VOLT is built for the stage of research where simulation work starts turning into figures, captions, methods sections, and drafts. Instead of exporting data from one system and writing somewhere else, you can stay in the same workspace and move directly from analysis to manuscript work.
+The LaTeX module enables document editing within the same workspace as trajectories, analyses, and notebooks. It supports multi-file projects, assets, a compile-to-preview flow, imports and exports, and contextual AI assistance.
 
 ![LaTeX Overview](/assets/overviews/overviews_latex.png)
 
@@ -17,17 +11,13 @@ LaTeX in VOLT is built for the stage of research where simulation work starts tu
 
 ## Project structure
 
-Each document is a project with its own file tree, entrypoint, assets, and compilation state.
-
-That means you are not limited to a single monolithic `.tex` file. You can organize the document the same way most real papers are organized: multiple files, supporting assets, and a chosen entrypoint that defines what gets compiled.
+Each document is a project with its own file tree, entrypoint, assets, and compilation state. Projects can contain multiple `.tex` files, supporting assets, and a designated entrypoint that defines what gets compiled.
 
 ![Create Project](/assets/modules/latex/latex-start-project.png)
 
 ## The editing workspace
 
-The three-panel layout keeps the core loop visible at the same time: file structure on the left, code in the center, and compiled output on the right.
-
-That is what makes the module feel less like a text editor embedded in a web page and more like an actual document workspace.
+The three-panel layout shows file structure on the left, code in the center, and compiled output on the right.
 
 ![Folder Organization](/assets/modules/latex/latex-folder.png)
 
@@ -35,22 +25,16 @@ That is what makes the module feel less like a text editor embedded in a web pag
 
 ## Collaboration and autosave
 
-Multiple people can work in the same project, and VOLT continuously synchronizes changes through the real-time layer. On top of that, autosave and compile behavior keep the PDF preview reasonably close to the current state of the project without forcing you into a manual save-compile-refresh loop.
+Multiple users can work in the same project. VOLT synchronizes changes through the real-time layer, and autosave plus background compilation keep the PDF preview close to the current project state without manual save-compile cycles.
 
 ## AI in document context
 
-The LaTeX AI panel is one of the places where Volt AI feels most specific. Instead of talking to the workspace in general, it can work with the active document and file context.
+The LaTeX AI panel operates on the active document and file context.
 
 ![Volt AI Panel](/assets/modules/latex/latex-volt-ai.png)
 
-That makes it useful for tasks such as rewriting a section, generating tables, fixing compile errors, or helping with figure scaffolding while still staying grounded in the current project.
+It supports tasks such as rewriting a section, generating tables, fixing compile errors, and figure scaffolding scoped to the current project.
 
 ## Import and export
 
-LaTeX projects can be imported from existing archives and exported again as source files or a packaged project. This keeps the module practical even if part of the document lifecycle still happens outside VOLT.
-
-## Why LaTeX belongs here
-
-This module makes the most sense when you see VOLT as a research workspace instead of a simulation viewer. The same platform that stores trajectories and analysis outputs can also hold the manuscript work that grows out of them.
-
-That continuity is the real benefit. Your data, discussion, notebook work, and writing process do not have to live in unrelated systems.
+LaTeX projects can be imported from existing archives and exported as source files or as a packaged project.

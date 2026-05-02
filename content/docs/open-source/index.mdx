@@ -1,12 +1,9 @@
 ---
 title: Open Source Ecosystem
+description: Repositories, foundational algorithms, and SDKs published by VOLT Labs.
 ---
 
-## Philosophy
-We've built an entire open-source ecosystem around VOLT. 
-
-We believe in transparency, collaboration, and giving back to the community.
-Science, or rather, human knowledge, has always advanced on the foundation of others' work. And this is our contribution to making the world a better place.
+The platform depends on a set of open-source repositories that cover 3D model assembly, headless rendering, LAMMPS parsing, the cluster daemon, the SDK, and the foundational scientific algorithms behind the bundled plugins.
 
 ## VOLT Labs Ecosystem
 
@@ -34,41 +31,34 @@ Science, or rather, human knowledge, has always advanced on the foundation of ot
 | **StructureIdentification** | Algorithms for crystal structure identification in atomistic simulations. Classifies atoms by local structural environment to detect BCC, FCC, HCP, diamond cubi… | [GitHub](https://github.com/VoltLabs-Research/StructureIdentification) |
 | **ClusterAnalysis** | Groups particles into clusters based on distance cutoff or bond topology. Identifies connected components, computes cluster sizes, centers of mass, and gyration… | [GitHub](https://github.com/VoltLabs-Research/ClusterAnalysis) |
 
-#### Disclaimer
+### Comparison with OVITO
 
-When you create a team in VOLT, a set of plugins is automatically uploaded to one of the team's available clusters. Each of these plugins runs the [Foundational Algorithms](#foundational-algorithms) under the hood.
+When a team is created, a set of plugins is automatically uploaded to one of its clusters. Each plugin executes one of the [Foundational Algorithms](#foundational-algorithms) under the hood.
 
-For context, there are several tools on the market that allow you to analyze LAMMPS simulations. Some, like [mdapy](https://github.com/mushroomfire/mdapy), use the `ovito` library published on PyPI to programmatically interact with OVITO's modifiers through Python, as well as their own algorithms. OVITO is currently the most widely used tool in the field and, consequently, the most cited — so if you need a reliable reference to compare results against, OVITO is a solid choice.
+OVITO is the most widely used and cited tool for analyzing LAMMPS simulations and serves as a reference for result comparison. The Foundational Algorithms — and the plugins built on them — are independent implementations.
 
-With that context in mind, the Foundational Algorithms (and by extension the Plugins) are built entirely using our own software ecosystem.
+For algorithms like **CoordinationAnalysis**, VOLT and OVITO produce identical results. For more complex algorithms such as **OpenDXA** or **ElasticStrain**, results may differ for the following reasons:
 
-<Callout type="info">
-It's important to know that when running something like **CoordinationAnalysis**, VOLT and OVITO produce exactly the same results. However, for more complex algorithms such as **OpenDXA** or **ElasticStrain**, you may observe differences compared to OVITO.
-</Callout>
+1. **Independent implementations.** VOLT's algorithms are not 1:1 replicas of OVITO's.
+2. **Compiler optimization flags.** Release builds can introduce small numerical differences.
+3. **Undefined behavior risk.** When the numerical difference under (2) is significant, it may indicate UB. During OpenDXA development, UB was caused by compiler optimizations applied to technically correct code.
+4. **Different parallelization stacks.** Repeated runs of the same algorithm may produce non-deterministic results within small tolerances.
+5. **Complex algorithms are sensitive.** In GrainSegmentation, OpenDXA, or structure identification methods like CNA and PTM, single-line changes can produce large divergence. The current cluster construction in OpenDXA differs from OVITO's DislocationAnalysisEngine: results are nearly identical with CNA but not guaranteed to match with PTM or other structure identification algorithms.
 
-This does not necessarily mean the results are incorrect. There are several factors that can contribute to these differences:
-
-1. **VOLT's algorithms are not 1:1 replicas of OVITO's.** The algorithms are independently developed.
-2. **Compiler optimization flags** used in Release builds can introduce small numerical differences.
-3. **If point 2 occurs and the numerical difference is significant**, it may indicate undefined behavior (UB). During the development of OpenDXA, UB was encountered and took weeks to track down — it was caused by compiler optimizations applied to code that was technically correct.
-4. **VOLT's algorithms are parallelized using different libraries and implementations** than those used by OVITO. This shouldn't be a problem in general, but you may notice that after several runs of the same algorithm, results are not perfectly deterministic. This is expected if the differences are small.
-5. **In complex algorithms** like GrainSegmentation, OpenDXA, or structural identification methods such as CNA or PTM, even the smallest change — a sign flip, a single line of code — can have catastrophic effects. At one point, estimating the RMSD for DXA + PTM seemed like a good idea — it wasn't. Currently, the way cluster construction works in OpenDXA differs from OVITO's DislocationAnalysisEngine. While results are virtually identical when using CNA, we cannot guarantee the same level of accuracy when using PTM or other structural identification algorithms beyond "it makes sense because the algorithm classifies better than CNA."
-
-The way we can ensure your confidence in the Foundational Algorithms is by providing benchmarks that compare VOLT's and OVITO's results for the same timestep. We're working on it! 🙂
+Benchmarks comparing VOLT and OVITO results on the same timestep are planned.
 
 ## Contributing
-We welcome contributions from the community! Whether it's fixing a bug, improving documentation, or proposing a new feature, your help is appreciated.
 
-1. **Fork** the repository you want to contribute to.
-2. **Create a branch** for your changes.
-3. **Submit a pull request** with a clear description of what you've done.
+1. Fork the relevant repository.
+2. Create a branch for the change.
+3. Submit a pull request with a clear description.
 
-Please make sure to read the `CONTRIBUTING.md` file in each repository for specific guidelines.
+Refer to `CONTRIBUTING.md` in each repository for repository-specific guidelines.
 
 <Callout type="warn">
-A set of AI-powered agents is available in the `.github` directory of the Volt repository. You can use them to develop new features or fix bugs with the help of artificial intelligence. However, **do not use AI for the Foundational Algorithms** — these are non-trivial algorithms, and even state-of-the-art models tend to hallucinate when working with them.
+AI-powered agents are available in the `.github` directory of the Volt repository for feature work and bug fixes. **Do not use AI for the Foundational Algorithms** — these are non-trivial algorithms, and current models tend to hallucinate when working with them.
 </Callout>
 
 ## License
 
-All VOLT Labs open source projects are released under the [MIT License](https://opensource.org/licenses/MIT) unless otherwise specified in the repository.
+VOLT Labs open-source projects are released under the [MIT License](https://opensource.org/licenses/MIT) unless otherwise specified in the repository.

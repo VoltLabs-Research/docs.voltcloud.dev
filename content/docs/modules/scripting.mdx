@@ -3,57 +3,33 @@ title: Scripting
 description: Run Jupyter-based custom workflows on your team clusters.
 ---
 
-<Callout type="info">
-**TL;DR** -- Scripting gives you Jupyter sessions backed by your own cluster. You can create general notebooks, open notebooks linked to a trajectory, and work in an environment that already includes the scientific Python stack VOLT expects.
-</Callout>
-
-## Overview
-
-Built-in plugins are great when the workflow already exists. Scripting is for the moments when it does not.
-
-This module gives you a notebook layer inside VOLT so you can run custom analysis, plotting, exploratory work, or one-off data preparation without leaving the same workspace your trajectories and analyses already live in.
+The Scripting module runs Jupyter sessions on team clusters for custom analysis, plotting, and data preparation. It supports general notebooks and notebooks linked to a specific trajectory, and ships with the scientific Python stack preinstalled.
 
 ![Scripting Overview](/assets/overviews/overviews_scripting.png)
 
 ## Notebook scopes
 
-Not every notebook needs to start from the same place. VOLT distinguishes between notebooks that are general-purpose and notebooks that are tied to a particular trajectory.
-
 | Scope | What It Is For |
 |---|---|
 | **General** | Shared scratchpads, utilities, and workflows not anchored to a single trajectory |
-| **Trajectory** | Notebook work that should stay close to one specific simulation dataset |
-
-That second option is especially useful when you know the notebook is part of the interpretation of a single run rather than a reusable team utility.
+| **Trajectory** | Notebook work tied to one specific simulation dataset |
 
 ## How sessions are created
 
-Opening a notebook does more than load a saved document. VOLT has to coordinate a real Jupyter runtime on the cluster side.
-
-The backend resolves a suitable team cluster, ensures that only one startup flow is creating the same session at a time, provisions or reuses the notebook runtime container, and then proxies the Jupyter interface back into the app.
-
-That means notebook startup can move through a short lifecycle of its own before the workspace is fully ready.
+Opening a notebook coordinates a Jupyter runtime on the cluster. The backend resolves a suitable team cluster, deduplicates concurrent startups for the same session, provisions or reuses the notebook runtime container, and proxies the Jupyter interface back into the app. Notebook startup runs through this lifecycle before the workspace is ready.
 
 ## What comes preinstalled
 
-The notebook image already includes the libraries most teams expect for this kind of work, including `voltsdk`, `numpy`, `scipy`, `pandas`, `matplotlib`, `ovito`, `ase`, `pymatgen`, `MDAnalysis`, `matminer`, `vtk`, `minio`, and `msgpack`.
-
-So the usual experience is not "open an empty Python box and bootstrap everything yourself." It is closer to opening a prepared scientific environment that already understands the rest of the platform.
+The notebook image includes `voltsdk`, `numpy`, `scipy`, `pandas`, `matplotlib`, `ovito`, `ase`, `pymatgen`, `MDAnalysis`, `matminer`, `vtk`, `minio`, and `msgpack`.
 
 ## Trajectory-linked workspaces
 
-When you open Scripting from a trajectory context, VOLT can create or reuse notebooks intended for that trajectory and even seed an example notebook to help you get moving faster.
-
-That is why Scripting feels different from just running Jupyter somewhere else. It is aware of the workspace around it.
+When opened from a trajectory context, Scripting creates or reuses notebooks scoped to that trajectory and can seed an example notebook.
 
 ## Notebook management
 
-From the listing you can search, rename, and delete notebooks. Deleting a notebook also tears down its associated runtime state, so notebook cleanup is more than removing a title from a table.
+The listing supports search, rename, and delete operations. Deleting a notebook also tears down its associated runtime state.
 
-## When to use Scripting instead of plugins
+## Scripting vs. plugins
 
-Use Scripting when you need freedom more than standardization. If the analysis is exploratory, temporary, or tightly tied to custom Python code, notebooks are usually the better fit. If the workflow is stable and should be repeatable for the whole team, that is often a sign it belongs in the plugin system instead.
-
-<Callout type="info">
-Jupyter sessions run on demand and depend on cluster availability. If notebook startup feels slow, the usual suspects are cluster connectivity, container startup time, or lack of free host ports on the machine running the daemon.
-</Callout>
+Scripting suits exploratory, temporary, or custom-Python work. Plugins suit stable, repeatable workflows shared across the team.
