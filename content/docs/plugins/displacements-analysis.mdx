@@ -1,38 +1,91 @@
 ---
 title: Displacements Analysis
-description: Compare two configurations atom by atom and measure displacement vectors.
+description: Compare a frame against a reference configuration atom by atom and measure displacement vectors.
 ---
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `reference` | `file` | — | Reference LAMMPS dump file. If omitted, the current frame is used, which usually produces near-zero displacement. |
-| `mic` | `bool` | `true` | Use minimum image convention. |
-| `affineMapping` | `string` | `noMapping` | Affine mapping mode. Options: `noMapping`, `toReferenceCell`, `toCurrentCell`. |
+| `reference` | `frame` | — | Reference frame to compare against. If omitted, the current frame is used as its own reference, which produces near-zero displacement. |
+| `mic` | `boolean` | `true` | Use the minimum image convention. |
+| `affine_mapping` | `select` | `none` | Affine mapping mode. UI options: `none`, `toReference`, `toCurrent`. |
+
+<Callout type="warn">
+The current frame and the reference frame must have identical atom counts. If they
+differ, the analysis fails with `Atom count mismatch between current and reference frames`.
+</Callout>
+
+<Callout type="info">
+The VOLT form sends the affine-mapping keys `none` / `toReference` / `toCurrent`, but the
+compiled binary's CLI flag `--affine_mapping` only recognizes `noMapping` /
+`toReferenceCell` / `toCurrentCell` (default `noMapping`); any other value falls back to no
+mapping. As a result, selecting `toReference` or `toCurrent` in the UI does not currently
+activate affine mapping in the binary.
+</Callout>
 
 ## Output
 
+The plugin produces two result files and one renderable export.
+
 ### `{outputBase}_displacements.msgpack`
 
+Surfaced in the UI as the **Displacements** result. Contains only the summary statistics.
+
 ```ts
-type Vec3 = [float, float, float];
-
-interface PerAtomProperties {
-    id: int;
-    displacement: Vec3;
-    magnitude: float;
-}
-
-interface DisplacementsOutput {
+interface DisplacementsSummary {
     main_listing: {
         average_displacement_magnitude: float;
         max_displacement_magnitude: float;
         min_displacement_magnitude: float;
     };
-    "per-atom-properties": PerAtomProperties[];
 }
 ```
+
+### `{outputBase}_atoms.msgpack`
+
+Surfaced in the UI as the **Displacements Model** result, in the canonical
+`AtomisticExporter` format consumed by the VOLT viewer. The per-atom displacement
+vector and magnitude are emitted as extra fields on each atom.
+
+```ts
+type Vec3 = [float, float, float];
+
+interface PerAtom {
+    id: int;
+    pos: Vec3;
+    structure_id: int;
+    structure_name: string; // "All"
+    cluster_id: int;
+    displacement: Vec3;
+    magnitude: float;
+}
+
+interface AtomsOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+    };
+    sub_listings: {
+        structures: {
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }[];
+    };
+    export: {
+        AtomisticExporter: {
+            // bucket name -> atoms; this plugin uses a single "All" bucket
+            All: PerAtom[];
+        };
+    };
+}
+```
+
+### GLB export
+
+The `{outputBase}_atoms.msgpack` model is also exported as a GLB via the
+`AtomisticExporter`, providing a renderable atomistic model of the displaced configuration.
 
 ## See Also
 

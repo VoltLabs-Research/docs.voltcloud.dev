@@ -11,10 +11,10 @@ The platform depends on a set of open-source repositories that cover 3D model as
 |---|---|---|
 | **SpatialAssembler** | Volt's 3D model assembler. Also available on npm: `npm install @voltstack/spatial-assembler` | [GitHub](https://github.com/VoltLabs-Research/SpatialAssembler) · [npm](https://www.npmjs.com/package/@voltstack/spatial-assembler) |
 | **HeadlessRasterizer** | Rasterize GLB models without a browser! Also available on npm: `npm install @voltstack/headless-rasterizer` | [GitHub](https://github.com/VoltLabs-Research/HeadlessRasterizer) · [npm](https://www.npmjs.com/package/@voltstack/headless-rasterizer) |
-| **CoreToolkit** | Core C++ library providing math primitives (Vector3, Matrix3, Quaternion), spatial data structures (KD-trees, octrees), simulation cell handling, and parallel a… | [GitHub](https://github.com/VoltLabs-Research/CoreToolkit) |
+| **CoreToolkit** | Core C++ library providing math primitives (Vector3, Matrix3, Quaternion), spatial data structures (KD-tree-style nearest-neighbor finder, cutoff/grid neighbor finder), simulation cell handling, and parallel a… | [GitHub](https://github.com/VoltLabs-Research/CoreToolkit) |
 | **LammpsIO** | High-performance parser & utilities for LAMMPS trajectory frames. Also available on npm: `npm install @voltstack/lammps-io` | [GitHub](https://github.com/VoltLabs-Research/LammpsIO) · [npm](https://www.npmjs.com/package/@voltstack/lammps-io) |
 | **VoltSDK** | The SDK to interact with the Volt APIs. Available on npm: `npm install @voltstack/voltclient` and PyPI: `pip install voltsdk` | [GitHub](https://github.com/VoltLabs-Research/VoltSDK) · [npm](https://www.npmjs.com/package/@voltstack/voltclient) · [PyPI](https://pypi.org/project/voltsdk/) |
-| **ClusterDaemon** | The compute node for your Volt Team! Also available on npm: `npm install @voltstack/daemon-cluster-client` | [GitHub](https://github.com/VoltLabs-Research/ClusterDaemon) · [npm](https://www.npmjs.com/package/@voltstack/daemon-cluster-client) |
+| **ClusterDaemon** | The compute node for your Volt Team! The daemon service itself is private/unpublished. To connect to a daemon from code, use the separate SDK client: `npm install @voltstack/daemon-cluster-client` | [GitHub](https://github.com/VoltLabs-Research/ClusterDaemon) · [npm](https://www.npmjs.com/package/@voltstack/daemon-cluster-client) |
 | **Volt** | The next-generation platform designed for high-performance research teams and enthusiastic materials scientists! | [GitHub](https://github.com/VoltLabs-Research/Volt) |
 | **docs.voltcloud.dev** | Docs for VOLT Labs Open-Source Software Ecosystem. | [GitHub](https://github.com/VoltLabs-Research/docs.voltcloud.dev) |
 
@@ -30,10 +30,14 @@ The platform depends on a set of open-source repositories that cover 3D model as
 | **AtomicStrain** | Computes per-atom strain tensors from atomic configurations. Calculates Green-Lagrangian strain, von Mises strain, and principal strains for deformation analysi… | [GitHub](https://github.com/VoltLabs-Research/AtomicStrain) |
 | **StructureIdentification** | Algorithms for crystal structure identification in atomistic simulations. Classifies atoms by local structural environment to detect BCC, FCC, HCP, diamond cubi… | [GitHub](https://github.com/VoltLabs-Research/StructureIdentification) |
 | **ClusterAnalysis** | Groups particles into clusters based on distance cutoff or bond topology. Identifies connected components, computes cluster sizes, centers of mass, and gyration… | [GitHub](https://github.com/VoltLabs-Research/ClusterAnalysis) |
+| **AdaptiveCommonNeighborAnalysis** | Runs ACNA/CNA, exports per-atom structure type, and generates cluster graph artifacts (clusters table and cluster transitions table) consumed by OpenDXA and other downstream plugins. | [GitHub](https://github.com/VoltLabs-Research/adaptive-common-neighbor-analysis) |
+| **PolyhedralTemplateMatching** | Runs PTM to classify atoms by local structural environment. Exports per-atom structure type and cluster graph artifacts consumed by OpenDXA and downstream plugins. Supports BCC, FCC, HCP, SC, cubic diamond, and hex diamond targets with a configurable RMSD threshold. | [GitHub](https://github.com/VoltLabs-Research/polyhedral-template-matching) |
+| **LineReconstructionDXA** | Reconstructs dislocation lines via DXA using cluster tables produced by ACNA/CNA or PTM. | [GitHub](https://github.com/VoltLabs-Research/line-reconstruction-dxa) |
+| **PatternStructureMatcher** | Runs pattern structure matching from user-defined reference patterns and exports a reconstructed-state artifact consumible by OpenDXA. | [GitHub](https://github.com/VoltLabs-Research/pattern-structure-matcher) |
 
 ### Comparison with OVITO
 
-When a team is created, a set of plugins is automatically uploaded to one of its clusters. Each plugin executes one of the [Foundational Algorithms](#foundational-algorithms) under the hood.
+Each plugin executes one of the [Foundational Algorithms](#foundational-algorithms) under the hood. Plugins are distributed through the Registry and pulled on demand by the ClusterDaemon when an analysis is run.
 
 OVITO is the most widely used and cited tool for analyzing LAMMPS simulations and serves as a reference for result comparison. The Foundational Algorithms — and the plugins built on them — are independent implementations.
 

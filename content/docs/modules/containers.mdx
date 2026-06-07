@@ -1,9 +1,9 @@
 ---
 title: Containers
-description: Run Docker workloads on team clusters with terminals, files, ports, and optional remote desktop.
+description: Run Docker workloads on team clusters with terminals, files, processes, stats, and HTTP port proxying.
 ---
 
-The Containers module runs custom runtimes, services, and desktop-enabled environments on team clusters. Containers can be created from templates or custom images and provide terminal access, files, stats, exposed ports, and VNC-style desktop sessions. They share the hardware capacity of the underlying cluster.
+The Containers module runs custom runtimes and services on team clusters. Containers can be created from templates or custom images and provide terminal access, files, processes, stats, and exposed ports. They share the hardware capacity of the underlying cluster.
 
 ![Containers Overview](/assets/overviews/overviews_containers.png)
 
@@ -15,7 +15,7 @@ The listing shows existing containers and their running state. The lifecycle cov
 
 ## Creating a container
 
-The creation wizard collects: the team cluster, CPU and memory limits, environment variables, port exposure, and optional capabilities such as remote desktop support.
+The creation wizard collects a name, the team, the deployment cluster, CPU and memory limits, optional public port mappings, environment variables, any template-specific custom fields, and an advanced Docker-socket-access toggle.
 
 ![Create Container](/assets/modules/containers/create-container.png)
 
@@ -29,12 +29,7 @@ If no command is set and the image's own command is not used, VOLT runs an idle 
 - **File access** for browsing and reading container content.
 - **Process and stats views** for operational visibility.
 - **Port access** for services routed safely through VOLT.
-- **Remote desktop** for GUI-capable images that expose the expected VNC/XRDP setup.
 
 ## Port proxying and accessible services
 
-VOLT proxies access to containerized services through controlled sessions routed via the team cluster, providing browser entry points for dashboards, internal tools, and other services without exposing host networking directly.
-
-## Remote desktop support
-
-For containers built with a desktop environment, VOLT can open a remote desktop session in the browser. The image and port setup must support it, and the container must be running before the UI exposes the session entry point.
+VOLT proxies access to containerized services through controlled sessions routed via the team cluster, providing browser entry points for dashboards, internal tools, and other services without exposing host networking directly. When a container exposes an accessible port, the UI surfaces an "Open :PORT" action that opens the proxied HTTP service in a new browser tab.

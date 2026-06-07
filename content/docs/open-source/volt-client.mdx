@@ -18,9 +18,8 @@ npm install @voltstack/voltclient
 ```typescript
 import { createVoltClient, secretKey } from '@voltstack/voltclient';
 
-const volt = createVoltClient({
-  baseUrl: 'https://api.voltcloud.dev',
-  credentials: secretKey('your-secret-key'),
+const volt = createVoltClient('https://api.voltcloud.dev/api', {
+  credential: secretKey('vsk_...'),
 });
 
 // Scope requests to a specific team
@@ -32,18 +31,33 @@ const trajectories = await team.getUnwrapped('/trajectory');
 
 ## Factory Function
 
-### `createVoltClient(options)`
+### `createVoltClient(baseUrl, options?)`
 
-Creates a new `VoltClient` instance with the specified configuration.
+Creates a new `VoltClient` instance scoped to `baseUrl`. The base URL is a positional first argument; configuration is passed in the optional second argument.
 
 ```typescript
-interface CreateVoltClientOptions {
-  baseUrl: string;
-  credentials: CredentialProvider;
-  // Optional: 'fetch' (default) or 'axios'
+const volt = createVoltClient('https://api.voltcloud.dev/api', {
+  credential: secretKey('vsk_...'),
+  adapter: 'fetch',
+  teamId: 'team-id',
+});
+```
+
+```typescript
+interface VoltClientFactoryOptions {
+  // Credential provider for authentication. If omitted, requests are
+  // sent without an Authorization header.
+  credential?: CredentialProvider;
+  // HTTP adapter to use. 'fetch' (default) or 'axios'.
   adapter?: 'fetch' | 'axios';
+  // Request timeout in milliseconds. Default: 30000.
+  timeout?: number;
+  // Global RBAC team ID scope, injected into every request URL.
+  teamId?: string;
 }
 ```
+
+Team scoping is configured via the `teamId` option or the [`withTeam()`](#team-scoping) method — there is no `credentials` field.
 
 ## Authentication Presets
 
@@ -59,8 +73,8 @@ import { staticToken, secretKey, dynamicToken } from '@voltstack/voltclient';
 // Static token
 const creds = staticToken('eyJhbGciOi...');
 
-// Secret key
-const creds = secretKey('sk-...');
+// Secret key (VoltLabs keys use a 'vsk_' prefix)
+const creds = secretKey('vsk_...');
 
 // Dynamic token (e.g., from a refresh flow)
 const creds = dynamicToken(async () => {
@@ -78,14 +92,22 @@ The client ships with two HTTP adapters:
 | `FetchHttpClient` | None (native `fetch`) | Browser, Node.js 18+ |
 | `AxiosHttpClient` | `axios >= 1.0.0` | Browser, Node.js |
 
+Both adapters require a `baseUrl` and accept an optional `credential` (singular) and `timeout`.
+
 ```typescript
 import { VoltClient, FetchHttpClient, AxiosHttpClient } from '@voltstack/voltclient';
 
 // Using fetch (default)
-const http = new FetchHttpClient({ credentials: secretKey('sk-...') });
+const http = new FetchHttpClient({
+  baseUrl: 'https://api.voltcloud.dev/api',
+  credential: secretKey('vsk_...'),
+});
 
 // Using axios
-const http = new AxiosHttpClient({ credentials: secretKey('sk-...') });
+const http = new AxiosHttpClient({
+  baseUrl: 'https://api.voltcloud.dev/api',
+  credential: secretKey('vsk_...'),
+});
 ```
 
 ## Constructor
@@ -189,17 +211,22 @@ Returns a normalized paginated response.
 
 ```typescript
 interface PaginatedResponse<T> {
+  status: 'success';
   data: T[];
-  totalResults: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+  _meta?: Record<string, unknown>;
 }
 ```
 
 ```typescript
 const page = await volt.getPaginated('/trajectory', { page: 1, limit: 20 });
-console.log(page.data, page.totalPages);
+console.log(page.data, page.pagination.totalPages);
 ```
 
 ### File Downloads
@@ -216,24 +243,52 @@ const blob = await volt.exportFile('/analysis/abc123/export');
 
 The SDK includes a declarative DSL for defining typed API services.
 
+`createService(config, methods, factory)` takes three arguments:
+
+- `config` — a base-path string (e.g. `'/trajectory'`), or a `SingleClientConfig` / `MultiClientConfig` object.
+- `methods` — a map of endpoint descriptors built with the helpers below. Path templates use `':param'` placeholders (e.g. `'/:id'`).
+- `factory` — a `ClientFactory`, `(basePath, opts?) => VoltClient`, that creates the scoped clients (decoupling the DSL from any particular HTTP configuration).
+
+It returns a built service whose methods are called directly — `service.method(params)` — with no second application.
+
 ```typescript
 import { createService, get, post, patch, del, paginated } from '@voltstack/voltclient';
 
-const TrajectoryService = createService((volt) => ({
-  list: paginated<Trajectory>('/trajectory'),
-  getById: get<Trajectory>((id: string) => `/trajectory/${id}`),
-  create: post<Trajectory>('/trajectory'),
-  update: patch<Trajectory>((id: string) => `/trajectory/${id}`),
-  remove: del<void>((id: string) => `/trajectory/${id}`),
-}));
+const clientFactory = (basePath: string) => volt.withBasePath(basePath);
 
-// Usage
-const service = TrajectoryService(volt);
-const trajectories = await service.list({ page: 1 });
-const trajectory = await service.getById('abc123');
+const TrajectoryService = createService(
+  '/trajectory',
+  {
+    list: paginated<{ page: number }, Trajectory>('/'),
+    getById: get<{ id: string }, Trajectory>('/:id'),
+    create: post<Trajectory, Trajectory>('/'),
+    update: patch<{ id: string } & Partial<Trajectory>, Trajectory>('/:id'),
+    remove: del<{ id: string }>('/:id'),
+  },
+  clientFactory,
+);
+
+// Usage — methods are invoked directly on the built service
+const trajectories = await TrajectoryService.list({ page: 1 });
+const trajectory = await TrajectoryService.getById({ id: 'abc123' });
 ```
 
+### DSL builders
+
+| Builder | Purpose |
+|---|---|
+| `get(path, opts?)` | GET endpoint |
+| `post(path, opts?)` | POST endpoint |
+| `patch(path, opts?)` | PATCH endpoint |
+| `del(path, opts?)` | DELETE endpoint |
+| `paginated(path, opts?)` | GET endpoint normalized to `PaginatedResponse<T>` |
+| `request(method, path, opts?)` | Raw HTTP request with an explicit method |
+| `download(method, path, opts?)` | Returns a `Blob` (auto-sets `responseType: 'blob'` and `unwrap: 'raw'`) |
+| `custom(run, opts?)` | Full control over execution via a `run` callback |
+
 ## Error Handling
+
+`ApiError` exposes a string `code` (e.g. `'Network::Timeout'`, `'Auth::Unauthorized'`) as its primary discriminator, alongside an optional HTTP `status` and `message`. It also provides `getFriendlyMessage()`, `isPermissionDenied()`, and the static `ApiError.isRBACError(err)` helper, so consumers can branch on error codes rather than HTTP status alone.
 
 ```typescript
 import { ApiError } from '@voltstack/voltclient';
@@ -242,7 +297,11 @@ try {
   await volt.get('/trajectory/invalid');
 } catch (err) {
   if (err instanceof ApiError) {
-    console.error(err.status, err.message);
+    if (ApiError.isRBACError(err)) {
+      console.error('Permission denied:', err.getFriendlyMessage());
+    } else {
+      console.error(err.code, err.status, err.message);
+    }
   }
 }
 ```

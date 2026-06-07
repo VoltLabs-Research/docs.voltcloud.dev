@@ -7,17 +7,23 @@ description: Measure local centrosymmetry as a fast way to highlight disorder an
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `numNeighbors` | `int` | `12` | Number of nearest neighbors to consider. Use a value consistent with the lattice you expect. |
+| `num_neighbors` | `int` | `12` | Number of nearest neighbors to consider. Use a value consistent with the lattice you expect. |
 | `mode` | `string` | `conventional` | CSP calculation mode. Options: `conventional`, `matching`. |
 
 ## Output
 
+The plugin writes two msgpack files per frame.
+
 ### `{outputBase}_centrosymmetry.msgpack`
 
+Summary statistics for the frame.
+
 ```ts
-interface PerAtomProperties {
-    id: int;
-    csp: float;
+interface HistogramBin {
+    bin: int;
+    start: float;
+    end: float;
+    count: int;
 }
 
 interface CentrosymmetryOutput {
@@ -26,18 +32,51 @@ interface CentrosymmetryOutput {
         histogram_bins: int;
         histogram_bin_size: float;
         max_csp: float;
-        histogram_counts: int[];
-        histogram_interval: {
-            start: float;
-            end: float;
+        histogram_start: float;
+        histogram_end: float;
+    };
+    sub_listings: {
+        histogram: HistogramBin[];
+    };
+}
+```
+
+### `{outputBase}_atoms.msgpack`
+
+Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are grouped into a single `"All"` bucket.
+
+```ts
+interface Atom {
+    id: int;
+    pos: [float, float, float];
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    csp: float;
+}
+
+interface AtomsOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+    };
+    sub_listings: {
+        structures: Array<{
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }>;
+    };
+    export: {
+        AtomisticExporter: {
+            [bucketName: string]: Atom[];
         };
     };
-    "per-atom-properties": PerAtomProperties[];
 }
 ```
 
 ## See Also
 
-- [Structure Identification](/docs/plugins/structure-identification) — local structure labels
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — local structure labels
 - [Atomic Strain](/docs/plugins/atomic-strain) — deformation measures at the atom level
 - [OpenDXA](/docs/plugins/open-dxa) — dislocation-network reconstruction

@@ -1,0 +1,182 @@
+---
+title: Line Reconstruction DXA
+description: Reconstruct dislocation lines via DXA from an upstream cluster package and DXA-style geometric parameters.
+---
+
+This plugin consumes per-atom structure-identification artifacts (an annotated dump plus cluster tables) produced upstream and reconstructs the dislocation network using the Dislocation eXtraction Algorithm (DXA). When upstream cluster tables are not supplied, the Python wrapper runs Polyhedral Template Matching inline to generate them before invoking the binary.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `crystalStructure` | `select` | `FCC` | Reference crystal structure. Options: `FCC`, `BCC`, `HCP`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. |
+| `crystalPathSteps` | `number` | `4` | Maximum crystal-path steps used for edge vectors (min `1`, step `1`). |
+| `alphaScale` | `number` | `3.5` | Alpha threshold scale relative to neighbor distance (min `0`, step `0.1`). |
+| `smoothingIterations` | `number` | `0` | Taubin smoothing iterations applied to the reconstructed lines (min `0`, step `1`). |
+| `linePointInterval` | `number` | `1.2` | Line coarsening interval (min `0`, step `0.1`). |
+
+The binary also accepts `--tessellationGhostLayerScale` (default `3.5`) and `--threads`, but these are not exposed as UI form inputs. The annotated dump, `--clusters-table`, and `--clusters-transitions` are required inputs wired in from the upstream structure-identification step rather than user-entered values.
+
+## Output
+
+### `{outputBase}_dislocations.msgpack`
+
+The primary result surfaced in the UI ("Dislocation Lines"), exported to GLB via `DislocationExporter`.
+
+```ts
+type Vec3 = [float, float, float];
+
+interface Burgers {
+    vector: Vec3;
+    vector_local: Vec3;
+    vector_global: Vec3;
+    magnitude: float;
+}
+
+interface DislocationLine {
+    line_id: int;
+    points: Vec3[];
+    num_points: int;
+    length: float;
+    burgers_vector: Vec3;
+    burgers_vector_local: Vec3;
+    burgers_vector_global: Vec3;
+    burgers: Burgers;
+    magnitude: float;
+    cluster_id: int;
+    structure_type: int;
+    is_closed: bool;
+    dislocation_type_id: int;
+}
+
+interface DislocationsOutput {
+    main_listing: {
+        dislocations: int;
+        total_points: int;
+        total_length: float;
+    };
+    sub_listings: {
+        dislocations: DislocationLine[];
+    };
+}
+```
+
+### `{outputBase}_dislocation_segments.msgpack`
+
+Individual line segments (PBC-clipped chunks) carrying the same Burgers data plus their stage of reconstruction.
+
+```ts
+interface DislocationSegment {
+    segment_id: int;
+    points: Vec3[];
+    num_points: int;
+    length: float;
+    position1: Vec3;
+    position2: Vec3;
+    burgers_vector: Vec3;
+    burgers_vector_local: Vec3;
+    burgers_vector_global: Vec3;
+    burgers: Burgers;
+    magnitude: float;
+    cluster_id: int;
+    structure_type: int;
+    stage: int;
+}
+
+interface DislocationSegmentsOutput {
+    main_listing: {
+        dislocation_segments: int;
+        dislocations: int;
+    };
+    sub_listings: {
+        dislocation_segments: DislocationSegment[];
+    };
+}
+```
+
+### `{outputBase}_unassigned_edges.msgpack`
+
+Tessellation edges that could not be assigned to a dislocation line.
+
+```ts
+interface UnassignedEdge {
+    edge_id: int;
+    position1: Vec3;
+    position2: Vec3;
+    atoms: [int, int];
+    stage: int;
+}
+
+interface UnassignedEdgesOutput {
+    main_listing: {
+        unassigned_edges: int;
+    };
+    sub_listings: {
+        unassigned_edges: UnassignedEdge[];
+    };
+}
+```
+
+### `{outputBase}_interface_mesh.msgpack`
+
+The interface mesh separating good and bad crystal regions, as unwrapped vertices and facets.
+
+```ts
+interface MeshPoint {
+    index: int;
+    position: Vec3;
+}
+
+interface MeshFacet {
+    vertices: int[];
+    region: int;
+}
+
+interface InterfaceMeshOutput {
+    main_listing: {
+        total_nodes: int;
+        total_facets: int;
+    };
+    sub_listings: {
+        points: MeshPoint[];
+        facets: MeshFacet[];
+    };
+}
+```
+
+### `{outputBase}_simulation_cell.msgpack`
+
+Geometry of the simulation cell for the analyzed frame.
+
+```ts
+interface SimulationCellOutput {
+    main_listing: {
+        simulation_cells: int;
+        volume: float;
+        is_2d: bool;
+        effective_dimensions: int;
+        periodic_dimensions: int;
+    };
+    sub_listings: {
+        simulation_cell: Array<{
+            volume: float;
+            is_2d: bool;
+            effective_dimensions: int;
+            a_x: float; a_y: float; a_z: float;
+            b_x: float; b_y: float; b_z: float;
+            c_x: float; c_y: float; c_z: float;
+            a_length: float;
+            b_length: float;
+            c_length: float;
+            pbc_x: bool;
+            pbc_y: bool;
+            pbc_z: bool;
+        }>;
+    };
+}
+```
+
+## See Also
+
+- [OpenDXA](/docs/plugins/open-dxa) — full dislocation-network reconstruction in crystalline systems
+- [Grain Segmentation](/docs/plugins/grain-segmentation) — segment polycrystalline regions by atom orientation

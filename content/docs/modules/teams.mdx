@@ -24,12 +24,12 @@ The team module includes an RBAC layer that maps roles to specific resources and
 
 | Role Type | What It Means |
 |---|---|
-| **System roles** | Built-in roles such as owner, admin, and member |
+| **System roles** | Built-in roles: owner, admin, member, and viewer |
 | **Custom roles** | Team-defined roles with targeted permission sets |
 
 ## Secret keys and programmatic access
 
-Teams issue secret keys for API and SDK access through tools such as `voltsdk` or `@voltstack/voltclient`. Keys are shown once at creation time and must be stored securely and revoked when no longer needed.
+Teams issue secret keys for API and SDK access through tools such as `voltsdk` or `@voltstack/voltclient`. Each key is assigned a team role and inherits that role's permissions, so keys can be scoped to exactly the access required. Keys use a `vsk_` prefix and are shown once at creation time; only a prefix and hash are retained. Store keys securely and revoke them when no longer needed.
 
 <Callout type="warn">
 Team secret keys grant programmatic access to the workspace. Store them securely, rotate them when needed, and revoke them on suspected exposure.

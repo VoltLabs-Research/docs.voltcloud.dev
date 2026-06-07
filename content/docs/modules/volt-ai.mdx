@@ -3,7 +3,7 @@ title: Volt AI
 description: Multi-provider AI assistant integrated across the entire platform.
 ---
 
-Volt AI is the built-in assistant available across the workspace as a dedicated conversation surface, a floating assistant, and a contextual helper inside modules like [LaTeX](/docs/modules/latex). It supports 13 providers and 71 tools, and operates against team-scoped providers, tools, and permissions. Each team configures its own API keys and selects which models are available.
+Volt AI is the built-in assistant available across the workspace as a dedicated conversation surface, a floating assistant, and a contextual helper inside modules like [LaTeX](/docs/modules/latex). It supports 13 providers and 12 tools, and operates against team-scoped providers, tools, and permissions. Each team configures its own API keys and selects which models are available.
 
 ![Volt AI Overview](/assets/overviews/overviews_vol-ai.png)
 
@@ -17,7 +17,7 @@ Volt AI currently supports the following providers:
 | **Anthropic** | Claude 4, Claude 3.5, and other Anthropic models |
 | **Google** | Gemini Pro, Gemini Flash, and other Google AI models |
 | **Groq** | Ultra-fast inference for open-source models |
-| **xAI** | Grok models from xAI |
+| **xAI (Grok)** | Grok models from xAI |
 | **Mistral** | Mistral Large, Medium, Small, and open-source models |
 | **Cohere** | Command R+, Command R, and other Cohere models |
 | **DeepSeek** | DeepSeek reasoning and coding models |
@@ -57,59 +57,13 @@ The chat experience is persistent and streamed in real time. Conversations are s
 
 ![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-1.png)
 
-A single conversation can operate across trajectories, analyses, and LaTeX documents through the same tool interface.
+A single conversation persists across tasks and can invoke the assistant's tools to inspect and manage Docker containers and to manage its own conversations.
 
 ![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-2.png)
 
 ## Available Tools
 
-Volt AI has access to **71 tools** organized across 8 categories. Tools cover read operations, workspace mutations, and operational actions like analysis execution and container management. Mutating tools require explicit approval before execution.
-
-### LaTeX Documents (11 tools)
-
-| Tool | Description |
-|---|---|
-| `compile_latex_document` | Compile a LaTeX document and return the compilation log |
-| `create_latex_file` | Create a new file in a LaTeX document |
-| `edit_latex_file` | Edit an existing LaTeX file's content |
-| `fix_latex_errors` | Compile, parse errors from the log, and return structured error context |
-| `generate_bibtex_entry` | Generate a BibTeX bibliography entry |
-| `generate_latex_figure` | Generate a LaTeX figure environment block |
-| `generate_latex_table` | Generate LaTeX table code from a description or structured data |
-| `list_latex_assets` | List all assets (images, PDFs) in a LaTeX document |
-| `list_latex_documents` | List all LaTeX documents in the current team |
-| `list_latex_files` | List all files in a LaTeX document |
-| `read_latex_file` | Read the content of a specific LaTeX file |
-
-### Trajectories & Analysis (11 tools)
-
-| Tool | Description |
-|---|---|
-| `list_trajectories` | List all trajectories with status, frame count, and dates |
-| `get_trajectory_by_id` | Get detailed information about a specific trajectory |
-| `count_trajectories` | Count trajectories available for the team |
-| `update_trajectory` | Update a trajectory |
-| `delete_trajectory` | Delete a trajectory |
-| `create_analysis` | Create a new analysis |
-| `get_analysis_by_id` | Get detailed information about a specific analysis |
-| `list_analyses_by_trajectory` | List analyses for a specific trajectory |
-| `delete_analysis` | Delete an analysis |
-| `run_analysis` | Execute a plugin analysis on a trajectory |
-| `get_team_metrics` | Get trajectory and analysis metrics for the team |
-
-### Plugin Analysis (8 tools)
-
-| Tool | Description |
-|---|---|
-| `list_plugins` | List plugins available in the team |
-| `get_plugin_by_id` | Get detailed information about a specific plugin |
-| `update_plugin` | Update a plugin |
-| `delete_plugin` | Delete a plugin |
-| `list_analysis_exposures` | List all files (msgpack, charts, GLB models) for an analysis |
-| `get_analysis_listing_data` | Read tabular plugin analysis results for a specific exposure |
-| `get_analysis_listing_summary` | Get a statistical summary of numeric columns from plugin data |
-| `get_analysis_chart` | Retrieve a pre-generated chart image from object storage |
-| `read_exposure_data` | Read raw exposure data (msgpack) from object storage |
+Volt AI has access to **12 tools** organized across 2 categories: container management and AI conversation management. Tools cover read operations and workspace mutations such as creating, updating, and deleting Docker containers. Mutating tools require explicit approval before execution.
 
 ### Containers (9 tools)
 
@@ -125,34 +79,6 @@ Volt AI has access to **71 tools** organized across 8 categories. Tools cover re
 | `list_container_files` | List files in a container directory |
 | `read_container_file` | Read a file from a container |
 
-### Team Management (13 tools)
-
-| Tool | Description |
-|---|---|
-| `list_team_members` | List all members with their roles |
-| `update_team_member` | Update a team member's role |
-| `remove_team_member` | Remove a team member |
-| `list_team_roles` | List all roles in the team |
-| `create_team_role` | Create a new role |
-| `update_team_role` | Update a team role |
-| `delete_team_role` | Delete a team role |
-| `send_team_invitation` | Send a team invitation |
-| `list_pending_invitations` | List pending team invitations |
-| `delete_team_invitation` | Cancel a pending invitation |
-| `list_secret_keys` | List API secret keys for the team |
-| `create_secret_key` | Create a new API secret key |
-| `delete_secret_key` | Permanently delete an API secret key |
-| `revoke_secret_key` | Revoke an API secret key |
-
-### SSH Connections (4 tools)
-
-| Tool | Description |
-|---|---|
-| `list_ssh_connections` | List all SSH connections configured for the team |
-| `create_ssh_connection` | Create a new SSH connection |
-| `update_ssh_connection` | Update an SSH connection |
-| `delete_ssh_connection` | Delete an SSH connection |
-
 ### AI Conversations (3 tools)
 
 | Tool | Description |
@@ -160,13 +86,6 @@ Volt AI has access to **71 tools** organized across 8 categories. Tools cover re
 | `list_conversations` | List all AI conversations for the current user |
 | `update_conversation` | Update an AI conversation title |
 | `delete_conversation` | Delete an AI conversation |
-
-### Scripting & Simulation (2 tools)
-
-| Tool | Description |
-|---|---|
-| `list_scripting_notebooks` | List all Jupyter scripting notebooks in the team |
-| `list_simulation_cells` | List all simulation cells in the team |
 
 ## Common tasks
 
@@ -181,15 +100,13 @@ Volt AI has access to **71 tools** organized across 8 categories. Tools cover re
 
 The provider appears in the provider list and its enabled models become available across Volt AI surfaces.
 
-### Run an analysis from natural language
+### Manage a container from natural language
 
 1. Open a **Volt AI** conversation.
-2. Submit a request such as `Run Coordination Analysis on trajectory X`.
-3. Volt AI resolves the trajectory and plugin, then prepares the tool call.
-4. Review the proposed action and approve it if confirmation is required.
-5. The analysis appears in the standard jobs and analysis flow.
-
-The run uses the same analysis system as direct execution, and results become available from the trajectory and analysis views.
+2. Submit a request such as `List the containers in this team and show me the stats for the running one`.
+3. Volt AI calls the relevant container tools and summarizes the results.
+4. For a mutating action (for example creating or deleting a container), review the proposed action and approve it when the assistant requests confirmation.
+5. The action runs through the same container system as direct execution, and changes appear in the standard container views.
 
 ## Troubleshooting
 

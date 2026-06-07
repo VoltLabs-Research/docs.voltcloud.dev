@@ -15,24 +15,55 @@ description: Count neighbors within a cutoff and compute a radial distribution f
 ### `{outputBase}_coordination.msgpack`
 
 ```ts
-interface PerAtomProperties {
-    id: int;
-    coordination: int;
-}
-
 interface CoordinationOutput {
     main_listing: {
         cutoff: float;
-        rdf: {
-            x: float[];
-            y: float[];
-        };
+        rdf_bins: int;
+        total_atoms: int;
+        min_coordination: int;
+        max_coordination: int;
+        mean_coordination: float;
     };
-    "per-atom-properties": PerAtomProperties[];
+    sub_listings: {
+        rdf: { r: float; g_r: float }[];
+    };
 }
 ```
 
+### `{outputBase}_atoms.msgpack`
+
+Per-atom data written by the AtomisticExporter. Atoms are bucketed by coordination number under group names `Coordination_<n>`. Each atom entry includes the standard atomistic fields plus:
+
+```ts
+interface CoordinationAtomFields {
+    coordination: int;
+    coordination_color: [float, float, float];
+    color: [float, float, float];
+}
+```
+
+This file is surfaced in VOLT as the **Coordination Model** exposure and exported as a `.glb` scene.
+
+### `{outputBase}_rdf_chart.msgpack`
+
+Chart payload for the RDF line chart exposure.
+
+```ts
+interface RdfChartOutput {
+    export: {
+        ChartExporter: {
+            rdf: {
+                r: float[];
+                g_r: float[];
+            };
+        };
+    };
+}
+```
+
+This file is surfaced in VOLT as the **RDF Chart** exposure and exported as a `chart-png` image (x-axis: `r`, y-axis: `g(r)`).
+
 ## See Also
 
-- [Structure Identification](/docs/plugins/structure-identification) — local crystal labels alongside neighbor information
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — local crystal structure classification alongside neighbor information
 - [Cluster Analysis](/docs/plugins/cluster-analysis) — connectivity-based grouping

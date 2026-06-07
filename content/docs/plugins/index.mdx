@@ -367,7 +367,7 @@ A Python ZIP typically uses:
 A packaged executable typically uses:
 
 ```text
---library-path {{ opendxa-entrypoint.projectPath }}/lib {{ opendxa-entrypoint.projectPath }}/bin/opendxa {{ foreach-trajectory-dumps.outputPath }}_annotated.dump {{ foreach-trajectory-dumps.outputPath }}
+{{ foreach-trajectory-dumps.outputPath }}_annotated.dump {{ foreach-trajectory-dumps.outputPath }} --lattice_dir {{ analysis-entrypoint.projectPath }}/share/volt/lattices {{ plugin-arguments.as_str }}
 ```
 
 <Callout type="info">

@@ -65,12 +65,15 @@ voltlabs-ecosystem/
 │   ├── StructureIdentification/
 │   ├── AtomicStrain/
 │   ├── CentroSymmetryParameter/
+│   ├── CommonNeighborAnalysis/
 │   ├── ClusterAnalysis/
 │   ├── CoordinationAnalysis/
 │   ├── DisplacementsAnalysis/
 │   ├── ElasticStrain/
 │   ├── GrainSegmentation/
-│   └── OpenDXA/
+│   ├── LineReconstructionDXA/
+│   ├── OpenDXA/
+│   └── PolyhedralTemplateMatching/
 └── app/
     ├── Volt/
     └── ClusterDaemon/
@@ -84,7 +87,7 @@ For each plugin in the `plugins/` directory, the script runs a **Docker-based bu
 
 1. A `gcc:14-bookworm` container installs CMake, Conan, and system dependencies.
 2. CoreToolkit is exported as a Conan package inside the container.
-3. Each plugin is compiled against CoreToolkit with Release optimizations (`-O3`, `-march=native`, statically linked `libstdc++` and `libgcc`).
+3. Each plugin is compiled against CoreToolkit with Release optimizations (`-O3`, `-mtune=generic`, statically linked `libstdc++` and `libgcc`). CPU-specific tuning (`-march=native`) is available but off by default; enable it with `-DVOLT_ENABLE_NATIVE_OPTIMIZATIONS=ON`.
 4. The resulting binaries are extracted to the output directory.
 
 ## Configuration
@@ -95,7 +98,7 @@ You can customize the script behavior with environment variables:
 |---|---|---|
 | `GITHUB_ORG` | `https://github.com/voltlabs-research` | Base URL for cloning repositories |
 | `WORK_DIR` | `./voltlabs-ecosystem` | Root directory for the ecosystem workspace |
-| `BUILD_OUTPUT_DIR` | `./scripts/out` (or second argument) | Where compiled plugin binaries are placed |
+| `BUILD_OUTPUT_DIR` | `<script dir>/out` (or second argument) | Where compiled plugin binaries are placed |
 
 ```bash
 WORK_DIR=~/my-volt BUILD_OUTPUT_DIR=~/my-volt/bin \
@@ -104,15 +107,29 @@ WORK_DIR=~/my-volt BUILD_OUTPUT_DIR=~/my-volt/bin \
 
 ### Rebuild Without Cache
 
-Pass `--no-cache` to force Docker to rebuild from scratch:
+Pass `--no-cache` to instruct Docker to rebuild plugin images without using the layer cache:
 
 ```bash
 ./voltlabs-ecosystem/tools/CoreToolkit/scripts/install.sh --no-cache
 ```
 
+<Callout type="info">
+Re-running the script always performs the full pipeline: OS and tooling verification, clone-or-skip for each repository, then the Docker-based plugin builds. The `--no-cache` flag only affects how Docker runs those builds — there is no rebuild-only mode that skips the earlier steps.
+</Callout>
+
 ## Build Output
 
-After a successful run, the compiled plugin binaries are placed in the output directory (default: `scripts/out/`). Each plugin produces a standalone executable that accepts `--input` (path to a LAMMPS dump file), `--output` (path for results), and `--params` (JSON configuration) as command-line arguments, and writes analysis results in MessagePack format to the specified output path.
+After a successful run, the compiled plugin binaries are placed in the output directory (default: `<script dir>/out/`). Each plugin produces a standalone executable invoked with positional arguments:
+
+```
+<binary> <input_dump> <output_base> [plugin-specific flags]
+```
+
+- `<input_dump>` — path to the LAMMPS dump file to analyse.
+- `<output_base>` — base path for result files; the binary appends suffixes and writes one or more MessagePack files (e.g. `<output_base>_cluster_analysis.msgpack`, `<output_base>_atoms.msgpack`).
+- Plugin-specific flags vary by algorithm and follow their own conventions (e.g. `--crystal_structure FCC --rmsd 0.1` for PTM-based plugins).
+
+Plugins are normally invoked through their Python wrapper scripts, which handle binary location, flag filtering, and output validation.
 
 <Callout type="warn">
 The Docker-based build currently compiles only the **plugin** repositories (the Foundational Algorithms). The tools (`VoltSDK`, `SpatialAssembler`, etc.) and the app (`Volt`, `ClusterDaemon`) are cloned but not built by this script.

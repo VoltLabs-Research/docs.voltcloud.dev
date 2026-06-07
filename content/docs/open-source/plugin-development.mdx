@@ -4,12 +4,18 @@ description: Build custom analysis plugins for VOLT using CoreToolkit.
 ---
 
 <Callout type="info">
-**TL;DR** — Write a C++ executable that links against CoreToolkit, reads a LAMMPS dump frame via `--input`, runs your analysis algorithm, and writes MessagePack results to `--output`. Build with CMake + Conan, then deploy to any cluster.
+**TL;DR** — A plugin is a C++23 service that links against CoreToolkit. You write a small service class, register it with the `VOLT_SERVICE_PLUGIN` macro, and the macro turns it into a CLI binary invoked as `myplugin <lammps_file> [output_base] [options]`. Results are written as one or more `*.msgpack` files. You ship a `plugin.json` (a workflow DAG describing the UI, frame iteration, entrypoint, and outputs) and a Python wrapper that VOLT actually invokes. Build with Conan + CMake; CI bundles the binary and publishes it.
 </Callout>
 
 ## Overview
 
-VOLT plugins are standalone C++ executables that link against **CoreToolkit**. Each plugin reads a LAMMPS dump frame, performs an analysis algorithm, and outputs results in MessagePack format. Once compiled, a plugin can be installed on any ClusterDaemon.
+VOLT plugins are C++23 analysis algorithms built on top of **CoreToolkit** (`coretoolkit::coretoolkit`). Each plugin:
+
+1. Reads one or more LAMMPS dump frames.
+2. Runs an analysis algorithm.
+3. Writes results as MessagePack (`*.msgpack`) files derived from an output base path.
+
+VOLT and the ClusterDaemon do not call the compiled binary directly. They invoke a **Python wrapper** (`scripts/<name>_plugin_wrapper.py`) declared in `plugin.json`, which locates the binary, filters VOLT runtime flags, runs it, and validates the expected outputs. The example throughout this page is `coordination-analysis`, which computes per-atom coordination numbers and a radial distribution function (RDF).
 
 ## Prerequisites
 
@@ -29,8 +35,15 @@ A typical plugin has this layout:
 MyPlugin/
 ├── CMakeLists.txt
 ├── conanfile.py
+├── plugin.json                 # workflow DAG (UI form, iteration, entrypoint, outputs)
+├── include/
+│   └── volt/
+│       └── myplugin_service.h
 ├── src/
-│   └── main.cpp
+│   ├── plugin.cpp              # entrypoint: registers the service via the macro
+│   └── myplugin_service.cpp    # the algorithm
+├── scripts/
+│   └── myplugin_plugin_wrapper.py
 └── .github/
     └── workflows/
         └── publish-plugin-binary.yml
@@ -38,46 +51,48 @@ MyPlugin/
 
 ## Step 1: CMakeLists.txt
 
+Plugins use the `volt_add_plugin(...)` macro provided by CoreToolkit's `VoltPlugin.cmake`. The macro sets C++23, finds the required dependencies (Boost, OneTBB, spdlog, nlohmann_json), builds a `<name>_lib` static library plus an executable from `MAIN_SOURCE`, and wires up the install targets. A canonical `CMakeLists.txt` is only a few lines:
+
 ```cmake
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+
 project(myplugin VERSION 1.0.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type")
-
 find_package(coretoolkit REQUIRED)
-find_package(Threads REQUIRED)
 
-add_executable(${PROJECT_NAME} src/main.cpp)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    coretoolkit::coretoolkit
-    Threads::Threads
+volt_add_plugin(myplugin
+    MAIN_SOURCE src/plugin.cpp
 )
-
-target_compile_options(${PROJECT_NAME} PRIVATE
-    $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU,Clang,AppleClang>>:
-        -O3 -march=native
-    >
-)
-
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 ```
+
+<Callout type="info">
+The macro also accepts `SOURCES`, `DEPENDENCIES`, `PACKAGES`, `INCLUDE_DIRS`, `VENDOR_SOURCES`, and `NO_EXECUTABLE` (for library-only plugins). If `MAIN_SOURCE` is omitted it falls back to `src/main.cpp`, then `src/*plugin*.cpp`. A handful of plugins (e.g. `cluster-analysis`) configure their targets manually instead of using the macro.
+</Callout>
 
 ## Step 2: conanfile.py
 
+A plugin is packaged as a Conan `static-library`. It requires CoreToolkit plus the same third-party libraries the macro links, and sets the `hwloc/*:shared=True` default option. The `package_info()` block exposes the `<name>_lib` library so other plugins can depend on it.
+
 ```python
 from conan import ConanFile
-from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 
 
 class MyPluginConan(ConanFile):
     name = "myplugin"
     version = "1.0.0"
+    package_type = "static-library"
+    license = "MIT"
     settings = "os", "arch", "compiler", "build_type"
-    requires = ("coretoolkit/1.0.0",)
+    requires = (
+        "boost/1.88.0",
+        "onetbb/2021.12.0",
+        "coretoolkit/1.0.0",
+        "spdlog/1.14.1",
+        "nlohmann_json/3.11.3",
+    )
+    default_options = {"hwloc/*:shared": True}
+    exports_sources = "CMakeLists.txt", "include/*", "src/*"
 
     def layout(self):
         cmake_layout(self)
@@ -90,83 +105,217 @@ class MyPluginConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+
+    def package(self):
+        cmake = CMake(self)
+        cmake.install()
+
+    def package_info(self):
+        self.cpp_info.set_property("cmake_target_name", "myplugin::myplugin")
+        self.cpp_info.libs = ["myplugin_lib"]
+        self.cpp_info.requires = [
+            "boost::headers",
+            "onetbb::onetbb",
+            "coretoolkit::coretoolkit",
+            "nlohmann_json::nlohmann_json",
+            "spdlog::spdlog",
+        ]
 ```
 
 ## Step 3: Plugin Source Code
 
-Here's a minimal plugin that computes per-atom coordination numbers:
+A plugin is a **service class** with parameter setters and a `compute(...)` method, registered by the `VOLT_SERVICE_PLUGIN` macro. The macro generates `main()`, parses CLI arguments, applies the option bindings to the service, parses the input frame, and calls `compute`.
+
+### The service class
+
+Declare setters for each tunable parameter and a `compute` method that takes a parsed `LammpsParser::Frame` and an `outputBase` path:
 
 ```cpp
-#include <volt/core/volt.h>
+// include/volt/myplugin_service.h
+#pragma once
+
 #include <volt/core/lammps_parser.h>
+#include <nlohmann/json.hpp>
+#include <string>
+
+namespace Volt {
+
+using json = nlohmann::json;
+
+class MyPluginService {
+public:
+    void setCutoff(double v);
+
+    json compute(const LammpsParser::Frame& frame, const std::string& outputBase);
+
+private:
+    double _cutoff = 3.2;
+};
+
+} // namespace Volt
+```
+
+### The algorithm
+
+`FrameAdapter` is a **static factory** that converts a parsed frame into `ParticleProperty` objects and validates the simulation cell. `CutoffNeighborFinder` is default-constructed, then `prepare(cutoff, positions, cell)`, and iterated with its nested `Query` class. `AnalysisResult` provides static helpers (`failure`, `success`, `addTiming`) that return JSON — there is no `addProperty`/`write`:
+
+```cpp
+// src/myplugin_service.cpp
+#include <volt/myplugin_service.h>
 #include <volt/core/frame_adapter.h>
-#include <volt/core/simulation_cell.h>
-#include <volt/core/particle_property.h>
 #include <volt/core/analysis_result.h>
 #include <volt/analysis/cutoff_neighbor_finder.h>
-#include <volt/cli/common.h>
 
-#include <nlohmann/json.hpp>
-#include <spdlog/spdlog.h>
+#include <vector>
 
-int main(int argc, char* argv[])
-{
-    // Parse CLI arguments (handles --input, --output, --params)
-    auto args = volt::cli::parse(argc, argv);
+namespace Volt {
 
-    // Read the LAMMPS dump frame
-    auto frame = volt::core::LammpsParser::parse(args.inputPath);
+void MyPluginService::setCutoff(double v) { _cutoff = v; }
 
-    // Read parameters from JSON
-    double cutoff = args.params.value("cutoff", 3.0);
+json MyPluginService::compute(const LammpsParser::Frame& frame, const std::string& outputBase) {
+    if (frame.natoms <= 0)
+        return AnalysisResult::failure("Invalid number of atoms");
+    if (!FrameAdapter::validateSimulationCell(frame.simulationCell))
+        return AnalysisResult::failure("Invalid simulation cell");
 
-    // Build neighbor list
-    volt::analysis::CutoffNeighborFinder finder(
-        frame.positions(),
-        frame.simulationCell(),
-        cutoff
-    );
+    // Zero-copy position property bound to the frame's memory.
+    auto positions = FrameAdapter::createPositionPropertyShared(frame);
+    if (!positions)
+        return AnalysisResult::failure("Failed to create position property");
 
-    // Compute coordination for each atom
-    std::vector<int> coordination(frame.atomCount());
-    for (size_t i = 0; i < frame.atomCount(); ++i) {
-        coordination[i] = finder.neighborCount(i);
+    // Build the neighbor list.
+    CutoffNeighborFinder finder;
+    finder.prepare(_cutoff, positions.get(), frame.simulationCell);
+
+    // Count neighbors per atom.
+    std::vector<int> coordination(static_cast<std::size_t>(frame.natoms), 0);
+    for (std::size_t i = 0; i < static_cast<std::size_t>(frame.natoms); ++i) {
+        int count = 0;
+        for (CutoffNeighborFinder::Query q(finder, i); !q.atEnd(); q.next())
+            ++count;
+        coordination[i] = count;
     }
 
-    // Build the result
-    volt::core::AnalysisResult result;
-    result.addProperty("Coordination", coordination);
-
-    // Write MessagePack output
-    result.write(args.outputPath);
-
-    return 0;
+    // Build a JSON result. Use AnalysisResult / JsonUtils / the output
+    // serializer helpers to write the *.msgpack files under outputBase.
+    json result;
+    result["main_listing"] = {{"cutoff", _cutoff}, {"total_atoms", frame.natoms}};
+    return result;
 }
+
+} // namespace Volt
 ```
+
+### Registering the plugin
+
+`src/plugin.cpp` binds each CLI flag to a setter with `opt(...)` and registers the service. The macro is what produces the CLI binary:
+
+```cpp
+// src/plugin.cpp
+#include <volt/plugin/plugin_entry.h>
+#include <volt/myplugin_service.h>
+
+using namespace Volt;
+using namespace Volt::Plugin;
+using S = MyPluginService;
+
+static const std::vector<OptionBinding<S>> bindings = {
+    opt("--cutoff", "Cutoff radius for neighbor search", 3.2, &S::setCutoff),
+};
+
+VOLT_SERVICE_PLUGIN("volt-myplugin", "My Plugin", S, bindings)
+```
+
+<Callout type="info">
+Option names are **snake_case** flags (e.g. `--cutoff`, `--rdf_bins`) and map 1:1 to the argument keys in `plugin.json`. STDOUT is reserved for the binary IPC protocol — write logs to STDERR (the CLI helpers in CoreToolkit are configured this way).
+</Callout>
 
 ## Step 4: Build Locally
 
-First, make sure CoreToolkit is exported as a Conan package:
+First make CoreToolkit available in your local Conan cache by creating the package from a checkout:
 
 ```bash
 # Clone CoreToolkit if you haven't already
 git clone https://github.com/VoltLabs-Research/CoreToolkit.git
-conan export CoreToolkit
+conan create CoreToolkit --build=missing -o "hwloc/*:shared=True"
+```
 
-# Build your plugin
+Then build the plugin using the Conan-generated CMake presets:
+
+```bash
 cd MyPlugin
-conan install . --build=missing --output-folder=build -o "hwloc/*:shared=True"
-cmake -S . -B build/build/Release \
-    -DCMAKE_TOOLCHAIN_FILE=build/build/Release/generators/conan_toolchain.cmake \
-    -DCMAKE_BUILD_TYPE=Release
+conan install . -of build --build=missing -o "hwloc/*:shared=True"
+cmake --preset conan-release
 cmake --build build/build/Release -j$(nproc)
 ```
 
-The resulting binary will be at `build/build/Release/myplugin`.
+The resulting binary is named after the project (e.g. `build/build/Release/myplugin`). You can run it directly:
 
-## Step 5: CI with GitHub Actions
+```bash
+./build/build/Release/myplugin <lammps_file> [output_base] [--cutoff 3.2]
+```
 
-CoreToolkit provides a reusable workflow that builds your plugin on Linux, macOS, and Windows, then publishes the binary to GHCR as an OCI artifact.
+## Step 5: plugin.json (the workflow DAG)
+
+Every plugin ships a `plugin.json` describing a `{ workflow: { nodes, edges } }` graph. This is not just metadata — it defines the UI form, how the trajectory is iterated, how the binary is invoked, and which `*.msgpack` files are surfaced to the viewer. Edges wire each node's `output` handle to the next node's `input` handle.
+
+### Node types
+
+| Type | Purpose |
+|---|---|
+| `modifier` | Plugin metadata: `name`, `key`, `icon`, `author`, `license`, `version`, `homepage`, `description`. |
+| `arguments` | UI form inputs. Each argument has an `argument` key (snake_case), a `type` (`number`/`boolean`/`select`/`pluginReference`), and optional `default`/`min`/`max`/`step`/`options`. |
+| `context` | A data source, e.g. `{ "source": "trajectory_dumps" }`. |
+| `forEach` | Iterates frames via a mustache `iterableSource`, e.g. `{{ trajectory-context.trajectory_dumps }}`. |
+| `entrypoint` | Executes the algorithm (see below). |
+| `exposure` | A result surfaced in the UI; `results` names a produced `*.msgpack` file. |
+| `export` | A post-process export, e.g. `{ "exporter": "AtomisticExporter", "type": "glb" }` or `ChartExporter`. |
+
+### The entrypoint node
+
+The entrypoint runs the Python wrapper (`type: "python-script"`) and builds the wrapper's argument list from a mustache template. The template feeds the binary its positional `<lammps_file> <output_base>` arguments plus the user's flags:
+
+```json
+{
+  "id": "analysis-entrypoint",
+  "type": "entrypoint",
+  "data": {
+    "entrypoint": {
+      "type": "python-script",
+      "binary": "myplugin-plugin.zip",
+      "binaryFileName": "myplugin-plugin.zip",
+      "entrypointScript": "scripts/myplugin_plugin_wrapper.py",
+      "arguments": "{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}",
+      "timeout": -1
+    }
+  }
+}
+```
+
+Here `currentValue.path` is the current frame's dump path (the positional `<lammps_file>`), `outputPath` is the `<output_base>`, and `plugin-arguments.as_str` expands the configured arguments into `--cutoff 3.2 --rdf_bins 500` flags. `timeout: -1` means no timeout.
+
+### Exposures and exports
+
+Each `exposure` node references one of the `*.msgpack` files the binary writes. For `coordination-analysis`, three exposures surface `coordination.msgpack` (the named summary), `atoms.msgpack` (the per-atom data, written in the AtomisticExporter shape and exported to GLB), and `rdf_chart.msgpack` (the RDF chart, exported via `ChartExporter`).
+
+<Callout type="info">
+Per-atom data is written to a **separate** `{outputBase}_atoms.msgpack` file (the AtomisticExporter shape), not embedded inside the named summary result.
+</Callout>
+
+## Step 6: The Python wrapper
+
+VOLT and the ClusterDaemon invoke `scripts/<name>_plugin_wrapper.py`, not the binary directly. The wrapper:
+
+- Resolves/locates the compiled binary (bundle `bin/`, local build dirs, `$PATH`, or an env override).
+- Filters VOLT runtime flags that the binary doesn't understand (e.g. `--selectedTimesteps`).
+- Runs the binary with the positional `<input_dump> <output_base>` arguments plus the parameter flags.
+- Validates that the required `*.msgpack` outputs were produced.
+
+STDOUT is reserved for the binary IPC protocol; the wrapper writes its logs to STDERR. A minimal wrapper exposes a `process(frame, config)` entry point (called by the daemon, with `config["args"]` holding the argument list) and a CLI fallback (`python myplugin_plugin_wrapper.py <input_dump> <output_base> [flags]`).
+
+## Step 7: CI with GitHub Actions
+
+CoreToolkit provides a reusable workflow, `build-plugin-binary.yml`, that builds the plugin on Linux, macOS, and Windows, bundles each install tree into a `.tar.zst` archive, and **publishes those bundles as a GitHub Release** (tag `v<version>`). On tag pushes it also publishes the plugin to the Registry via `vpm`.
 
 Create `.github/workflows/publish-plugin-binary.yml`:
 
@@ -175,24 +324,33 @@ name: Publish Plugin Binary
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  publish:
     uses: VoltLabs-Research/CoreToolkit/.github/workflows/build-plugin-binary.yml@main
-    with:
-      plugin_name: MyPlugin
-    permissions:
-      contents: read
-      packages: write
+    secrets: inherit
 ```
 
-After a push, your binary will be available at:
+The reusable workflow's only `workflow_call` inputs are `coretoolkit_ref` (the CoreToolkit ref to build against) and `dependency_repos` (newline-separated plugin repos to export to Conan first, for plugins that depend on other plugins). It has no `plugin_name` input.
+
+After a build, the release assets are named:
 
 ```
-ghcr.io/your-org/myplugin-binary:sha-<commit>-linux-x64
+<key>-<version>-<os>-<arch>.tar.zst
+# e.g. myplugin-1.0.0-linux-x86_64.tar.zst
+#      myplugin-1.0.0-darwin-arm64.tar.zst
+#      myplugin-1.0.0-windows-x86_64.tar.zst
 ```
+
+Each bundle contains `plugin.json`, `bin/<binary>`, and (when present) `lib/`, `scripts/`, and `share/`. A companion `.sha256` checksum is published alongside each archive.
 
 ## CoreToolkit API Quick Reference
 
@@ -200,15 +358,15 @@ ghcr.io/your-org/myplugin-binary:sha-<commit>-linux-x64
 
 | Class | Header | Purpose |
 |---|---|---|
-| `LammpsParser` | `volt/core/lammps_parser.h` | Parse LAMMPS dump files |
-| `FrameAdapter` | `volt/core/frame_adapter.h` | Access frame data (positions, types, cell) |
+| `LammpsParser` | `volt/core/lammps_parser.h` | Parse LAMMPS dump files into `LammpsParser::Frame` (`.natoms`, `.simulationCell`, …) |
+| `FrameAdapter` | `volt/core/frame_adapter.h` | Static factory: builds `ParticleProperty` objects from a frame; validates the simulation cell |
 | `SimulationCell` | `volt/core/simulation_cell.h` | Box vectors, periodicity, coordinate wrapping |
 
 ### Neighbor Search
 
 | Class | Header | Purpose |
 |---|---|---|
-| `CutoffNeighborFinder` | `volt/analysis/cutoff_neighbor_finder.h` | Find neighbors within a distance cutoff |
+| `CutoffNeighborFinder` | `volt/analysis/cutoff_neighbor_finder.h` | Find neighbors within a distance cutoff (`prepare(...)` + nested `Query`) |
 | `NearestNeighborFinder` | `volt/analysis/nearest_neighbor_finder.h` | Find k-nearest neighbors |
 
 ### Math
@@ -225,24 +383,31 @@ ghcr.io/your-org/myplugin-binary:sha-<commit>-linux-x64
 
 | Class | Header | Purpose |
 |---|---|---|
-| `AnalysisResult` | `volt/core/analysis_result.h` | Build and serialize analysis results |
+| `AnalysisResult` | `volt/core/analysis_result.h` | Static JSON helpers: `failure()`, `success()`, `addTiming()` |
 | `ParticleProperty` | `volt/core/particle_property.h` | Per-atom typed property storage |
 
-### CLI
+### CLI & Plugin Registration
 
-| Function | Header | Purpose |
+| Symbol | Header | Purpose |
 |---|---|---|
-| `volt::cli::parse()` | `volt/cli/common.h` | Parse `--input`, `--output`, `--params` arguments |
+| `Volt::CLI::parseArgs / parseFrame / deriveOutputBase / getDouble / getInt / getString / getBool` | `volt/cli/common.h` | Parse positional args + flags, parse the frame, read option values |
+| `VOLT_SERVICE_PLUGIN(id, desc, ServiceType, bindings)` | `volt/plugin/plugin_entry.h` | Generate `main()` for a service class |
+| `opt(name, help, default, &Service::setter)` | `volt/plugin/option_binding.h` | Bind a CLI flag to a service setter |
 
 ## Plugin I/O Contract
 
 ### Input
 
-The plugin receives:
-- **`--input`**: Path to a LAMMPS dump file (single timestep).
-- **`--output`**: Path where the MessagePack result should be written.
-- **`--params`**: JSON string with user-configured parameters.
+The binary is invoked as:
+
+```
+myplugin <lammps_file> [output_base] [options]
+```
+
+- **`<lammps_file>`** — path to a LAMMPS dump file (positional, required).
+- **`[output_base]`** — base path for the output files (positional, optional; derived from the input path when omitted).
+- **`--<param> <value>`** — one flag per parameter, named after the service's `opt(...)` bindings (e.g. `--cutoff 3.2 --rdf_bins 500`). There is no single `--params` JSON blob.
 
 ### Output
 
-The plugin writes a MessagePack file containing per-atom properties and optional metadata. The VOLT platform reads this file, stores it in MinIO, and makes it available for visualization in the 3D viewer.
+The plugin writes one or more MessagePack files derived from `output_base`, each declared by an `exposure` node in `plugin.json`. Typically this includes a named summary result and a separate `{outputBase}_atoms.msgpack` holding the per-atom data (AtomisticExporter shape). VOLT reads these files, stores them in MinIO, and makes them available for visualization in the 3D viewer (and for chart/GLB export where the `plugin.json` declares it).

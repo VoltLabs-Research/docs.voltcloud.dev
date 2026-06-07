@@ -3,7 +3,9 @@
   "pages": [
     "index",
     "---Structural Analysis---",
-    "structure-identification",
+    "adaptive-common-neighbor-analysis",
+    "polyhedral-template-matching",
+    "pattern-structure-matcher",
     "coordination-analysis",
     "centrosymmetry-parameter",
     "cluster-analysis",
@@ -13,6 +15,7 @@
     "displacements-analysis",
     "---Advanced---",
     "open-dxa",
+    "line-reconstruction-dxa",
     "grain-segmentation"
   ]
 }

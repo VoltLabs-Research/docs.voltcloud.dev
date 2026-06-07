@@ -76,11 +76,10 @@ It connects outward to VOLT over a reverse control channel, so the cluster does 
 - receive analysis requests,
 - maintain heartbeats and metrics,
 - orchestrate job queues,
-- parse and preprocess trajectories,
+- parse and preprocess trajectories pulled from object storage,
 - generate GLB models and preview rasters,
 - create Jupyter runtimes,
-- manage remote-access bridges,
-- import trajectories over SSH,
+- proxy access to managed data services (MinIO, MongoDB, and Redis explorers) and container HTTP/WebSocket ports,
 - and coordinate artifacts and exports.
 
 The server coordinates operations; the daemon executes them on cluster infrastructure.
@@ -158,28 +157,28 @@ A cluster can fail in one phase but not the other: a machine may install correct
 
 ClusterDaemon starts in this sequence:
 
-1. load configuration,
-2. create the local platform module,
-3. create runtime modules such as metrics, trajectory-native, workflow, Jupyter, SSH import, job runtime, cloud control, and artifacts,
-4. connect local dependencies first,
-5. start memory monitoring,
-6. connect to VoltCloud,
+1. register the decorated command groups against the reverse channel,
+2. bind the reverse channel to the VoltCloud and object-gateway connections,
+3. connect local infrastructure (MongoDB, Redis, the analysis data store, and MinIO buckets),
+4. mark the command registry ready and start the heartbeat plane,
+5. open the cloud connections (cloud control, event channel, object gateway) and the local object-gateway server,
+6. publish the daemon's own exposure and fetch the runtime configuration,
 7. start the exposure registry,
-8. start the workers for analysis, GLB generation, rasterization, and SSH import.
+8. initialize the `RuntimeRoleCoordinator`, which starts the trajectory frame-processing and rasterization workers and then, depending on the cluster's effective role, the compute workers (analysis, GLB conversion, artifact upload, and plugin warmup).
 
 If MongoDB, Redis, MinIO, or Docker are unavailable locally, the daemon fails before the cloud side sees a meaningful runtime.
 
 ## Memory-aware runtime behavior
 
-The daemon launcher calculates heap size from available memory and enables manual garbage collection. The runtime monitors memory pressure and may delay or requeue jobs under stress, instead of continuing to dispatch work onto an unhealthy process. A delayed job is not necessarily a queue bug — it can be the daemon backing off.
+The daemon launcher (`scripts/start.js`) sizes the V8 heap from the available memory before the process starts: it reads the cgroup limit when running under Docker (falling back to the host's total RAM otherwise) and sets `--max-old-space-size` to roughly 80% of that budget, bounded by a floor and a ceiling. It also injects `--expose-gc` so manual garbage collection is available. This keeps the heap inside the container's memory budget and avoids the daemon being OOM-killed for sizing its heap against host RAM.
 
 ## Exposure registry and service discovery
 
-The exposure registry inspects managed containers, reads their labels, determines which services should be reachable through VOLT, and periodically publishes snapshots back to the server. This drives proxied HTTP services, notebook targets, and remote-desktop flows without manual endpoint registration.
+The exposure registry inspects managed containers, reads their labels, determines which services should be reachable through VOLT, and periodically publishes snapshots back to the server. Each published exposure carries one of three access modes — HTTP, WebSocket, or TCP — so proxied HTTP services and notebook targets become reachable without manual endpoint registration. (Interactive container VNC sessions are a separate server-side feature and are not produced by the exposure registry.)
 
 ## Shutdown behavior
 
-On shutdown the daemon stops memory monitoring, winds down debug and worker activity, stops exposure sync, disconnects the cloud channel, closes queue state, and releases its local dependencies. A clean stop looks different from a crash in the logs.
+On shutdown the daemon shuts down debug sessions, stops its compute workers, removes its own exposure and stops the exposure registry, stops the object-gateway server, disconnects the cloud, event-channel, and object-gateway connections, stops the heartbeat plane, closes queue state, shuts down the plugin process pool, and releases its local dependencies. A clean stop looks different from a crash in the logs.
 
 ## Failure checklist
 
@@ -187,6 +186,6 @@ When VOLT misbehaves, check:
 
 - cluster connection state,
 - local platform dependency health,
-- daemon memory pressure,
+- daemon memory budget (heap sizing relative to the container's memory limit),
 - worker process state,
 - and reverse channel liveness.

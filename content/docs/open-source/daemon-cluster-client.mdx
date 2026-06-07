@@ -24,19 +24,22 @@ import { ClusterDaemonClient } from '@voltstack/daemon-cluster-client';
 
 const client = new ClusterDaemonClient({
   serverUrl: 'https://api.voltcloud.dev',
-  controlSocketUrl: 'wss://api.voltcloud.dev/control',
+  controlSocketUrl: 'wss://api.voltcloud.dev',
   credentials: {
     teamClusterId: 'cluster-abc123',
     daemonPassword: 'password',
   },
 });
 
-await client.connect();
-
-client.registerHandler('execute-plugin', async (payload) => {
-  // Handle inbound command from server
-  return { success: true };
+// Handlers are ReverseChannelHandler objects with a handle() method.
+client.registerHandler('execute-plugin', {
+  async handle(payload, context) {
+    // Handle inbound command from the server.
+    return { data: { success: true } };
+  },
 });
+
+await client.connect();
 ```
 
 ## Constructor
@@ -51,17 +54,17 @@ class ClusterDaemonClient {
 
 ```typescript
 interface ClusterDaemonClientOptions {
-  // Base URL of the VOLT server
+  // Base URL of the VOLT server (used with enrollment.url for the healthcheck request)
   serverUrl: string;
-  // socket.io control namespace URL
+  // socket.io control socket URL, e.g. wss://api.voltcloud.dev (no namespace path)
   controlSocketUrl: string;
   // Authentication credentials
   credentials: DaemonCredentials;
-  // Optional: enrollment configuration
+  // Optional: enrollment (healthcheck) configuration
   enrollment?: EnrollmentOptions;
   // Optional: heartbeat configuration
   heartbeat?: HeartbeatOptions;
-  // Optional: socket.io options
+  // Optional: control socket options
   socket?: SocketOptions;
   // Optional: default command timeout in ms (default: 30000)
   commandTimeout?: number;
@@ -70,13 +73,40 @@ interface ClusterDaemonClientOptions {
 interface DaemonCredentials {
   teamClusterId: string;
   daemonPassword: string;
-  // Used during first-time enrollment
+  // One-time enrollment token issued when the cluster was provisioned
   enrollmentToken?: string;
+  // Semantic version string reported to the server during enrollment
+  installedVersion?: string;
+}
+
+interface EnrollmentOptions {
+  // Full URL of the healthcheck endpoint, required when enrollment is enabled,
+  // e.g. https://api.voltcloud.dev/api/team-clusters/<id>/healthcheck
+  url: string;
+  // Whether to perform enrollment on connect() (default: true when enrollmentToken is present)
+  enabled?: boolean;
 }
 
 interface HeartbeatOptions {
   // Interval in ms (default: 30000)
   interval?: number;
+  // Random jitter in ms added to each interval (default: 0). Delay = interval + random(0, jitter)
+  jitter?: number;
+  // Factory called before each heartbeat to build the payload (default: empty object)
+  payloadFactory?: () => object | Promise<object>;
+}
+
+interface SocketOptions {
+  // Automatically reconnect on disconnect (default: true)
+  reconnect?: boolean;
+  // Maximum reconnection attempts; Infinity retries forever (default: Infinity)
+  maxReconnectAttempts?: number;
+  // Base delay in ms for the first reconnection attempt (default: 500)
+  reconnectBaseDelayMs?: number;
+  // Maximum reconnection delay cap in ms (default: 30000)
+  reconnectMaxDelayMs?: number;
+  // Randomization factor (0-1) added to the reconnection delay (default: 0.3)
+  randomizationFactor?: number;
 }
 ```
 
@@ -93,11 +123,24 @@ interface HeartbeatOptions {
 
 Performs the full connection sequence:
 
-1. **Enrollment** (if `enrollmentToken` is provided): Registers the daemon with the VOLT server via HTTP. The server may rotate the daemon password.
-2. **Socket connection**: Establishes a socket.io connection to the control namespace and completes registration.
+1. **Enrollment** (only when `enrollment.url` is configured and a `credentials.enrollmentToken` is present, unless `enrollment.enabled === false`): performs an HTTP POST to the healthcheck endpoint. The server may rotate the daemon password.
+2. **Socket connection**: Establishes a socket.io connection to the control socket and completes registration.
 3. **Heartbeat**: Starts a periodic heartbeat loop that sends `runtime.heartbeat` commands.
 
 ```typescript
+const client = new ClusterDaemonClient({
+  serverUrl: 'https://api.voltcloud.dev',
+  controlSocketUrl: 'wss://api.voltcloud.dev',
+  credentials: {
+    teamClusterId: 'cluster-abc123',
+    daemonPassword: 'password',
+    enrollmentToken: 'one-time-token',
+  },
+  enrollment: {
+    url: 'https://api.voltcloud.dev/api/team-clusters/cluster-abc123/healthcheck',
+  },
+});
+
 await client.connect();
 ```
 
@@ -150,7 +193,7 @@ Sends a fire-and-forget message on the control socket. Used for notifications th
 ```typescript
 client.emit({
   type: 'exposure-snapshot',
-  data: { analysisId, timestep, status: 'complete' },
+  exposures: [/* full exposure registry */],
 });
 ```
 
@@ -162,16 +205,30 @@ The VOLT server can send commands to the daemon (e.g., "run this plugin", "list 
 
 Registers a handler for a specific inbound command. Handlers survive reconnections.
 
+A handler is a `ReverseChannelHandler` object with a `handle(payload, context)` method. The
+method returns a `CommandResult` — an object with optional `status` (HTTP-style status code,
+default `200`), `data` (JSON-serialisable response data), `body` (a raw `Buffer`), `headers`,
+and `stream` (a `ReadableStream<Uint8Array>`). The `body`, `data`, and `stream` fields are
+mutually exclusive. The bridge wraps the result into a response envelope and sends it back to
+the server automatically.
+
 ```typescript
-client.registerHandler('execute-plugin', async (payload) => {
-  const result = await runPlugin(payload.pluginId, payload.params);
-  return result;
+client.registerHandler('execute-plugin', {
+  async handle(payload, context) {
+    const result = await runPlugin(payload.pluginId, payload.params);
+    return { data: result };
+  },
 });
 
-client.registerHandler('list-files', async (payload) => {
-  return fs.readdirSync(payload.path);
+client.registerHandler('list-files', {
+  async handle(payload, context) {
+    return { data: fs.readdirSync(payload.path) };
+  },
 });
 ```
+
+The `context` argument provides the originating `command` name and the `requestId` from the
+incoming command envelope.
 
 ### `unregisterHandler(command): this`
 
@@ -185,9 +242,15 @@ client.unregisterHandler('execute-plugin');
 
 Subscribes to all inbound non-command messages (e.g., session input, tunnel events, exposure snapshots).
 
+Each message is a member of the `TeamClusterDaemonMessage` union, discriminated by its `type`
+field (e.g. `session-input`, `session-data`, `tunnel-open`, `tunnel-state`, `exposure-snapshot`).
+Narrow on `message.type` to access the type-specific fields.
+
 ```typescript
 client.onMessage((message) => {
-  console.log(message.type, message.data);
+  if (message.type === 'session-input') {
+    handleSessionInput(message.sessionId, message.chunkBase64);
+  }
 });
 ```
 
@@ -259,16 +322,19 @@ try {
 
 ### Error Codes
 
-| Code | Description |
-|---|---|
-| `EnrollmentFailed` | HTTP enrollment request failed |
-| `SocketConnectionFailed` | Could not establish socket.io connection |
-| `SocketRegistrationFailed` | Socket connected but registration was rejected |
-| `CommandTimeout` | Server did not respond within the timeout |
-| `CommandRejected` | Server explicitly rejected the command |
-| `SocketNotReady` | Attempted to send before connection was ready |
-| `HandlerError` | An inbound command handler threw an error |
-| `EmitFailed` | Fire-and-forget emit failed |
+The `code` value on a `DaemonClientError` is the string returned below (the corresponding
+`DaemonClientErrorCode` enum member is shown for reference).
+
+| `err.code` value | Enum member | Description |
+|---|---|---|
+| `ENROLLMENT_FAILED` | `DaemonClientErrorCode.EnrollmentFailed` | HTTP enrollment request failed |
+| `SOCKET_CONNECTION_FAILED` | `DaemonClientErrorCode.SocketConnectionFailed` | Could not establish socket.io connection |
+| `SOCKET_REGISTRATION_FAILED` | `DaemonClientErrorCode.SocketRegistrationFailed` | Socket connected but registration was rejected |
+| `COMMAND_TIMEOUT` | `DaemonClientErrorCode.CommandTimeout` | Server did not respond within the timeout |
+| `COMMAND_REJECTED` | `DaemonClientErrorCode.CommandRejected` | Server explicitly rejected the command |
+| `SOCKET_NOT_READY` | `DaemonClientErrorCode.SocketNotReady` | Attempted to send before connection was ready |
+| `HANDLER_ERROR` | `DaemonClientErrorCode.HandlerError` | An inbound command handler threw an error |
+| `EMIT_FAILED` | `DaemonClientErrorCode.EmitFailed` | Fire-and-forget emit failed |
 
 ## Architecture
 

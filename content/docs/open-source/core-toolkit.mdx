@@ -21,7 +21,7 @@ description: Core C++ library powering VOLT's atomistic simulation analysis. Pro
 
 ## Modules
 
-CoreToolkit is organized into six modules under the `include/volt/` namespace:
+CoreToolkit is organized into seven modules under the `include/volt/` namespace:
 
 ### `volt/math`
 
@@ -54,7 +54,7 @@ Core data model for atomistic simulations.
 | `particle_property.h` | Per-particle property storage |
 | `property_base.h` | Type-erased property base class |
 | `analysis_result.h` | Standard result type for analysis plugins |
-| `volt.h` | Precompiled header aggregating all core includes |
+| `volt.h` | Precompiled header (std lib + spdlog + `boost::dynamic_bitset` + `math/lin_alg.h` + common constants and forward declarations) used as the PCH for the library and all plugins |
 
 ### `volt/analysis`
 
@@ -72,7 +72,7 @@ Higher-level crystallographic data structures.
 | Header | Description |
 |---|---|
 | `cluster.h` | Cluster representation for defect analysis |
-| `lattice_vectors.h` | Crystal lattice vector utilities |
+| `crystal_structure_types.h` | Crystal structure type enumerations (FCC, HCP, BCC, diamond, etc.) consumed by `volt/plugin/option_binding.h` |
 
 ### `volt/utilities`
 
@@ -82,8 +82,8 @@ General-purpose infrastructure.
 |---|---|
 | `memory_pool.h` | Thread-safe arena-style memory pool |
 | `bounded_priority_queue.h` | Fixed-capacity priority queue for k-NN search |
-| `json_utils.h` | JSON serialization helpers (nlohmann/json) |
-| `concurrence/` | TBB-based parallel utilities |
+| `json_utils.h` | JSON serialization helpers (nlohmann/json), including msgpack output |
+| `msgpack_atom_writer.h` | Streams per-atom output to a `_atoms.msgpack` file in the canonical `AtomisticExporter` format (used by `volt/plugin/output_serializer.h`) |
 
 ### `volt/cli`
 
@@ -92,6 +92,18 @@ CLI scaffolding for plugin executables.
 | Header | Description |
 |---|---|
 | `common.h` | Argument parsing, I/O paths, and JSON output helpers shared by all plugin binaries |
+
+### `volt/plugin`
+
+The plugin-authoring API. These headers wrap the boilerplate of a plugin executable — argument parsing, frame loading, thread control, and result serialization — so an algorithm only needs to implement its `compute()` step.
+
+| Header | Description |
+|---|---|
+| `plugin_main.h` | `pluginMain()` driver and the `VOLT_PLUGIN_MAIN` macro: parses CLI args, loads the LAMMPS frame (and optional `--reference` frame), sets OneTBB thread limits via `--threads`, then invokes the plugin's run function |
+| `plugin_entry.h` | `VOLT_SERVICE_PLUGIN` macro that wires a service type's `compute()` method to `pluginMain`, binding UI arguments and selecting the 2- or 3-argument `compute()` overload |
+| `option_binding.h` | Binds plugin.json UI arguments to service setters (`opt(...)`, `applyAll`, `optionsMeta`), including lattice-type options resolved against `crystal_structure_types.h` |
+| `output_serializer.h` | `serializePluginOutput()` writes the summary `{outputBase}{suffix}.msgpack` and, when a bucket resolver is supplied, a separate `{outputBase}_atoms.msgpack` |
+| `particle_id_mapper.h` | Builds current↔reference particle index mappings from atom IDs (for reference-frame analyses such as displacement) |
 
 ## Dependencies
 
@@ -104,21 +116,23 @@ CoreToolkit manages its dependencies via [Conan 2](https://conan.io/):
 | spdlog | 1.14.1 | Structured logging |
 | nlohmann_json | 3.11.3 | JSON I/O |
 
-Additionally, three vendored libraries are compiled as static dependencies:
+Additionally, three libraries are vendored under `dependencies/`. `MWM_CSP` and `Geogram` are compiled as static libraries; `fast_float` is header-only and installed as headers:
 
 | Library | Purpose |
 |---|---|
-| **PTM** | Polyhedral Template Matching for crystal structure identification |
 | **MWM_CSP** | Minimum-weight matching for centrosymmetry parameter calculation |
 | **Geogram** | Delaunay tessellation (PSM subset) |
+| **fast_float** | Header-only fast string-to-float parser |
 
 ## Build Flags
 
-Release builds use HPC-tuned compiler flags:
+For GCC/Clang Release builds, CoreToolkit applies HPC-tuned compiler flags (propagated to all consumers via `PUBLIC`):
 
 ```
--O3 -march=native -fno-math-errno -fno-trapping-math -ffp-contract=fast
+-O3 -mtune=generic -fno-math-errno -fno-trapping-math -ffp-contract=fast
 ```
+
+CPU-specific tuning is opt-in. Configure with `-DVOLT_ENABLE_NATIVE_OPTIMIZATIONS=ON` (the option defaults to `OFF`) to swap `-mtune=generic` for `-march=native`.
 
 <Callout type="info">
 CoreToolkit deliberately avoids `-ffast-math` globally to preserve strict IEEE compliance on geometry-critical code paths.
@@ -128,13 +142,15 @@ CoreToolkit deliberately avoids `-ffast-math` globally to preserve strict IEEE c
 
 CoreToolkit exposes a **reusable workflow** at `.github/workflows/build-plugin-binary.yml` that any plugin repository can call to:
 
-1. Build the plugin against a fresh CoreToolkit checkout (on Linux, macOS, and Windows).
-2. Package the resulting binary into a `.tar.gz` archive with SHA-256 checksum and metadata.
-3. Publish the bundle to **GHCR** as an OCI artifact.
+1. Build the plugin against a fresh CoreToolkit checkout across a matrix of `ubuntu-latest` (`linux/x86_64`), `macos-latest` (`darwin/arm64`), and `windows-latest` (`windows/x86_64`). CoreToolkit and any `dependency_repos` are exported to Conan first.
+2. Bundle the install tree (`bin/`, `lib/`, `scripts/`, `share/`) together with `plugin.json` into a Zstandard-compressed `.tar.zst` archive plus a `.sha256` checksum (via `.github/scripts/build_plugin_bundle.py`). Library-only plugins with no executable entrypoint are skipped.
+3. Publish a **GitHub Release** tagged `v<version>` with the bundles attached (`softprops/action-gh-release`). On tag pushes, a separate job also publishes the bundles to the Registry via `vpm publish`.
 
-Package naming follows:
+Bundle file naming follows:
 
 ```
-ghcr.io/voltlabs-research/<plugin-lowercase>-binary:sha-<commit>-<os>-<arch>
-ghcr.io/voltlabs-research/<plugin-lowercase>-binary:<tag>-<os>-<arch>
+<key>-<version>-<os>-<arch>.tar.zst
+<key>-<version>-<os>-<arch>.tar.zst.sha256
 ```
+
+where `<key>` and `<version>` come from the plugin's `plugin.json` modifier node, and `<os>-<arch>` is one of `linux-x86_64`, `darwin-arm64`, or `windows-x86_64`.

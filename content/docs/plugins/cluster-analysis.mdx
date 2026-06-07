@@ -8,10 +8,10 @@ description: Find connected particle clusters using a distance cutoff.
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `cutoff` | `float` | `3.2` | Cutoff radius used to define connectivity. |
-| `sortBySize` | `bool` | `true` | Sort clusters by size in descending order. |
+| `sort_by_size` | `bool` | `true` | Sort clusters by size in descending order. |
 | `unwrap` | `bool` | `false` | Unwrap particle coordinates inside each cluster. |
-| `centersOfMass` | `bool` | `false` | Compute cluster centers with uniform weights. |
-| `radiusOfGyration` | `bool` | `false` | Compute radii and tensors of gyration with uniform weights. |
+| `centers_of_mass` | `bool` | `false` | Compute cluster centers with uniform weights. |
+| `radius_of_gyration` | `bool` | `false` | Compute radii and tensors of gyration with uniform weights. |
 
 ## Output
 
@@ -29,12 +29,6 @@ interface Cluster {
     gyration_tensor?: GyrationTensor;
 }
 
-interface PerAtomProperties {
-    id: int;
-    cluster: int;
-    pos_unwrapped?: Vec3;
-}
-
 interface ClusterAnalysisOutput {
     main_listing: {
         total_atoms: int;
@@ -45,11 +39,47 @@ interface ClusterAnalysisOutput {
     sub_listings: {
         clusters: Cluster[];
     };
-    "per-atom-properties": PerAtomProperties[];
 }
 ```
+
+### `{outputBase}_atoms.msgpack`
+
+Per-atom data in the canonical AtomisticExporter format consumed by the VOLT viewer. Atoms are grouped into named buckets (`Cluster_<n>` for clustered atoms, `Unclustered` for atoms with no cluster assignment).
+
+```ts
+type Vec3 = [float, float, float];
+
+interface AtomEntry {
+    id: int;
+    pos: Vec3;
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    pos_unwrapped?: Vec3;   // present only when `unwrap` is true
+}
+
+interface AtomsOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+    };
+    sub_listings: {
+        structures: Array<{
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }>;
+    };
+    export: {
+        AtomisticExporter: {
+            [bucketName: string]: AtomEntry[];
+        };
+    };
+}
+```
+
+This file also feeds the `cluster-model-export` node in the workflow DAG, which produces a GLB 3D model via the AtomisticExporter.
 
 ## See Also
 
 - [Coordination Analysis](/docs/plugins/coordination-analysis) — local neighbor counts and RDF
-- [Structure Identification](/docs/plugins/structure-identification) — local crystal classification

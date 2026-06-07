@@ -1,0 +1,94 @@
+---
+title: Pattern Structure Matching
+description: Classify atoms against user-defined lattice patterns and emit a reconstructed-state contract consumable by OpenDXA.
+---
+
+`PatternStructureMatching` classifies atoms by matching them against lattice
+templates that the user defines directly in the VOLT form. From each pattern it
+derives both a matching lattice and an OpenDXA reference lattice, so it can be
+selected as the upstream structure-identification algorithm for
+[OpenDXA](/docs/plugins/open-dxa).
+
+## Parameters
+
+The form is driven by a required `pattern_definitions` list. Each entry is one
+crystal template, with nested cell-vector tuples and a nested `basis_atoms`
+list. Two top-level options control matrix-phase resolution and clustering.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `pattern_definitions` | `list` | — (required) | One or more custom lattice templates. Each entry holds the fields below. |
+| `matrix_pattern_name` | `string` | `""` | Matrix Pattern Name override. Takes precedence when resolving which pattern is the matrix phase. |
+| `dissolve_small_clusters` | `boolean` | `false` | Mark small clusters as `OTHER` after clustering. |
+
+Each entry in `pattern_definitions` has these fields:
+
+| Field | Type | Default | Options | Description |
+|---|---|---|---|---|
+| `name` | `string` | `""` | — | Pattern name. |
+| `is_matrix_phase` | `boolean` | `false` | — | Use this pattern as the matrix phase. |
+| `coordination_number` | `number` | `12` | min `1`, step `1` | Coordination number of the template. |
+| `scale` | `number` | `1.0` | min `0.000001`, step `0.1` | Lattice scale factor. |
+| `coordinate_mode` | `select` | `fractional` | `fractional`, `cartesian` | Interpretation of cell/basis coordinates. |
+| `reference_basis_index` | `number` | `0` | min `0`, step `1` | Basis atom used as origin when deriving the OpenDXA neighbor vectors. |
+| `cell_a` | `tuple` | `{x:1, y:0, z:0}` | — | First cell vector (`x`, `y`, `z`). |
+| `cell_b` | `tuple` | `{x:0, y:1, z:0}` | — | Second cell vector (`x`, `y`, `z`). |
+| `cell_c` | `tuple` | `{x:0, y:0, z:1}` | — | Third cell vector (`x`, `y`, `z`). |
+| `basis_atoms` | `list` | — (required) | — | Nested list of basis atoms; each has `species` (number, default `1`), `x`, `y`, `z`. |
+
+Matrix-phase resolution order: `matrix_pattern_name` if set, then the single
+pattern marked `is_matrix_phase`, then the only pattern when exactly one is
+defined. If multiple patterns are defined and none is unambiguously the matrix
+phase, execution fails with a validation error.
+
+The wrapper materializes the patterns into generated lattice YAMLs and passes
+them to the binary as `--lattice_dir` and `--reference_lattice_dir`. The
+binary's own CLI options are `--lattice_dir`, `--reference_lattice_dir`,
+`--patterns` (CSV filter) and `--dissolve_small_clusters`.
+
+## Output
+
+The binary writes a single msgpack result file. Per-atom data is emitted to a
+LAMMPS dump (`{outputBase}_annotated.dump`) and the cluster graph to two text
+tables (`{outputBase}_clusters.table`, `{outputBase}_cluster_transitions.table`)
+that OpenDXA consumes; this plugin does not produce a separate
+`_atoms.msgpack`.
+
+### `{outputBase}_pattern_analysis.msgpack`
+
+```ts
+interface SelectedPattern {
+    pattern_id: int;
+    structure_type: int;
+    pattern_name: string;
+}
+
+interface StructureCount {
+    structure_name: string;
+    count: int;
+}
+
+interface PatternCount {
+    pattern_id: int;
+    pattern_name: string;
+    count: int;
+}
+
+interface PatternAnalysisOutput {
+    is_failed: boolean;
+    lattice_directory: string;
+    reference_lattice_directory: string;
+    cluster_mode: string; // "cluster-builder"
+    selected_patterns: SelectedPattern[];
+    main_listing: StructureCount[]; // atom count per resolved structure name
+    pattern_listing: PatternCount[]; // atom count per matched pattern (sorted by name)
+    input_dump: string; // path to the annotated LAMMPS dump
+    clusters_table: string; // path to the cluster graph table
+    cluster_transitions_table: string; // path to the cluster transitions table
+}
+```
+
+## See Also
+
+- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — fixed-template structure identification, an alternative upstream classifier
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — adaptive-cutoff structure classification

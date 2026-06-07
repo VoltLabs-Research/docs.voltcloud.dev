@@ -37,7 +37,7 @@ Each team cluster runs the daemon plus the local services it depends on and requ
 | Component | Minimum | Recommended |
 |---|---|---|
 | **OS** | Ubuntu 20.04+ / Debian 11+ | Ubuntu 22.04 LTS |
-| **Node.js** | 18.x | 22.x |
+| **Node.js** | 22.x | 22.x |
 | **RAM** | 4 GB | 8 GB+ |
 | **Disk** | 20 GB | Sized to your trajectory and artifact volume |
 | **Docker** | 20.x+ | Latest stable |
@@ -49,7 +49,6 @@ Each team cluster runs the daemon plus the local services it depends on and requ
 | **MongoDB** | Structured metadata and result projections | 27017 |
 | **Redis** | Queues, cache, and runtime state | 6379 |
 | **MinIO** | Trajectory dumps, models, plugins, previews, and assets | 9000 |
-| **Guacamole** *(optional)* | Browser-accessible remote desktop relay support | 4822 |
 
 ## Quick start for the app stack
 
@@ -101,15 +100,14 @@ docker compose up -d
 git clone https://github.com/VoltLabs-Research/Volt.git
 cd Volt
 cp server/.env.example server/.env
-cp client/.env.example client/.env
 ```
 
-Configure the environment files with the MongoDB, Redis, MinIO, server URL, client URL, secret-key, and SSH encryption settings.
+Configure the server environment file with the MongoDB, Redis, MinIO, server URL, client URL, secret-key, and encryption settings. The client has no `.env.example`; it is configured at build time through Vite variables — set `VITE_SERVER_ENDPOINT` (the server origin the browser talks to) and, if you proxy the API through a different host, `VITE_PROXY_API_URL`.
 
 Two values are operationally critical:
 
 - `SECRET_KEY` signs sensitive server-side tokens.
-- `SSH_ENCRYPTION_KEY` protects stored SSH credentials used by import flows.
+- `SSH_ENCRYPTION_KEY` (a legacy key name for `VOLT_SECRET_ENCRYPTION_KEY`) protects credentials at rest, including the SSH access used to install and enroll the daemon on a remote cluster host.
 
 Then build:
 
@@ -161,7 +159,7 @@ server {
 
 Once the app is online, the next step is connecting a team cluster. The installer bootstraps Docker support, writes daemon configuration, and waits for the daemon to come online and begin heartbeating.
 
-A healthy app without a healthy cluster has no execution target: trajectory uploads, analysis runs, notebooks, container operations, and SSH imports all fail.
+A healthy app without a healthy cluster has no execution target: trajectory uploads, analysis runs, notebooks, and container operations all fail.
 
 ## Verification
 
@@ -201,9 +199,9 @@ For notebook validation, do not stop at "session created." A new Jupyter session
 3. load the proxied Jupyter UI successfully,
 4. and run a simple cell inside the live session.
 
-### Remote service runbook
+### Proxied container service runbook
 
-If your deployment uses containerized services, VNC-capable images, or internal tools exposed through VOLT, validate at least one proxied service path from end to end. That confirms the exposure registry, reverse channel, and relay behavior are all healthy.
+If your deployment runs containerized services or internal tools that you reach through VOLT's "Open :PORT" relay, validate at least one proxied service path from end to end. The relay opens short-lived sessions in the `TEAM_CLUSTER_APP_PROXY_PORT_START`–`TEAM_CLUSTER_APP_PROXY_PORT_END` range, so confirm that range is reachable and that the exposure registry, reverse channel, and relay behavior are all healthy. Cluster remote-access terminals and file explorers share the same reverse channel.
 
 ## Common failure points
 
@@ -232,7 +230,7 @@ A healthy queue can stall if the daemon is under memory pressure. Workers intent
 
 Common causes: no free host ports, Docker problems, incorrect public-base-path settings, or a runtime container that has not reached readiness.
 
-### VNC or proxied services never appear
+### Proxied container services never appear
 
 Check the container state, the expected labels, and whether the daemon's exposure registry is publishing snapshots. This is typically a discovery issue.
 

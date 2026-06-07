@@ -1,0 +1,105 @@
+---
+title: Adaptive Common Neighbor Analysis
+description: Classify atoms by local crystal environment with ACNA/CNA and emit the cluster-graph artifacts consumed by OpenDXA.
+---
+
+Adaptive Common Neighbor Analysis (ACNA/CNA) assigns each atom a structure type
+(`FCC`, `HCP`, `BCC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`, or `OTHER`) from its local
+coordination environment, then builds the reconstructed cluster graph that
+DXA-compatible tools (OpenDXA, LineReconstructionDXA, ElasticStrain) consume.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `crystal_structure` | `select` | `FCC` | Reference lattice for classification. Options: `BCC`, `FCC`, `HCP`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. (Simple cubic `SC` is not supported — use Polyhedral Template Matching instead.) |
+| `dissolve_small_clusters` | `boolean` | `false` | Mark atoms in small clusters as `OTHER` after clustering. |
+
+## Output
+
+### `{outputBase}_cna_analysis.msgpack`
+
+Compact analysis summary. The cluster-graph tables are written to disk as
+separate `.table` files; this result records their paths rather than embedding
+their contents.
+
+```ts
+interface CnaAnalysisOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+    };
+    sub_listings: {};
+    "per-atom-properties": [];
+    input_dump: string;                  // path to the annotated LAMMPS dump
+    clusters_table: string;              // path to {outputBase}_clusters.table
+    cluster_transitions_table: string;   // path to {outputBase}_cluster_transitions.table
+    is_failed: boolean;
+}
+```
+
+### `{outputBase}_atoms.msgpack`
+
+Per-atom structure identification written by the shared `AtomisticExporter`
+serializer. Atoms are grouped by structure name for 3D rendering, and a flat
+per-atom array is included for downstream consumers.
+
+```ts
+type Vec3 = [float, float, float];
+
+interface AtomisticAtom {
+    id: int;
+    pos: Vec3;
+    structure_id: int;
+    structure_name: string;       // "FCC" | "HCP" | "BCC" | "CUBIC_DIAMOND" | "HEX_DIAMOND" | "OTHER" | ...
+    cluster_id: int;
+    topology_name?: string;       // present only when the atom's cluster has a named topology
+}
+
+interface PerAtomProperty {
+    id: int;
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    topology_name?: string;
+}
+
+interface AtomsOutput {
+    export: {
+        AtomisticExporter: {
+            // keyed by structure_name; each value is the group's atoms
+            [structureName: string]: AtomisticAtom[];
+        };
+        ChartExporter: {
+            structure_counts: {
+                structure_name: string[];
+                atom_count: int[];
+            };
+        };
+    };
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+        clustered_atoms: int;
+        unclustered_atoms: int;
+    };
+    sub_listings: {
+        structures: {
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }[];
+    };
+    "per-atom-properties": PerAtomProperty[];
+}
+```
+
+The entrypoint also emits three plain-text artifacts alongside the msgpack
+files: `{outputBase}_annotated.dump` (structure-annotated LAMMPS dump),
+`{outputBase}_clusters.table`, and `{outputBase}_cluster_transitions.table` —
+the cluster graph required by OpenDXA and related tools.
+
+## See Also
+
+- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — alternative structure classifier that also supports simple-cubic and icosahedral environments
+- [Coordination Analysis](/docs/plugins/coordination-analysis) — per-atom coordination numbers from the same neighbor-finding primitives

@@ -20,7 +20,7 @@ Opening a notebook coordinates a Jupyter runtime on the cluster. The backend res
 
 ## What comes preinstalled
 
-The notebook image includes `voltsdk`, `numpy`, `scipy`, `pandas`, `matplotlib`, `ovito`, `ase`, `pymatgen`, `MDAnalysis`, `matminer`, `vtk`, `minio`, and `msgpack`.
+The notebook image is built on the Jupyter `scipy-notebook` base (which provides `numpy`, `scipy`, `matplotlib`, and `pandas`) and adds `jupyterlab`, `voltsdk` (2.0.0), `ovito`, `ase`, `pymatgen`, `MDAnalysis`, `matminer`, `vtk`, `minio`, and `msgpack`.
 
 ## Trajectory-linked workspaces
 
@@ -28,7 +28,7 @@ When opened from a trajectory context, Scripting creates or reuses notebooks sco
 
 ## Notebook management
 
-The listing supports search, rename, and delete operations. Deleting a notebook also tears down its associated runtime state.
+The listing supports tabbed views (General and Trajectory Notebooks), sortable columns (Title, Last Opened), pagination, rename, and delete operations. Deleting a notebook also tears down its associated runtime state.
 
 ## Scripting vs. plugins
 

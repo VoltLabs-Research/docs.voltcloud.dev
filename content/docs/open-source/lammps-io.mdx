@@ -46,7 +46,7 @@ Parses a LAMMPS data file and returns atom positions, types, and metadata.
 function parseData(
   filepath: string,
   options?: { includeIds?: boolean }
-): ParseResult
+): ParseResult | null
 ```
 
 | Parameter | Type | Description |
@@ -54,7 +54,7 @@ function parseData(
 | `filepath` | `string` | Path to the LAMMPS data file |
 | `options.includeIds` | `boolean` | Include atom IDs in the output (default: `false`) |
 
-**Returns:**
+**Returns** `ParseResult | null`:
 
 ```typescript
 interface ParseResult {
@@ -79,6 +79,12 @@ interface ParseResult {
 }
 ```
 
+<Callout type="info">
+For LAMMPS data files, `metadata.timestep` is always `0` and `metadata.headers` is always an empty array — data files have no `ITEM: TIMESTEP` or `ITEM: ATOMS` column-header line. These fields are only meaningful for `parseDump`.
+</Callout>
+
+The function throws on unreadable or invalid input (e.g., `"Failed to open file"`, `"Invalid LAMMPS data format"`, `"No atoms parsed"`). Callers should handle errors appropriately.
+
 ---
 
 ## Dump Parser
@@ -90,14 +96,38 @@ Parses a LAMMPS dump file (single timestep snapshot) and returns atom data with 
 ```typescript
 function parseDump(
   filepath: string,
-  options?: { includeIds?: boolean }
-): ParseResult
+  options?: { includeIds?: boolean; properties?: string[] }
+): ParseResult | null
 ```
 
-Parameters and return type are identical to `parseData`, except:
+| Parameter | Type | Description |
+|---|---|---|
+| `filepath` | `string` | Path to the LAMMPS dump file |
+| `options.includeIds` | `boolean` | Include atom IDs in the output (default: `false`) |
+| `options.properties` | `string[]` | Extra column names to extract as Float32Arrays. Use `"*"` as a wildcard to extract all non-base columns (`id`, `type`, `x`, `y`, `z` are always excluded from the wildcard). |
 
-- `metadata.timestep` reflects the actual timestep from the dump file.
-- `metadata.headers` contains the column names from the `ITEM: ATOMS` line (e.g., `["id", "type", "x", "y", "z", "vx", "vy", "vz"]`).
+**Returns** `ParseResult | null`. The shape extends the base `ParseResult` with:
+
+- `metadata.timestep` — the actual timestep value from the dump file.
+- `metadata.headers` — column names from the `ITEM: ATOMS` line (e.g., `["id", "type", "x", "y", "z", "vx", "vy", "vz"]`).
+- `properties` — present only when `options.properties` is provided. An object mapping each requested column name to a `Float32Array` of per-atom values.
+
+```typescript
+// Example: extract velocity columns
+const result = dumpParser.parseDump('dump.lammpstrj', {
+  properties: ['vx', 'vy', 'vz']
+});
+// result.properties.vx  → Float32Array (one value per atom)
+// result.properties.vy  → Float32Array
+// result.properties.vz  → Float32Array
+
+// Wildcard: extract all non-base columns
+const result2 = dumpParser.parseDump('dump.lammpstrj', {
+  properties: ['*']
+});
+```
+
+The function throws on unreadable or invalid input (e.g., `"Failed to open file"`, `"Invalid LAMMPS dump format"`). The typed contract returns `NativeParseResult | null`; callers should guard against a null result.
 
 <Callout type="info">
 For files with more than 50,000 atoms, the dump parser automatically uses multi-threaded parsing with hardware concurrency detection.

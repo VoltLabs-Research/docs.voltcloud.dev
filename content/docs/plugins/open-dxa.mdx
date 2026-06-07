@@ -1,32 +1,81 @@
 ---
 title: OpenDXA
-description: A modified Dislocation Extraction Algorithm pipeline for reconstructing dislocation networks from atomistic data.
+description: A modified Dislocation Extraction Algorithm pipeline that reconstructs dislocation networks from a pre-computed structure-identification package.
 ---
+
+OpenDXA (UI name **Dislocation Analysis**, plugin key `opendxa`) reconstructs dislocation
+networks from atomistic data. It is **decoupled from the upstream structure-identification
+algorithm**: rather than classifying local structure itself, it consumes a pre-computed
+annotated dump plus cluster tables and runs the Dislocation Extraction Algorithm on top of
+them.
+
+<Callout type="info">
+In the VOLT workflow, OpenDXA chains a structure-analysis plugin through a required
+`structure_analysis_plugin` reference (Polyhedral Template Matching or Adaptive Common
+Neighbor Analysis). That upstream plugin produces the annotated dump and the
+`*_clusters.table` / `*_cluster_transitions.table` files OpenDXA reads.
+</Callout>
+
+<Callout type="warn">
+OpenDXA incorporates OVITO-derived code and ships a `LICENSE.OVITO` alongside its MIT
+`LICENSE`. Those upstream licensing terms are binding.
+</Callout>
 
 ## Parameters
 
+The UI form (and the CLI) use snake_case argument keys.
+
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `crystalStructure` | `string` | `BCC` | Reference crystal structure. Options: `BCC`, `FCC`, `HCP`, `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. |
-| `identificationMode` | `string` | `CNA` | Structure identification mode. Options: `CNA`, `PTM`, `DIAMOND`. |
-| `rmsd` | `float` | `0.1` | RMSD threshold for PTM classification. |
-| `maxTrialCircuitSize` | `int` | `14` | Maximum Burgers circuit size. |
-| `circuitStretchability` | `int` | `9` | Circuit stretchability factor. |
-| `lineSmoothingLevel` | `float` | `1.0` | Dislocation line smoothing level. |
-| `linePointInterval` | `float` | `2.5` | Point interval on dislocation lines. |
-| `onlyPerfectDislocations` | `bool` | `false` | Restrict the result to perfect dislocations. |
-| `markCoreAtoms` | `bool` | `false` | Historical parameter. Core-atom export is currently not emitted by the implementation. |
+| `structure_analysis_plugin` | `pluginReference` | — (required) | The chained structure-analysis plugin that produces OpenDXA's inputs. Filtered to `polyhedral-template-matching` and `adaptive-common-neighbor-analysis`. |
+| `reference_topology` | `select` | `fcc` | Matrix-phase topology name, resolved from the lattice YAMLs. Options: `fcc`, `bcc`, `hcp`, `sc`, `cubic_diamond`, `hex_diamond`. Its value is mapped onto the chained plugin's `crystal_structure`. |
+| `max_trial_circuit_size` | `number` | `14` | Maximum Burgers circuit size. |
+| `circuit_stretchability` | `number` | `9` | Circuit stretchability factor. |
+| `line_smoothing_level` | `number` | `1.0` | Dislocation line smoothing level. |
+| `line_point_interval` | `number` | `2.5` | Point interval along dislocation lines. |
+
+### Additional CLI options
+
+These are exposed by the OpenDXA binary and can be passed when invoking it directly (the
+VOLT entrypoint sets several `--export_*` toggles for you).
+
+| Option | Default | Description |
+|---|---|---|
+| `--lattice_dir <path>` | package lattice dir | Directory containing lattice topology YAMLs. |
+| `--clusters_table <path>` | — | Path to the upstream `*_clusters.table`. |
+| `--clusters_transitions <path>` | — | Path to the upstream `*_cluster_transitions.table`. |
+| `--ghost_layer_scale <float>` | `3.5` | Multiplier on the reconstructed max neighbor distance when building ghost atoms for the Delaunay tessellation. |
+| `--interface_alpha_scale <float>` | `5.0` | Multiplier on the reconstructed max neighbor distance for the interface alpha-shape filter. |
+| `--crystal_path_steps <int>` | `4` | Maximum crystal path search depth. |
+| `--clip_pbc_segments <bool>` | `true` | Clip exported dislocation polylines at periodic boundaries. |
+| `--cover_domain_with_finite_tets <bool>` | `false` | Add helper points so the Delaunay domain is fully covered by finite tetrahedra. |
+| `--export_defect_mesh <bool>` | `true` | Write `*_defect_mesh.msgpack`. |
+| `--export_interface_mesh <bool>` | `false` | Write `*_interface_mesh.msgpack`. |
+| `--export_delaunay_tessellation <bool>` | `false` | Write `*_delaunay_tessellation.msgpack`. |
+| `--export_structure_identification <bool>` | `false` | Write `*_atoms.msgpack`. |
+| `--export_coherent_crystalline_regions <bool>` | `false` | Write `*_coherent_crystalline_regions.msgpack`. |
+| `--export_dislocations <bool>` | `true` | Write `*_dislocations.msgpack`. |
+| `--export_circuit_information <bool>` | `true` | Include circuit information in the dislocations msgpack. |
+| `--export_dislocation_network_stats <bool>` | `true` | Include network statistics in the dislocations msgpack. |
+| `--export_junctions <bool>` | `true` | Include junction information in the dislocations msgpack. |
+
+<Callout type="info">
+The VOLT analysis entrypoint always passes `--export_interface_mesh true`,
+`--export_structure_identification true`, and `--export_coherent_crystalline_regions true`,
+in addition to the defaults above.
+</Callout>
 
 ## Output
 
 ```ts
 type Vec3 = [float, float, float];
-type Mat3x3 = [Vec3, Vec3, Vec3];
-
-type Quaternion = [float, float, float, float];
 ```
 
 ### `{outputBase}_dislocations.msgpack`
+
+The dislocation network is written in the streaming export path: per-segment data lives
+under `export.DislocationExporter.segments`, Burgers-vector chart series live under
+`export.ChartExporter`, and `sub_listings` is written as `null`.
 
 ```ts
 interface DislocationSegment {
@@ -34,38 +83,28 @@ interface DislocationSegment {
     points: Vec3[];
     length: float;
     num_points: int;
-    burgers_vector: Vec3;
-    magnitude: float;
-    fractional: string;
-}
-
-interface JunctionInformation {
-    total_junctions: int;
-    junction_arm_distribution: Record<int, int>;
-}
-
-interface CircuitInformation {
-    total_circuits: int;
-    dangling_circuits: int;
-    blocked_circuits: int;
-    average_edge_count: float;
-    edge_count_range: {
-        min: int;
-        max: int;
-    };
-}
-
-interface NetworkStatistics {
-    total_network_length: float;
-    segment_count: int;
-    junction_count: int;
-    dangling_segments: int;
-    average_segment_length: float;
-    density: float;
-    total_segments_including_degenerate: int;
+    burgers_vector: Vec3;        // local Burgers vector
+    burgers_vector_local: Vec3;
+    burgers_vector_global: Vec3;
+    magnitude: float;            // length of the local Burgers vector
 }
 
 interface DislocationsOutput {
+    export: {
+        DislocationExporter: {
+            segments: DislocationSegment[];
+        };
+        ChartExporter: {
+            burgers_counts: {
+                burgers_vector: string[];
+                segment_count: int[];
+            };
+            burgers_lengths: {
+                burgers_vector: string[];
+                total_length: float[];
+            };
+        };
+    };
     main_listing: {
         dislocations: int;
         total_points: int;
@@ -74,12 +113,7 @@ interface DislocationsOutput {
         min_segment_length: float;
         total_length: float;
     };
-    sub_listings: {
-        dislocation_segments: DislocationSegment[];
-        junction_information: JunctionInformation;
-        circuit_information: CircuitInformation;
-        network_statistics: NetworkStatistics;
-    };
+    sub_listings: null;
 }
 ```
 
@@ -104,6 +138,12 @@ interface MeshOutput {
         points: MeshPoint[];
         facets: MeshFacet[];
     };
+    export: {
+        MeshExporter: {
+            vertices: MeshPoint[];
+            facets: MeshFacet[];
+        };
+    };
     topology?: {
         euler_characteristic: int;
         is_completely_good: boolean;
@@ -116,109 +156,128 @@ interface MeshOutput {
 
 Same schema as `MeshOutput`.
 
-### `{outputBase}_simulation_cell.msgpack`
+### `{outputBase}_delaunay_tessellation.msgpack`
+
+The boundary/internal facets of the Delaunay tessellation. Written only when
+`--export_delaunay_tessellation` is enabled.
 
 ```ts
-interface LatticeVector {
-    x: float;
-    y: float;
-    z: float;
-}
-
-interface SimulationCellOutput {
-    matrix: Mat3x3;
-    volume: float;
-    is_2d: boolean;
-    lattice_vectors: {
-        a: LatticeVector;
-        b: LatticeVector;
-        c: LatticeVector;
-    };
-    lattice_parameters: {
-        a_length: float;
-        b_length: float;
-        c_length: float;
-    };
-    periodic_boundary_conditions: {
-        x: boolean;
-        y: boolean;
-        z: boolean;
-    };
-    angles: {
-        alpha: float;
-        beta: float;
-        gamma: float;
-    };
-    reciprocal_lattice: {
-        matrix: Mat3x3;
-        volume: float;
-    };
-    dimensionality: {
-        is_2d: boolean;
-        effective_dimensions: 2 | 3;
-    };
-}
-```
-
-### `{outputBase}_ptm_data.msgpack`
-
-Only exported when `identificationMode` is `PTM`.
-
-```ts
-interface PTMPerAtomProperties {
-    id: int;
-    correspondences: int;
-    structure_type?: int;
-    orientation: Quaternion;
-}
-
-interface PTMDataOutput {
+interface DelaunayTessellationOutput {
     main_listing: {
-        total_atoms: int;
-        include_structure_type: boolean;
+        total_primary_tetrahedra: int;
+        total_nodes: int;
+        total_facets: int;
+        boundary_facets: int;
+        internal_facets: int;
     };
-    "per-atom-properties": PTMPerAtomProperties[];
+    sub_listings: {
+        points: MeshPoint[];
+        facets: MeshFacet[];
+    };
+    export: {
+        MeshExporter: {
+            vertices: MeshPoint[];
+            facets: MeshFacet[];
+        };
+    };
 }
 ```
 
 ### `{outputBase}_atoms.msgpack`
 
-Atoms grouped by identified structure type name.
+Per-atom structure-identification results, grouped by structure type name. Written only
+when `--export_structure_identification` is enabled.
 
 ```ts
 interface Atom {
     id: int;
     pos: Vec3;
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    topology_name?: string;   // present only when known
+}
+
+interface PerAtomProperty {
+    id: int;
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    topology_name?: string;
 }
 
 interface AtomsOutput {
     export: {
-        AtomisticExporter: Record<string, Atom[]>;
+        AtomisticExporter: Record<string, Atom[]>;  // keyed by structure name
+        ChartExporter: {
+            structure_counts: {
+                structure_name: string[];
+                atom_count: int[];
+            };
+        };
     };
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+        clustered_atoms: int;
+        unclustered_atoms: int;
+    };
+    sub_listings: {
+        structures: {
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }[];
+    };
+    "per-atom-properties": PerAtomProperty[];
 }
 ```
 
-### `{outputBase}_structure_analysis_stats.msgpack`
+### `{outputBase}_coherent_crystalline_regions.msgpack`
 
-This file contains both summary statistics and per-atom structural information.
+Atoms grouped into coherent crystalline regions (clusters). Written only when
+`--export_coherent_crystalline_regions` is enabled.
 
 ```ts
-interface StructureAnalysisStatsOutput {
+interface CoherentRegion {
+    cluster_id: int;
+    cluster_name: string;        // e.g. "Cluster 12"
+    atom_count: int;
+    structure_id: int;
+    structure_name: string;
+    topology_name: string;
+}
+
+interface CoherentRegionAtom {
+    id: int;
+    pos: Vec3;
+    structure_id: int;
+    structure_type: int;
+    structure_name: string;
+    cluster_id: int;
+    topology_name?: string;      // present only when known
+}
+
+interface CoherentCrystallineRegionsOutput {
     main_listing: {
         total_atoms: int;
-        analysis_method: string;
-        [key: `${string}_count`]: int;
-        [key: `${string}_percentage`]: float;
-        total_identified: int;
-        total_unidentified: int;
-        identification_rate: float;
-        unique_structure_types: int;
+        coherent_region_count: int;
+        assigned_atoms: int;
+        unassigned_atoms: int;
+        largest_region_size: int;
+    };
+    sub_listings: {
+        coherent_crystalline_regions: CoherentRegion[];
+    };
+    export: {
+        AtomisticExporter: Record<string, CoherentRegionAtom[]>;  // keyed by cluster name
     };
 }
 ```
 
 ## See Also
 
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — structure classification that can feed OpenDXA's `structure_analysis_plugin` chain
+- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — alternative upstream structure-analysis algorithm for the OpenDXA chain
 - [Grain Segmentation](/docs/plugins/grain-segmentation) — orientation-driven grain separation
 - [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — scalar defect highlighting
-- [Structure Identification](/docs/plugins/structure-identification) — local structure classification used as part of the pipeline

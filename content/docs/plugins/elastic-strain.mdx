@@ -3,18 +3,21 @@ title: Elastic Strain
 description: Compute crystal-referenced elastic strain by mapping local environments to an ideal lattice.
 ---
 
+<Callout type="info">
+  Elastic strain analysis requires an upstream structure-identification step. The plugin consumes the cluster tables (`clusters_table` and `clusters_transitions`) produced by the referenced structure-analysis plugin; the analysis will fail if those inputs are absent.
+</Callout>
+
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `latticeConstant` | `float` | — | Lattice constant a0. **Required.** |
-| `crystalStructure` | `string` | `BCC` | Reference crystal structure type. Options: `FCC`, `BCC`, `HCP`, `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. |
-| `caRatio` | `float` | `1.0` | c/a ratio for HCP and hexagonal crystals. |
-| `pushForward` | `bool` | `false` | Push strain to the spatial frame. |
-| `calcDeformationGradient` | `bool` | `true` | Compute deformation gradient `F`. |
-| `calcStrainTensors` | `bool` | `true` | Compute strain tensors. |
-| `identificationMode` | `string` | `PTM` | Structure identification mode. Options: `CNA`, `PTM`. |
-| `rmsd` | `float` | `0.10` | RMSD cutoff for PTM classification. |
+| `structure_analysis_plugin` | `pluginReference` | — | **Required.** Upstream structure-identification algorithm that produces the cluster tables. Accepts `polyhedral-template-matching` or `adaptive-common-neighbor-analysis`. |
+| `lattice_constant` | `float` | `3.615` | Lattice constant a₀. Required by the binary. |
+| `crystal_structure` | `string` | `FCC` | Reference crystal structure. Plugin UI options: `FCC`, `BCC`, `HCP`. (The underlying binary CLI additionally accepts `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`.) |
+| `ca_ratio` | `float` | `1.0` | c/a ratio for HCP and hexagonal crystals. |
+| `push_forward` | `bool` | `false` | Push strain to the spatial frame (Euler strain). |
+| `calc_deformation_gradient` | `bool` | `true` | Compute deformation gradient `F`. |
+| `calc_strain_tensors` | `bool` | `true` | Compute strain tensors. |
 
 ## Output
 
@@ -41,10 +44,13 @@ interface ElasticStrainOutput {
 
 ### `{outputBase}_atoms.msgpack`
 
-Grouped atoms by structure family for visualization and downstream context.
+Per-atom atomistic export consumed by the **Elastic Strain Model** exposure and exported as a GLB via `AtomisticExporter`. The envelope contains:
+
+- `main_listing` — aggregate counts: `total_atoms`, `structure_count`, `clustered_atoms`, `unclustered_atoms`.
+- `sub_listings.structures` — array of `{ structure_id, structure_name, atom_count }` for each occupied structure type.
+- `export.AtomisticExporter` — atoms keyed by structure name. Each atom carries `id`, `pos`, `structure_id`, `structure_type`, `structure_name`, `cluster_id`, optional `topology_name`, and the strain quantities (`volumetric_strain`, `strain_tensor`, `deformation_gradient`) when computed.
 
 ## See Also
 
 - [Atomic Strain](/docs/plugins/atomic-strain) — reference-frame local deformation analysis
 - [Displacements Analysis](/docs/plugins/displacements-analysis) — direct atom-by-atom displacement comparison
-- [Structure Identification](/docs/plugins/structure-identification) — structural matching groundwork

@@ -8,31 +8,20 @@ description: Measure local deformation by comparing atomic neighborhoods against
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `cutoff` | `float` | `3.0` | Cutoff radius for neighbor search. |
-| `reference` | `file` | — | Reference LAMMPS dump file. If omitted, the current frame is used, which usually produces near-zero strain. |
-| `eliminateCellDeformation` | `bool` | `false` | Eliminate cell deformation before the local fit. |
-| `assumeUnwrapped` | `bool` | `false` | Assume coordinates are already unwrapped. |
-| `calcDeformationGradient` | `bool` | `true` | Compute deformation gradient `F`. |
-| `calcStrainTensors` | `bool` | `true` | Compute strain tensors. |
-| `calcD2min` | `bool` | `true` | Compute `D2min`, the non-affine residual. |
+| `reference` | `frame` | — | Reference frame to compare against. If omitted, the current frame is used, which usually produces near-zero strain. |
+| `eliminate_cell_deformation` | `bool` | `false` | Eliminate cell deformation before the local fit. |
+| `assume_unwrapped` | `bool` | `false` | Assume coordinates are already unwrapped. |
+| `calc_deformation_gradient` | `bool` | `true` | Compute deformation gradient `F`. |
+| `calc_strain_tensors` | `bool` | `true` | Compute strain tensors. |
+| `calc_d2min` | `bool` | `true` | Compute `D2min`, the non-affine residual. |
 
 ## Output
 
 ### `{outputBase}_atomic_strain.msgpack`
 
+Summary statistics for the analysis run.
+
 ```ts
-type StrainTensor = [float, float, float, float, float, float];
-type DeformationGradient = [float, float, float, float, float, float, float, float, float];
-
-interface PerAtomProperties {
-    id: int;
-    shear_strain: float;
-    volumetric_strain: float;
-    strain_tensor?: StrainTensor;
-    deformation_gradient?: DeformationGradient;
-    D2min: float | null;
-    invalid: boolean;
-}
-
 interface AtomicStrainOutput {
     main_listing: {
         cutoff: float;
@@ -41,9 +30,56 @@ interface AtomicStrainOutput {
         average_volumetric_strain: float;
         max_shear_strain: float;
     };
-    "per-atom-properties": PerAtomProperties[];
+    is_failed: boolean;
 }
 ```
+
+### `{outputBase}_atoms.msgpack`
+
+Per-atom data in the canonical AtomisticExporter format consumed by the VOLT viewer. Atoms are partitioned into `VALID` and `INVALID` buckets.
+
+```ts
+type StrainTensor = [float, float, float, float, float, float];
+type DeformationGradient = [float, float, float, float, float, float, float, float, float];
+
+interface AtomRecord {
+    // Base fields (always present)
+    id: int;
+    pos: [float, float, float];
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    // Plugin-specific fields
+    shear_strain: float;
+    volumetric_strain: float;
+    invalid: boolean;
+    strain_tensor?: StrainTensor;       // present when calc_strain_tensors is true
+    deformation_gradient?: DeformationGradient; // present when calc_deformation_gradient is true
+    D2min?: float;                      // present when calc_d2min is true (key absent when disabled)
+}
+
+interface AtomsOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+    };
+    sub_listings: {
+        structures: Array<{
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }>;
+    };
+    export: {
+        AtomisticExporter: {
+            VALID: AtomRecord[];
+            INVALID: AtomRecord[];
+        };
+    };
+}
+```
+
+The `atoms.msgpack` result is also exported to a renderable GLB model via `AtomisticExporter` for 3D viewing in the VOLT client.
 
 ## See Also
 

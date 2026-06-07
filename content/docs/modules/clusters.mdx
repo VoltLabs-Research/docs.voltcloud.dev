@@ -26,7 +26,7 @@ Enrolling a cluster:
 
 1. VOLT creates a cluster record.
 2. An enrollment token is issued.
-3. An install command is provided for the target machine.
+3. An install command is provided for the target machine. For Linux and macOS this is a `curl | bash` one-liner; for Windows it is a PowerShell command. Both are run directly on the target machine — VOLT does not SSH into the machine.
 4. The daemon starts and sends heartbeats.
 5. The cluster transitions from waiting to connected.
 
@@ -38,11 +38,17 @@ The listing reports cluster reachability and lifecycle state.
 
 | Status | Meaning |
 |---|---|
-| **Connected** | The daemon is online and the cluster is actively participating in the workspace |
 | **Waiting for Connection** | The cluster has been created, but the daemon has not connected yet |
+| **Healthcheck Received** | The daemon has contacted VOLT and the enrollment healthcheck has been acknowledged |
+| **Preparing Environment** | The daemon is setting up the local services and runtime environment |
+| **Connected** | The daemon is online and the cluster is actively participating in the workspace |
 | **Disconnected** | The cluster was known previously, but heartbeats are currently missing |
 | **Updating** | A managed update is in progress |
+| **Update Failed** | The managed update did not complete successfully |
 | **Deleting** | The cluster is being removed from the team |
+| **Delete Failed** | The deletion did not complete successfully |
+| **OS Not Supported** | The target operating system is not supported by the daemon installer |
+| **Dependency Install Failed** | One or more required dependencies could not be installed during setup |
 
 ![Cluster Listing](/assets/modules/clusters/cluster-listing.png)
 

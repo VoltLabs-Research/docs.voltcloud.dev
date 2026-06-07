@@ -1,0 +1,108 @@
+---
+title: Polyhedral Template Matching
+description: Classify atoms by local crystal structure with PTM and export per-atom orientation plus the cluster graph consumed by OpenDXA.
+---
+
+Polyhedral Template Matching (PTM) identifies the local crystalline structure around each atom by matching its neighbor shell against a set of reference templates. Besides the structure type, it recovers per-atom orientation, RMSD, interatomic distance and deformation gradient, and emits the reconstructed cluster graph that downstream DXA-compatible tools (OpenDXA, LineReconstructionDXA, ElasticStrain) consume.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `crystal_structure` | `select` | `FCC` | Reference lattice to match against. One of `BCC`, `FCC`, `HCP`, `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. |
+| `rmsd` | `float` | `0.1` | RMSD threshold for PTM. Atoms whose best match exceeds this value are classified as `OTHER`. Minimum `0`, step `0.01`. |
+| `dissolve_small_clusters` | `bool` | `false` | Mark atoms in small clusters as `OTHER` after the clustering pass. |
+
+## Output
+
+### `{outputBase}_ptm_analysis.msgpack`
+
+Summary record for the frame. `sub_listings` is emitted as an empty object and `per-atom-properties` as an empty array; the per-atom data lives in `{outputBase}_atoms.msgpack`. The `input_dump`, `clusters_table` and `cluster_transitions_table` fields are filesystem paths to the artifacts written alongside this record.
+
+```ts
+interface PtmAnalysisOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+        rmsd: float;
+    };
+    sub_listings: {};
+    "per-atom-properties": [];
+    input_dump: string;
+    clusters_table: string;
+    cluster_transitions_table: string;
+}
+```
+
+### `{outputBase}_atoms.msgpack`
+
+Per-atom structure identification in the canonical `AtomisticExporter` shape, with PTM-specific fields attached to each atom. Atoms are grouped by structure name under `export.AtomisticExporter`, and the `export.ChartExporter.structure_counts` block backs the structure-counts bar chart.
+
+```ts
+type Vec3 = [float, float, float];
+type Quaternion = [float, float, float, float]; // [x, y, z, w]
+type Mat3 = [
+    float, float, float,
+    float, float, float,
+    float, float, float
+]; // row-major 3x3
+
+interface PtmAtom {
+    id: int;
+    pos: Vec3;
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    // PTM per-atom fields
+    ptm_valid: bool;
+    // present only when ptm_valid === true:
+    rmsd?: float;
+    orientation?: Quaternion;
+    interatomic_distance?: float;
+    scaling?: float;
+    deformation_gradient?: Mat3;
+    ordering_type?: int;
+    correspondences?: int;
+    template_index?: int;
+}
+
+interface StructureGroup {
+    structure_id: int;
+    structure_name: string;
+    atom_count: int;
+}
+
+interface AtomsOutput {
+    export: {
+        AtomisticExporter: Record<string, PtmAtom[]>; // keyed by structure_name
+        ChartExporter: {
+            structure_counts: {
+                structure_name: string[];
+                atom_count: int[];
+            };
+        };
+    };
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+        clustered_atoms: int;
+        unclustered_atoms: int;
+    };
+    sub_listings: {
+        structures: StructureGroup[];
+    };
+    "per-atom-properties": Array<{
+        id: int;
+        structure_id: int;
+        structure_name: string;
+        cluster_id: int;
+    }>;
+}
+```
+
+In addition to the msgpack files, the entrypoint emits plain-text artifacts: `{outputBase}_annotated.dump` (per-atom structure-annotated LAMMPS dump) and the cluster graph tables `{outputBase}_clusters.table` and `{outputBase}_cluster_transitions.table`, which are required inputs for OpenDXA and other DXA-compatible plugins.
+
+## See Also
+
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — alternative per-atom structure classification
+- [Grain Segmentation](/docs/plugins/grain-segmentation) — builds on PTM orientations to group atoms into grains

@@ -22,53 +22,71 @@ npm install @voltstack/spatial-assembler
 
 ## API
 
-### `generateGLB(positions, types)`
+### `generateGLB(positions, types, min, max)`
 
-Generates a GLB buffer from a point cloud with type-based coloring (8 predefined colors).
+Generates a GLB buffer from a point cloud with type-based coloring (8 predefined colors). Atoms are Morton-sorted within the supplied bounding box for spatial coherence.
 
 ```typescript
 function generateGLB(
   positions: Float32Array,
-  types: Uint32Array
+  types: Uint16Array,
+  min: number[],
+  max: number[]
 ): Buffer
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
 | `positions` | `Float32Array` | Vertex positions as `[x1, y1, z1, x2, y2, z2, ...]` |
-| `types` | `Uint32Array` | Atom type index per vertex (0–7) |
+| `types` | `Uint16Array` | Atom type index per vertex (clamped to 0–7 for color selection) |
+| `min` | `number[]` | Bounding box minimum as `[x, y, z]` |
+| `max` | `number[]` | Bounding box maximum as `[x, y, z]` |
 
 **Returns:** `Buffer` — GLB binary data.
 
-### `generateGLBToFile(positions, types, filePath)`
+### `generateGLBToFile(positions, types, min, max, filePath)`
 
-Same as `generateGLB`, but writes the result directly to disk.
+Same as `generateGLB`, but streams the result directly to disk (bypasses the Node.js buffer size limit, suitable for very large datasets).
 
 ```typescript
 function generateGLBToFile(
   positions: Float32Array,
-  types: Uint32Array,
+  types: Uint16Array,
+  min: number[],
+  max: number[],
   filePath: string
 ): boolean
 ```
 
+| Parameter | Type | Description |
+|---|---|---|
+| `positions` | `Float32Array` | Vertex positions as `[x1, y1, z1, x2, y2, z2, ...]` |
+| `types` | `Uint16Array` | Atom type index per vertex (clamped to 0–7 for color selection) |
+| `min` | `number[]` | Bounding box minimum as `[x, y, z]` |
+| `max` | `number[]` | Bounding box maximum as `[x, y, z]` |
+| `filePath` | `string` | Output file path |
+
 **Returns:** `boolean` — `true` on success.
 
-### `generatePointCloudGLB(positions, colors)`
+### `generatePointCloudGLB(positions, colors, min, max)`
 
-Generates a GLB from a point cloud with explicit RGBA colors.
+Generates a GLB from a point cloud with explicit, pre-computed vertex colors.
 
 ```typescript
 function generatePointCloudGLB(
   positions: Float32Array,
-  colors: Float32Array
+  colors: Float32Array,
+  min: number[],
+  max: number[]
 ): Buffer
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
 | `positions` | `Float32Array` | Vertex positions as `[x, y, z, ...]` |
-| `colors` | `Float32Array` | RGBA colors per vertex as `[r, g, b, a, ...]` |
+| `colors` | `Float32Array` | Per-vertex colors, either RGB (`[r, g, b, ...]`) or RGBA (`[r, g, b, a, ...]`). The layout is auto-detected from the array length. |
+| `min` | `number[]` | Bounding box minimum as `[x, y, z]` |
+| `max` | `number[]` | Bounding box maximum as `[x, y, z]` |
 
 **Returns:** `Buffer` — GLB binary data.
 
@@ -94,7 +112,7 @@ function generateMeshGLB(
 | `normals` | `Float32Array` | Vertex normals |
 | `indices` | `Uint32Array \| Uint16Array` | Triangle indices |
 | `hasColors` | `boolean` | Whether to include vertex colors |
-| `colors` | `Float32Array` | RGBA colors (used if `hasColors` is true) |
+| `colors` | `Float32Array` | RGBA colors (only read when `hasColors` is true; may be omitted/undefined otherwise) |
 | `bounds` | `Bounds` | Bounding box `{ minX, minY, minZ, maxX, maxY, maxZ }` |
 | `material` | `Material` | PBR material properties |
 
@@ -109,40 +127,44 @@ interface Material {
   metallic: number;
   roughness: number;
   emissive: [number, number, number];
-  doubleSided: boolean;
+  doubleSided?: boolean;
 }
 ```
 
+`doubleSided` defaults to `true` when omitted.
+
 **Returns:** `Buffer` — GLB binary data.
 
-### `applyPropertyColors(colorIndices, colorValues)`
+### `applyPropertyColors(values, minVal, maxVal, gradientType)`
 
-Maps scalar property values to a gradient color palette (Viridis, Plasma, Blue-Red, or Grayscale with a 1024-entry LUT).
+Maps scalar property values onto a gradient color palette using a 1024-entry lookup table. Each value is normalized into the `[minVal, maxVal]` range, clamped, and sampled from the selected gradient.
 
 ```typescript
 function applyPropertyColors(
-  colorIndices: Uint32Array,
-  colorValues: Float32Array
+  values: Float32Array,
+  minVal: number,
+  maxVal: number,
+  gradientType: number
 ): Float32Array
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
-| `colorIndices` | `Uint32Array` | Index into the color map per vertex |
-| `colorValues` | `Float32Array` | RGB values for gradient interpolation |
+| `values` | `Float32Array` | One scalar value per vertex |
+| `minVal` | `number` | Lower bound of the value range (maps to the start of the gradient) |
+| `maxVal` | `number` | Upper bound of the value range (maps to the end of the gradient) |
+| `gradientType` | `number` | Gradient selector: `0` = Viridis, `1` = Plasma, `2` = Blue-Red, `3` = Grayscale (out-of-range values fall back to `0`) |
 
-**Returns:** `Float32Array` — RGBA colors per vertex.
+**Returns:** `Float32Array` — RGB colors per vertex as `[r, g, b, ...]` (3 components per vertex).
 
-### `taubinSmooth(positions, indices, lambda, mu, iterations)`
+### `taubinSmooth(positions, indices, iterations)`
 
-Applies Taubin smoothing (bilateral mesh filtering) to a triangle mesh. Modifies positions in place.
+Applies Taubin smoothing (bilateral mesh filtering) to a triangle mesh. Modifies positions in place. The lambda/mu smoothing factors are fixed internally (`0.5` and `-0.52`).
 
 ```typescript
 function taubinSmooth(
   positions: Float32Array,
   indices: Uint32Array | Uint16Array,
-  lambda: number,
-  mu: number,
   iterations: number
 ): boolean
 ```
@@ -151,9 +173,7 @@ function taubinSmooth(
 |---|---|---|
 | `positions` | `Float32Array` | Mesh vertex positions (modified in place) |
 | `indices` | `Uint32Array \| Uint16Array` | Triangle indices |
-| `lambda` | `number` | Positive smoothing factor |
-| `mu` | `number` | Negative smoothing factor (shrinkage compensation) |
-| `iterations` | `number` | Number of smoothing passes |
+| `iterations` | `number` | Number of smoothing passes (`<= 0` is a no-op) |
 
 **Returns:** `boolean` — `true` on success.
 
