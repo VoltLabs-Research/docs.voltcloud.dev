@@ -5,6 +5,7 @@
     "ecosystem-setup",
     "core-toolkit",
     "plugin-development",
+    "vpm",
     "---VoltSDK---",
     "volt-client",
     "daemon-cluster-client",
