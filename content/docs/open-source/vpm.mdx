@@ -1,15 +1,15 @@
 ---
 title: VPM
-description: The VoltCloud plugin registry CLI — authenticate, publish, install, and manage Volt plugin packages from the terminal.
+description: The VOLT Cloud plugin registry CLI — authenticate, publish, install, and manage VOLT plugin packages from the terminal.
 ---
 
 <Callout type="info">
-**TL;DR** — `vpm` is the npm-installed CLI for the Volt plugin Registry. It logs in via a device-code flow, publishes multi-platform plugin bundles, and installs them into a shared on-disk cache that the [Python SDK](/docs/open-source/python-client) and ClusterDaemon read from. Requires Node ≥ 20.
+**TL;DR** — `vpm` is the npm-installed CLI for the VOLT plugin Registry. It logs in via a device-code flow, publishes multi-platform plugin bundles, and installs them into a shared on-disk cache that the [Python SDK](/docs/open-source/python-client) and ClusterDaemon read from. Requires Node ≥ 20.
 </Callout>
 
 ## Overview
 
-**vpm** (Volt Package Manager) is a Node CLI that talks to two services: the **Registry** (package metadata, bundles, search) and the **Console** (authentication, personal access tokens). It is the tool the CI workflow in [plugin-development](/docs/open-source/plugin-development) calls to publish a plugin on tag pushes, and it can also be used directly to discover and install plugins.
+**vpm** (VOLT Package Manager) is a Node CLI that talks to two services: the **Registry** (package metadata, bundles, search) and the **Console** (authentication, personal access tokens). It is the tool the CI workflow in [plugin-development](/docs/open-source/plugin-development) calls to publish a plugin on tag pushes, and it can also be used directly to discover and install plugins.
 
 | | |
 |---|---|
