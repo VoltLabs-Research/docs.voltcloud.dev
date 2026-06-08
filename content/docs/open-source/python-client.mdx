@@ -194,12 +194,12 @@ run["dislocations"].open_in_volt()          # render in the Volt web canvas
 
 ### Identifiers and versions
 
-Plugin keys accept the canonical `@scope/name` form and the legacy `publisher@name` form. Versions may be exact, the literal `latest`, or a semver range.
+Plugin keys use the canonical `@scope/name` form. Versions may be exact, the literal `latest`, or a semver range.
 
 ```python
-hub.get("@voltlabs/opendxa", "1.0.0")   # canonical, explicit version
-hub.get("voltlabs@opendxa", "^1.0.0")   # legacy form + semver range
-hub["voltlabs@opendxa"]                  # shorthand for the latest version
+hub.get("@voltlabs/opendxa", "1.0.0")    # explicit version
+hub.get("@voltlabs/opendxa", "^1.0.0")   # semver range
+hub["@voltlabs/opendxa"]                  # shorthand for the latest version
 hub.install("@voltlabs/opendxa")         # pre-download the latest bundle
 hub.uninstall("@voltlabs/opendxa")       # drop every cached version
 ```
