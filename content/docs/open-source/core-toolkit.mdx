@@ -82,8 +82,8 @@ General-purpose infrastructure.
 |---|---|
 | `memory_pool.h` | Thread-safe arena-style memory pool |
 | `bounded_priority_queue.h` | Fixed-capacity priority queue for k-NN search |
-| `json_utils.h` | JSON serialization helpers (nlohmann/json), including msgpack output |
-| `msgpack_atom_writer.h` | Streams per-atom output to a `_atoms.msgpack` file in the canonical `AtomisticExporter` format (used by `volt/plugin/output_serializer.h`) |
+| `json_utils.h` | JSON serialization helpers (nlohmann/json), including parquet output |
+| `parquet_atom_writer.h` | Streams per-atom output to a `_atoms.parquet` file in the canonical `AtomisticExporter` format (used by `volt/plugin/output_serializer.h`) |
 
 ### `volt/cli`
 
@@ -102,7 +102,7 @@ The plugin-authoring API. These headers wrap the boilerplate of a plugin executa
 | `plugin_main.h` | `pluginMain()` driver and the `VOLT_PLUGIN_MAIN` macro: parses CLI args, loads the LAMMPS frame (and optional `--reference` frame), sets OneTBB thread limits via `--threads`, then invokes the plugin's run function |
 | `plugin_entry.h` | `VOLT_SERVICE_PLUGIN` macro that wires a service type's `compute()` method to `pluginMain`, binding UI arguments and selecting the 2- or 3-argument `compute()` overload |
 | `option_binding.h` | Binds plugin.json UI arguments to service setters (`opt(...)`, `applyAll`, `optionsMeta`), including lattice-type options resolved against `crystal_structure_types.h` |
-| `output_serializer.h` | `serializePluginOutput()` writes the summary `{outputBase}{suffix}.msgpack` and, when a bucket resolver is supplied, a separate `{outputBase}_atoms.msgpack` |
+| `output_serializer.h` | `serializePluginOutput()` writes the summary `{outputBase}{suffix}.parquet` and, when a bucket resolver is supplied, a separate `{outputBase}_atoms.parquet` |
 | `particle_id_mapper.h` | Builds current↔reference particle index mappings from atom IDs (for reference-frame analyses such as displacement) |
 
 ## Dependencies

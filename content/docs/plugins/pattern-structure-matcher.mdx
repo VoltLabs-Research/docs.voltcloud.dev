@@ -48,13 +48,13 @@ binary's own CLI options are `--lattice_dir`, `--reference_lattice_dir`,
 
 ## Output
 
-The binary writes a single msgpack result file. Per-atom data is emitted to a
+The binary writes a single parquet result file. Per-atom data is emitted to a
 LAMMPS dump (`{outputBase}_annotated.dump`) and the cluster graph to two text
 tables (`{outputBase}_clusters.table`, `{outputBase}_cluster_transitions.table`)
 that OpenDXA consumes; this plugin does not produce a separate
-`_atoms.msgpack`.
+`_atoms.parquet`.
 
-### `{outputBase}_pattern_analysis.msgpack`
+### `{outputBase}_pattern_analysis.parquet`
 
 ```ts
 interface SelectedPattern {

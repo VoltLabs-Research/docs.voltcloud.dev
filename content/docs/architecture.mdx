@@ -99,13 +99,13 @@ sequenceDiagram
     D->>D: Plan workflow and enqueue jobs
     D->>M: Download frame dump
     D->>P: Execute plugin binary
-    P-->>D: Write MessagePack exposures
+    P-->>D: Write Apache Parquet exposures
     D->>M: Upload result artifacts
     D->>S: Report progress and completion
     S->>U: Stream live updates
 ```
 
-The daemon transforms plugin output into MessagePack data, listings, exports, and 3D artifacts for the viewer.
+The daemon transforms plugin output into Apache Parquet data, listings, exports, and 3D artifacts for the viewer.
 
 ## Data flow for trajectories
 

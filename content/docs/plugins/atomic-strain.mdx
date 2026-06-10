@@ -17,7 +17,7 @@ description: Measure local deformation by comparing atomic neighborhoods against
 
 ## Output
 
-### `{outputBase}_atomic_strain.msgpack`
+### `{outputBase}_atomic_strain.parquet`
 
 Summary statistics for the analysis run.
 
@@ -34,7 +34,7 @@ interface AtomicStrainOutput {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Per-atom data in the canonical AtomisticExporter format consumed by the VOLT viewer. Atoms are partitioned into `VALID` and `INVALID` buckets.
 
@@ -79,7 +79,7 @@ interface AtomsOutput {
 }
 ```
 
-The `atoms.msgpack` result is also exported to a renderable GLB model via `AtomisticExporter` for 3D viewing in the VOLT client.
+The `atoms.parquet` result is also exported to a renderable GLB model via `AtomisticExporter` for 3D viewing in the VOLT client.
 
 ## See Also
 

@@ -1,11 +1,11 @@
 ---
 title: VoltClient (Python)
-description: Python SDK for the Volt platform — run native plugins locally, browse REST resources, convert MessagePack to DataFrames, and visualize GLB models.
+description: Python SDK for the Volt platform — run native plugins locally, browse REST resources, convert Apache Parquet to DataFrames, and visualize GLB models.
 ---
 
 ## Overview
 
-`voltsdk` is the official Python SDK for the Volt scientific computing platform. It does more than wrap the REST API: it can download, cache, and run native C++ analysis plugins locally (`PluginHub`), browse Volt resources (trajectories, analyses, frames, exposures), assemble and render GLB 3D models (`SpatialAssembler`, `open_in_volt`, `view_glb`), and convert MessagePack analysis output to pandas DataFrames.
+`voltsdk` is the official Python SDK for the Volt scientific computing platform. It does more than wrap the REST API: it can download, cache, and run native C++ analysis plugins locally (`PluginHub`), browse Volt resources (trajectories, analyses, frames, exposures), assemble and render GLB 3D models (`SpatialAssembler`, `open_in_volt`, `view_glb`), and convert Apache Parquet analysis output to pandas DataFrames.
 
 | | |
 |---|---|
@@ -136,7 +136,7 @@ for analysis in client.analyses:
 
 `Analysis` properties: `id`, `status`, `plugin_name`, `plugin_id`, `trajectory_id`, `config`, and `progress` (fraction of frames completed, 0.0–1.0).
 
-Download every artifact (msgpack + GLB) for an analysis as a zip:
+Download every artifact (parquet + GLB) for an analysis as a zip:
 
 ```python
 # Download and recursively extract (default)
@@ -240,7 +240,7 @@ By default the viewer opens against `https://app.voltcloud.dev`; override it wit
 
 ### `SpatialAssembler`
 
-Build GLBs locally from Volt exporter payloads (`AtomisticExporter`, `MeshExporter`, `DislocationExporter`). It accepts the full artifact file (`.json` or `.msgpack`) or the raw nested payload.
+Build GLBs locally from Volt exporter payloads (`AtomisticExporter`, `MeshExporter`, `DislocationExporter`). It accepts the full artifact file (`.json` or `.parquet`) or the raw nested payload.
 
 ```python
 from voltsdk import SpatialAssembler, open_in_volt
@@ -272,14 +272,14 @@ Requires `voltsdk[visualization]` (VTK desktop window). For the inline notebook 
 
 ## Utility Functions
 
-### `msgpack_as_df(file_path, iterable_key=None)`
+### `parquet_as_df(file_path, iterable_key=None)`
 
-Converts a Volt MessagePack result file to a pandas DataFrame, transparently merging chunked (streamed) messages.
+Converts a Volt Apache Parquet result file to a pandas DataFrame, transparently merging chunked (streamed) messages.
 
 ```python
-from voltsdk import msgpack_as_df
+from voltsdk import parquet_as_df
 
-df = msgpack_as_df("out/output.msgpack")
+df = parquet_as_df("out/output.parquet")
 print(df.head())
 print(df.columns.tolist())
 ```
@@ -287,13 +287,13 @@ print(df.columns.tolist())
 `iterable_key` is a dot-separated path extracted from each chunk before merging — useful when the result wraps its rows under a named key:
 
 ```python
-df = msgpack_as_df("out/output.msgpack", iterable_key="main_listing")
+df = parquet_as_df("out/output.parquet", iterable_key="main_listing")
 ```
 
 ## Example Workflow
 
 ```python
-from voltsdk import VoltClient, msgpack_as_df
+from voltsdk import VoltClient, parquet_as_df
 
 client = VoltClient.from_env()
 
@@ -306,7 +306,7 @@ print(analysis.plugin_name, analysis.status)
 out_dir = analysis.download_artifacts(dest="out/")
 
 # 3. Convert a result file to a DataFrame
-df = msgpack_as_df(f"{out_dir}/output.msgpack")
+df = parquet_as_df(f"{out_dir}/output.parquet")
 print(f"Rows: {len(df)}")
 print(f"Columns: {df.columns.tolist()}")
 print(df.describe())

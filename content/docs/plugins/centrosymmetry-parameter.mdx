@@ -12,9 +12,9 @@ description: Measure local centrosymmetry as a fast way to highlight disorder an
 
 ## Output
 
-The plugin writes two msgpack files per frame.
+The plugin writes two parquet files per frame.
 
-### `{outputBase}_centrosymmetry.msgpack`
+### `{outputBase}_centrosymmetry.parquet`
 
 Summary statistics for the frame.
 
@@ -41,7 +41,7 @@ interface CentrosymmetryOutput {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are grouped into a single `"All"` bucket.
 

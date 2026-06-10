@@ -15,7 +15,7 @@ description: Segment polycrystalline regions by grouping atoms with compatible o
 
 ## Output
 
-### `{outputBase}_grains.msgpack`
+### `{outputBase}_grains.parquet`
 
 ```ts
 type Vec3 = [float, float, float];
@@ -39,7 +39,7 @@ interface GrainSegmentationOutput {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Atoms grouped by identified structure family for downstream visualization.
 

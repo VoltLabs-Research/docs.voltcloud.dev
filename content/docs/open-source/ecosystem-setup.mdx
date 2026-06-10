@@ -126,7 +126,7 @@ After a successful run, the compiled plugin binaries are placed in the output di
 ```
 
 - `<input_dump>` — path to the LAMMPS dump file to analyse.
-- `<output_base>` — base path for result files; the binary appends suffixes and writes one or more MessagePack files (e.g. `<output_base>_cluster_analysis.msgpack`, `<output_base>_atoms.msgpack`).
+- `<output_base>` — base path for result files; the binary appends suffixes and writes one or more Apache Parquet files (e.g. `<output_base>_cluster_analysis.parquet`, `<output_base>_atoms.parquet`).
 - Plugin-specific flags vary by algorithm and follow their own conventions (e.g. `--crystal_structure FCC --rmsd 0.1` for PTM-based plugins).
 
 Plugins are normally invoked through their Python wrapper scripts, which handle binary location, flag filtering, and output validation.

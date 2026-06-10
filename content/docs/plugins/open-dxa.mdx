@@ -49,15 +49,15 @@ VOLT entrypoint sets several `--export_*` toggles for you).
 | `--crystal_path_steps <int>` | `4` | Maximum crystal path search depth. |
 | `--clip_pbc_segments <bool>` | `true` | Clip exported dislocation polylines at periodic boundaries. |
 | `--cover_domain_with_finite_tets <bool>` | `false` | Add helper points so the Delaunay domain is fully covered by finite tetrahedra. |
-| `--export_defect_mesh <bool>` | `true` | Write `*_defect_mesh.msgpack`. |
-| `--export_interface_mesh <bool>` | `false` | Write `*_interface_mesh.msgpack`. |
-| `--export_delaunay_tessellation <bool>` | `false` | Write `*_delaunay_tessellation.msgpack`. |
-| `--export_structure_identification <bool>` | `false` | Write `*_atoms.msgpack`. |
-| `--export_coherent_crystalline_regions <bool>` | `false` | Write `*_coherent_crystalline_regions.msgpack`. |
-| `--export_dislocations <bool>` | `true` | Write `*_dislocations.msgpack`. |
-| `--export_circuit_information <bool>` | `true` | Include circuit information in the dislocations msgpack. |
-| `--export_dislocation_network_stats <bool>` | `true` | Include network statistics in the dislocations msgpack. |
-| `--export_junctions <bool>` | `true` | Include junction information in the dislocations msgpack. |
+| `--export_defect_mesh <bool>` | `true` | Write `*_defect_mesh.parquet`. |
+| `--export_interface_mesh <bool>` | `false` | Write `*_interface_mesh.parquet`. |
+| `--export_delaunay_tessellation <bool>` | `false` | Write `*_delaunay_tessellation.parquet`. |
+| `--export_structure_identification <bool>` | `false` | Write `*_atoms.parquet`. |
+| `--export_coherent_crystalline_regions <bool>` | `false` | Write `*_coherent_crystalline_regions.parquet`. |
+| `--export_dislocations <bool>` | `true` | Write `*_dislocations.parquet`. |
+| `--export_circuit_information <bool>` | `true` | Include circuit information in the dislocations parquet. |
+| `--export_dislocation_network_stats <bool>` | `true` | Include network statistics in the dislocations parquet. |
+| `--export_junctions <bool>` | `true` | Include junction information in the dislocations parquet. |
 
 <Callout type="info">
 The VOLT analysis entrypoint always passes `--export_interface_mesh true`,
@@ -71,7 +71,7 @@ in addition to the defaults above.
 type Vec3 = [float, float, float];
 ```
 
-### `{outputBase}_dislocations.msgpack`
+### `{outputBase}_dislocations.parquet`
 
 The dislocation network is written in the streaming export path: per-segment data lives
 under `export.DislocationExporter.segments`, Burgers-vector chart series live under
@@ -117,7 +117,7 @@ interface DislocationsOutput {
 }
 ```
 
-### `{outputBase}_defect_mesh.msgpack`
+### `{outputBase}_defect_mesh.parquet`
 
 ```ts
 interface MeshPoint {
@@ -152,11 +152,11 @@ interface MeshOutput {
 }
 ```
 
-### `{outputBase}_interface_mesh.msgpack`
+### `{outputBase}_interface_mesh.parquet`
 
 Same schema as `MeshOutput`.
 
-### `{outputBase}_delaunay_tessellation.msgpack`
+### `{outputBase}_delaunay_tessellation.parquet`
 
 The boundary/internal facets of the Delaunay tessellation. Written only when
 `--export_delaunay_tessellation` is enabled.
@@ -183,7 +183,7 @@ interface DelaunayTessellationOutput {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Per-atom structure-identification results, grouped by structure type name. Written only
 when `--export_structure_identification` is enabled.
@@ -233,7 +233,7 @@ interface AtomsOutput {
 }
 ```
 
-### `{outputBase}_coherent_crystalline_regions.msgpack`
+### `{outputBase}_coherent_crystalline_regions.parquet`
 
 Atoms grouped into coherent crystalline regions (clusters). Written only when
 `--export_coherent_crystalline_regions` is enabled.

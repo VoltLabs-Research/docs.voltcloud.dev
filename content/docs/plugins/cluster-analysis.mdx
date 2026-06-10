@@ -15,7 +15,7 @@ description: Find connected particle clusters using a distance cutoff.
 
 ## Output
 
-### `{outputBase}_cluster_analysis.msgpack`
+### `{outputBase}_cluster_analysis.parquet`
 
 ```ts
 type Vec3 = [float, float, float];
@@ -42,7 +42,7 @@ interface ClusterAnalysisOutput {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Per-atom data in the canonical AtomisticExporter format consumed by the VOLT viewer. Atoms are grouped into named buckets (`Cluster_<n>` for clustered atoms, `Unclustered` for atoms with no cluster assignment).
 

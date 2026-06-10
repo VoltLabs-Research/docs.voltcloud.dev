@@ -12,7 +12,7 @@ description: Count neighbors within a cutoff and compute a radial distribution f
 
 ## Output
 
-### `{outputBase}_coordination.msgpack`
+### `{outputBase}_coordination.parquet`
 
 ```ts
 interface CoordinationOutput {
@@ -30,7 +30,7 @@ interface CoordinationOutput {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Per-atom data written by the AtomisticExporter. Atoms are bucketed by coordination number under group names `Coordination_<n>`. Each atom entry includes the standard atomistic fields plus:
 
@@ -44,7 +44,7 @@ interface CoordinationAtomFields {
 
 This file is surfaced in VOLT as the **Coordination Model** exposure and exported as a `.glb` scene.
 
-### `{outputBase}_rdf_chart.msgpack`
+### `{outputBase}_rdf_chart.parquet`
 
 Chart payload for the RDF line chart exposure.
 

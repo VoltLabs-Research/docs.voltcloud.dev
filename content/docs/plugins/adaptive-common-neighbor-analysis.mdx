@@ -17,7 +17,7 @@ DXA-compatible tools (OpenDXA, LineReconstructionDXA, ElasticStrain) consume.
 
 ## Output
 
-### `{outputBase}_cna_analysis.msgpack`
+### `{outputBase}_cna_analysis.parquet`
 
 Compact analysis summary. The cluster-graph tables are written to disk as
 separate `.table` files; this result records their paths rather than embedding
@@ -38,7 +38,7 @@ interface CnaAnalysisOutput {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Per-atom structure identification written by the shared `AtomisticExporter`
 serializer. Atoms are grouped by structure name for 3D rendering, and a flat
@@ -94,7 +94,7 @@ interface AtomsOutput {
 }
 ```
 
-The entrypoint also emits three plain-text artifacts alongside the msgpack
+The entrypoint also emits three plain-text artifacts alongside the parquet
 files: `{outputBase}_annotated.dump` (structure-annotated LAMMPS dump),
 `{outputBase}_clusters.table`, and `{outputBase}_cluster_transitions.table` —
 the cluster graph required by OpenDXA and related tools.

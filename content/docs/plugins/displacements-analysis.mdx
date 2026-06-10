@@ -28,7 +28,7 @@ activate affine mapping in the binary.
 
 The plugin produces two result files and one renderable export.
 
-### `{outputBase}_displacements.msgpack`
+### `{outputBase}_displacements.parquet`
 
 Surfaced in the UI as the **Displacements** result. Contains only the summary statistics.
 
@@ -42,7 +42,7 @@ interface DisplacementsSummary {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Surfaced in the UI as the **Displacements Model** result, in the canonical
 `AtomisticExporter` format consumed by the VOLT viewer. The per-atom displacement
@@ -84,7 +84,7 @@ interface AtomsOutput {
 
 ### GLB export
 
-The `{outputBase}_atoms.msgpack` model is also exported as a GLB via the
+The `{outputBase}_atoms.parquet` model is also exported as a GLB via the
 `AtomisticExporter`, providing a renderable atomistic model of the displaced configuration.
 
 ## See Also

@@ -19,7 +19,7 @@ The binary also accepts `--tessellationGhostLayerScale` (default `3.5`) and `--t
 
 ## Output
 
-### `{outputBase}_dislocations.msgpack`
+### `{outputBase}_dislocations.parquet`
 
 The primary result surfaced in the UI ("Dislocation Lines"), exported to GLB via `DislocationExporter`.
 
@@ -61,7 +61,7 @@ interface DislocationsOutput {
 }
 ```
 
-### `{outputBase}_dislocation_segments.msgpack`
+### `{outputBase}_dislocation_segments.parquet`
 
 Individual line segments (PBC-clipped chunks) carrying the same Burgers data plus their stage of reconstruction.
 
@@ -94,7 +94,7 @@ interface DislocationSegmentsOutput {
 }
 ```
 
-### `{outputBase}_unassigned_edges.msgpack`
+### `{outputBase}_unassigned_edges.parquet`
 
 Tessellation edges that could not be assigned to a dislocation line.
 
@@ -117,7 +117,7 @@ interface UnassignedEdgesOutput {
 }
 ```
 
-### `{outputBase}_interface_mesh.msgpack`
+### `{outputBase}_interface_mesh.parquet`
 
 The interface mesh separating good and bad crystal regions, as unwrapped vertices and facets.
 
@@ -144,7 +144,7 @@ interface InterfaceMeshOutput {
 }
 ```
 
-### `{outputBase}_simulation_cell.msgpack`
+### `{outputBase}_simulation_cell.parquet`
 
 Geometry of the simulation cell for the analyzed frame.
 

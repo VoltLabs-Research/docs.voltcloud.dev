@@ -4,7 +4,7 @@ description: Build custom analysis plugins for VOLT using CoreToolkit.
 ---
 
 <Callout type="info">
-**TL;DR** — A plugin is a C++23 service that links against CoreToolkit. You write a small service class, register it with the `VOLT_SERVICE_PLUGIN` macro, and the macro turns it into a CLI binary invoked as `myplugin <lammps_file> [output_base] [options]`. Results are written as one or more `*.msgpack` files. You ship a `plugin.json` (a workflow DAG describing the UI, frame iteration, entrypoint, and outputs) and a Python wrapper that VOLT actually invokes. Build with Conan + CMake; CI bundles the binary and publishes it.
+**TL;DR** — A plugin is a C++23 service that links against CoreToolkit. You write a small service class, register it with the `VOLT_SERVICE_PLUGIN` macro, and the macro turns it into a CLI binary invoked as `myplugin <lammps_file> [output_base] [options]`. Results are written as one or more `*.parquet` files. You ship a `plugin.json` (a workflow DAG describing the UI, frame iteration, entrypoint, and outputs) and a Python wrapper that VOLT actually invokes. Build with Conan + CMake; CI bundles the binary and publishes it.
 </Callout>
 
 ## Overview
@@ -13,7 +13,7 @@ VOLT plugins are C++23 analysis algorithms built on top of **CoreToolkit** (`cor
 
 1. Reads one or more LAMMPS dump frames.
 2. Runs an analysis algorithm.
-3. Writes results as MessagePack (`*.msgpack`) files derived from an output base path.
+3. Writes results as Apache Parquet (`*.parquet`) files derived from an output base path.
 
 VOLT and the ClusterDaemon do not call the compiled binary directly. They invoke a **Python wrapper** (`scripts/<name>_plugin_wrapper.py`) declared in `plugin.json`, which locates the binary, filters VOLT runtime flags, runs it, and validates the expected outputs. The example throughout this page is `coordination-analysis`, which computes per-atom coordination numbers and a radial distribution function (RDF).
 
@@ -197,7 +197,7 @@ json MyPluginService::compute(const LammpsParser::Frame& frame, const std::strin
     }
 
     // Build a JSON result. Use AnalysisResult / JsonUtils / the output
-    // serializer helpers to write the *.msgpack files under outputBase.
+    // serializer helpers to write the *.parquet files under outputBase.
     json result;
     result["main_listing"] = {{"cutoff", _cutoff}, {"total_atoms", frame.natoms}};
     return result;
@@ -257,7 +257,7 @@ The resulting binary is named after the project (e.g. `build/build/Release/myplu
 
 ## Step 5: plugin.json (the workflow DAG)
 
-Every plugin ships a `plugin.json` describing a `{ workflow: { nodes, edges } }` graph. This is not just metadata — it defines the UI form, how the trajectory is iterated, how the binary is invoked, and which `*.msgpack` files are surfaced to the viewer. Edges wire each node's `output` handle to the next node's `input` handle.
+Every plugin ships a `plugin.json` describing a `{ workflow: { nodes, edges } }` graph. This is not just metadata — it defines the UI form, how the trajectory is iterated, how the binary is invoked, and which `*.parquet` files are surfaced to the viewer. Edges wire each node's `output` handle to the next node's `input` handle.
 
 ### Node types
 
@@ -268,7 +268,7 @@ Every plugin ships a `plugin.json` describing a `{ workflow: { nodes, edges } }`
 | `context` | A data source, e.g. `{ "source": "trajectory_dumps" }`. |
 | `forEach` | Iterates frames via a mustache `iterableSource`, e.g. `{{ trajectory-context.trajectory_dumps }}`. |
 | `entrypoint` | Executes the algorithm (see below). |
-| `exposure` | A result surfaced in the UI; `results` names a produced `*.msgpack` file. |
+| `exposure` | A result surfaced in the UI; `results` names a produced `*.parquet` file. |
 | `export` | A post-process export, e.g. `{ "exporter": "AtomisticExporter", "type": "glb" }` or `ChartExporter`. |
 
 ### The entrypoint node
@@ -296,10 +296,10 @@ Here `currentValue.path` is the current frame's dump path (the positional `<lamm
 
 ### Exposures and exports
 
-Each `exposure` node references one of the `*.msgpack` files the binary writes. For `coordination-analysis`, three exposures surface `coordination.msgpack` (the named summary), `atoms.msgpack` (the per-atom data, written in the AtomisticExporter shape and exported to GLB), and `rdf_chart.msgpack` (the RDF chart, exported via `ChartExporter`).
+Each `exposure` node references one of the `*.parquet` files the binary writes. For `coordination-analysis`, three exposures surface `coordination.parquet` (the named summary), `atoms.parquet` (the per-atom data, written in the AtomisticExporter shape and exported to GLB), and `rdf_chart.parquet` (the RDF chart, exported via `ChartExporter`).
 
 <Callout type="info">
-Per-atom data is written to a **separate** `{outputBase}_atoms.msgpack` file (the AtomisticExporter shape), not embedded inside the named summary result.
+Per-atom data is written to a **separate** `{outputBase}_atoms.parquet` file (the AtomisticExporter shape), not embedded inside the named summary result.
 </Callout>
 
 ## Step 6: The Python wrapper
@@ -309,7 +309,7 @@ VOLT and the ClusterDaemon invoke `scripts/<name>_plugin_wrapper.py`, not the bi
 - Resolves/locates the compiled binary (bundle `bin/`, local build dirs, `$PATH`, or an env override).
 - Filters VOLT runtime flags that the binary doesn't understand (e.g. `--selectedTimesteps`).
 - Runs the binary with the positional `<input_dump> <output_base>` arguments plus the parameter flags.
-- Validates that the required `*.msgpack` outputs were produced.
+- Validates that the required `*.parquet` outputs were produced.
 
 STDOUT is reserved for the binary IPC protocol; the wrapper writes its logs to STDERR. A minimal wrapper exposes a `process(frame, config)` entry point (called by the daemon, with `config["args"]` holding the argument list) and a CLI fallback (`python myplugin_plugin_wrapper.py <input_dump> <output_base> [flags]`).
 
@@ -410,4 +410,4 @@ myplugin <lammps_file> [output_base] [options]
 
 ### Output
 
-The plugin writes one or more MessagePack files derived from `output_base`, each declared by an `exposure` node in `plugin.json`. Typically this includes a named summary result and a separate `{outputBase}_atoms.msgpack` holding the per-atom data (AtomisticExporter shape). VOLT reads these files, stores them in MinIO, and makes them available for visualization in the 3D viewer (and for chart/GLB export where the `plugin.json` declares it).
+The plugin writes one or more Apache Parquet files derived from `output_base`, each declared by an `exposure` node in `plugin.json`. Typically this includes a named summary result and a separate `{outputBase}_atoms.parquet` holding the per-atom data (AtomisticExporter shape). VOLT reads these files, stores them in MinIO, and makes them available for visualization in the 3D viewer (and for chart/GLB export where the `plugin.json` declares it).

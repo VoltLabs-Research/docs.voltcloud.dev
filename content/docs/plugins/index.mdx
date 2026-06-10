@@ -30,10 +30,10 @@ Plugin workflow:
 ![Atomistic exporter example workflow](/assets/plugins/atomistic-exporter-example-workflow.png)
 
 
-The script runs in four phases: it reads the current dump and finds the `ITEM: ATOMS` section, validates that the required columns exist, assigns each atom to an example cluster, and builds a single MessagePack payload containing listings, `per-atom-properties`, and the grouped `AtomisticExporter` data.
+The script runs in four phases: it reads the current dump and finds the `ITEM: ATOMS` section, validates that the required columns exist, assigns each atom to an example cluster, and builds a single Apache Parquet payload containing listings, `per-atom-properties`, and the grouped `AtomisticExporter` data.
 
 ```python
-import msgpack
+import parquet
 import sys
 
 # From "arguments" in Entrypoint node configuration.
@@ -118,11 +118,11 @@ payload = {
     }
 }
 
-# The Exposure node expects: {output_base}_example.msgpack
-with open(f'{output_base}_example.msgpack', 'wb') as f:
-    f.write(msgpack.packb(payload, use_bin_type=True))
+# The Exposure node expects: {output_base}_example.parquet
+with open(f'{output_base}_example.parquet', 'wb') as f:
+    f.write(parquet.packb(payload, use_bin_type=True))
 
-print(f'Wrote {output_base}_example.msgpack with {len(export_groups)} atom groups')
+print(f'Wrote {output_base}_example.parquet with {len(export_groups)} atom groups')
 ```
 
 ![Atomistic exporter canvas example](/assets/plugins/atomistic-exporter-canvas-example.png)
@@ -253,7 +253,7 @@ Main fields:
 | **Type** | `python-script` | Chooses the runtime mode |
 | **Binary / Package** | `listing-example.zip` | Uploaded file to execute |
 | **Entry Script** | `main.py` | Script or executable inside the uploaded package |
-| **Requirements File** | `msgpack` | Python dependencies to install |
+| **Requirements File** | `parquet` | Python dependencies to install |
 | **Arguments** | `{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}` | Runtime argument template |
 | **Timeout** | `-1` | Optional execution timeout |
 
@@ -278,7 +278,7 @@ Typical configuration:
 | Field | Example value | What it does |
 |---|---|---|
 | **Exposure Name** | `Structure Identification` | Result name shown in VOLT |
-| **Results File Suffix** | `atoms.msgpack` | File suffix your program must write |
+| **Results File Suffix** | `atoms.parquet` | File suffix your program must write |
 | **Icon** | `TbEye` | Optional result icon |
 
 The first image shows one `Entrypoint` connected to several `Exposure` nodes — a single execution can produce multiple result files, each with its own exposure.
@@ -381,18 +381,18 @@ The **Exposure** node defines a file contract. Given:
 | Field | Value |
 |---|---|
 | Exposure Name | `Structure Identification` |
-| Results File Suffix | `atoms.msgpack` |
+| Results File Suffix | `atoms.parquet` |
 
 and an output base of `abc`, the plugin must write the file:
 
-`abc_atoms.msgpack`
+`abc_atoms.parquet`
 
 VOLT will not ingest the result if the filename does not match, even when the payload is valid.
 
 For example, if your entrypoint receives the output base in `sys.argv[2]`, the code can write the exposure file like this:
 
 ```python
-import msgpack
+import parquet
 import sys
 
 output_base = sys.argv[2]
@@ -404,11 +404,11 @@ payload = {
     }
 }
 
-with open(f"{output_base}_atoms.msgpack", "wb") as f:
-    f.write(msgpack.packb(payload, use_bin_type=True))
+with open(f"{output_base}_atoms.parquet", "wb") as f:
+    f.write(parquet.packb(payload, use_bin_type=True))
 ```
 
-If `output_base` is `abc`, this writes `abc_atoms.msgpack`, which matches the `Exposure` node contract.
+If `output_base` is `abc`, this writes `abc_atoms.parquet`, which matches the `Exposure` node contract.
 
 ## What the Exposure node is for
 
@@ -417,7 +417,7 @@ The two essential fields are:
 | Exposure field | What it means |
 |---|---|
 | **Exposure Name** | The label shown in VOLT for that result. |
-| **Results File Suffix** | The exact suffix the plugin writes after the output base (e.g. `atoms.msgpack`, `defect_mesh.msgpack`, `dislocations.msgpack`). |
+| **Results File Suffix** | The exact suffix the plugin writes after the output base (e.g. `atoms.parquet`, `defect_mesh.parquet`, `dislocations.parquet`). |
 
 ## Entrypoint arguments
 
@@ -431,7 +431,7 @@ For example:
 
 ```python
 import sys
-import msgpack
+import parquet
 
 input_file = sys.argv[1]
 output_base = sys.argv[2]
@@ -442,15 +442,15 @@ payload = {
     }
 }
 
-with open(f"{output_base}_results.msgpack", "wb") as f:
-    f.write(msgpack.packb(payload, use_bin_type=True))
+with open(f"{output_base}_results.parquet", "wb") as f:
+    f.write(parquet.packb(payload, use_bin_type=True))
 ```
 
-When the exposure suffix is `results.msgpack`, this file is ingested correctly.
+When the exposure suffix is `results.parquet`, this file is ingested correctly.
 
 ## What can go inside one exposure file
 
-An exposure file is a MessagePack object containing one or more of these keys:
+An exposure file is a Apache Parquet object containing one or more of these keys:
 
 ```json
 {
@@ -558,7 +558,7 @@ In the **Export** node:
 - choose export type **glb**,
 - connect that export node to the exposure that will contain the atom payload.
 
-Then write the export payload inside the same MessagePack file under `export`.
+Then write the export payload inside the same Apache Parquet file under `export`.
 
 ### Single-object export format
 
@@ -733,14 +733,14 @@ The next image shows the execution log for this example. This is the expected re
 - Download: [listing-example.zip](/assets/plugins/examples/listing-example.zip)
 - This example shows how an **Exposure** node can return `main_listing` and `sub_listings`.
 - Its purpose is to teach the result shape VOLT reads to render summary values and result tables.
-- If the Exposure node uses `example.msgpack` as its results suffix, this script writes the correct file: `{outputBase}_example.msgpack`.
+- If the Exposure node uses `example.parquet` as its results suffix, this script writes the correct file: `{outputBase}_example.parquet`.
 - Once the run finishes, the output is visible through the exposure result in VOLT rather than only in the execution log.
 
 **Flow in the builder**
 
 `Modifier -> Arguments -> Context -> ForEach -> Entrypoint -> Exposure`
 
-Here the important node is **Exposure**, because it tells VOLT to ingest the MessagePack file written by the program and render the listing output in the UI.
+Here the important node is **Exposure**, because it tells VOLT to ingest the Apache Parquet file written by the program and render the listing output in the UI.
 
 The first image shows the full workflow. The important part is the last node: **Exposure**. That is the node that reads the file exported by the code.
 
@@ -750,10 +750,10 @@ The next image shows the **Exposure** node configuration used by this example. T
 
 ![Listing Example exposure configuration](/assets/plugins/listing-example-exposure-config.png)
 
-The Python code below writes the MessagePack file consumed by that **Exposure** node.
+The Python code below writes the Apache Parquet file consumed by that **Exposure** node.
 
 ```python
-import msgpack
+import parquet
 import sys
 
 # Each key in main_listing and sub_listings becomes a column name in VOLT.
@@ -792,10 +792,10 @@ payload = {
 }
 
 output_base = sys.argv[2]
-with open(f'{output_base}_example.msgpack', 'wb') as f:
-    f.write(msgpack.packb(payload, use_bin_type=True))
+with open(f'{output_base}_example.parquet', 'wb') as f:
+    f.write(parquet.packb(payload, use_bin_type=True))
 
-print(f'Wrote {output_base}_example.msgpack')
+print(f'Wrote {output_base}_example.parquet')
 ```
 
 ## Running plugins in the canvas
@@ -870,7 +870,7 @@ This flow looks similar to the listing example, but the exposure payload is diff
 
 ```python
 import math
-import msgpack
+import parquet
 import sys
 
 with open(sys.argv[1]) as f:
@@ -913,8 +913,8 @@ payload = {
 }
 
 output_base = sys.argv[2]
-with open(f'{output_base}_example.msgpack', 'wb') as f:
-    f.write(msgpack.packb(payload, use_bin_type=True))
+with open(f'{output_base}_example.parquet', 'wb') as f:
+    f.write(parquet.packb(payload, use_bin_type=True))
 
-print(f'Wrote {output_base}_example.msgpack')
+print(f'Wrote {output_base}_example.parquet')
 ```

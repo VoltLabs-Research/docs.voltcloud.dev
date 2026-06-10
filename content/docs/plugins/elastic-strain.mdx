@@ -21,7 +21,7 @@ description: Compute crystal-referenced elastic strain by mapping local environm
 
 ## Output
 
-### `{outputBase}_elastic_strain.msgpack`
+### `{outputBase}_elastic_strain.parquet`
 
 ```ts
 type StrainTensor = [float, float, float, float, float, float];
@@ -42,7 +42,7 @@ interface ElasticStrainOutput {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Per-atom atomistic export consumed by the **Elastic Strain Model** exposure and exported as a GLB via `AtomisticExporter`. The envelope contains:
 

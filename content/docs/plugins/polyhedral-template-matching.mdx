@@ -15,9 +15,9 @@ Polyhedral Template Matching (PTM) identifies the local crystalline structure ar
 
 ## Output
 
-### `{outputBase}_ptm_analysis.msgpack`
+### `{outputBase}_ptm_analysis.parquet`
 
-Summary record for the frame. `sub_listings` is emitted as an empty object and `per-atom-properties` as an empty array; the per-atom data lives in `{outputBase}_atoms.msgpack`. The `input_dump`, `clusters_table` and `cluster_transitions_table` fields are filesystem paths to the artifacts written alongside this record.
+Summary record for the frame. `sub_listings` is emitted as an empty object and `per-atom-properties` as an empty array; the per-atom data lives in `{outputBase}_atoms.parquet`. The `input_dump`, `clusters_table` and `cluster_transitions_table` fields are filesystem paths to the artifacts written alongside this record.
 
 ```ts
 interface PtmAnalysisOutput {
@@ -34,7 +34,7 @@ interface PtmAnalysisOutput {
 }
 ```
 
-### `{outputBase}_atoms.msgpack`
+### `{outputBase}_atoms.parquet`
 
 Per-atom structure identification in the canonical `AtomisticExporter` shape, with PTM-specific fields attached to each atom. Atoms are grouped by structure name under `export.AtomisticExporter`, and the `export.ChartExporter.structure_counts` block backs the structure-counts bar chart.
 
@@ -100,7 +100,7 @@ interface AtomsOutput {
 }
 ```
 
-In addition to the msgpack files, the entrypoint emits plain-text artifacts: `{outputBase}_annotated.dump` (per-atom structure-annotated LAMMPS dump) and the cluster graph tables `{outputBase}_clusters.table` and `{outputBase}_cluster_transitions.table`, which are required inputs for OpenDXA and other DXA-compatible plugins.
+In addition to the parquet files, the entrypoint emits plain-text artifacts: `{outputBase}_annotated.dump` (per-atom structure-annotated LAMMPS dump) and the cluster graph tables `{outputBase}_clusters.table` and `{outputBase}_cluster_transitions.table`, which are required inputs for OpenDXA and other DXA-compatible plugins.
 
 ## See Also
 
