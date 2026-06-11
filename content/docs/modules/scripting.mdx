@@ -20,7 +20,7 @@ Opening a notebook coordinates a Jupyter runtime on the cluster. The backend res
 
 ## What comes preinstalled
 
-The notebook image is built on the Jupyter `scipy-notebook` base (which provides `numpy`, `scipy`, `matplotlib`, and `pandas`) and adds `jupyterlab`, `voltsdk` (2.0.0), `ovito`, `ase`, `pymatgen`, `MDAnalysis`, `matminer`, `vtk`, `minio`, and `parquet`.
+The notebook image is built on the Jupyter `scipy-notebook` base (which provides `numpy`, `scipy`, `matplotlib`, and `pandas`) and adds `jupyterlab`, `voltsdk` (3.1.1), `ovito`, `ase`, `pymatgen`, `MDAnalysis`, `matminer`, `vtk`, `minio`, and `pyarrow`. When a notebook session starts, the cluster injects `VOLT_SECRET_KEY`, `VOLT_BASE_URL`, and `VOLT_TRAJECTORY_ID` into the container, so `VoltClient.from_env()` is authenticated and the linked trajectory is preloaded with no setup.
 
 ## Trajectory-linked workspaces
 

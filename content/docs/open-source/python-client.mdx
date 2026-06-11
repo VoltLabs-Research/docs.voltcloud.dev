@@ -5,7 +5,7 @@ description: Python SDK for the Volt platform — run native plugins locally, br
 
 ## Overview
 
-`voltsdk` is the official Python SDK for the Volt scientific computing platform. It does more than wrap the REST API: it can download, cache, and run native C++ analysis plugins locally (`PluginHub`), browse Volt resources (trajectories, analyses, frames, exposures), assemble and render GLB 3D models (`SpatialAssembler`, `open_in_volt`, `view_glb`), and convert Apache Parquet analysis output to pandas DataFrames.
+`voltsdk` is the official Python SDK for the Volt scientific computing platform. It does more than wrap the REST API: it can download, cache, and run native C++ analysis plugins locally (`PluginHub`), browse Volt resources (trajectories, analyses, frames, listings), assemble and render GLB 3D models (`SpatialAssembler`, `open_in_volt`), and load analysis output into pandas DataFrames.
 
 | | |
 |---|---|
@@ -59,7 +59,7 @@ from voltsdk import VoltClient
 
 client = VoltClient(
     secret_key="vsk_abc123...",
-    base_url="https://server.voltcloud.dev/api",
+    base_url="https://server.voltcloud.dev",
 )
 ```
 
@@ -70,7 +70,7 @@ client = VoltClient.from_env()
 ```
 
 <Callout type="info">
-`base_url` is the server REST root and must end in `/api`. The constructor accepts only `secret_key` and `base_url` — there is no `timeout` parameter.
+`base_url` is the server origin. The `/api` suffix is optional — both `https://server.voltcloud.dev` and `https://server.voltcloud.dev/api` work, since the client appends `/api` when it is missing. The constructor accepts only `secret_key` and `base_url` — there is no `timeout` parameter.
 </Callout>
 
 ## Resources
@@ -146,22 +146,20 @@ path = analysis.download_artifacts(dest="out/")
 zip_path = analysis.download_artifacts(dest="out/", unzip=False)
 ```
 
-### Exposures
+### Analysis results
 
-An `Exposure` is one result slot produced by a plugin (e.g. *Dislocations*, *Common Neighbor Analysis*). Access them via `analysis.exposures`.
+`analysis.df()` returns the analysis listing rows (one row per timestep) as a DataFrame — the quickest way to a table. `analysis.listings` exposes the same data with extra controls (`columns=`, `to_csv(...)`).
 
 ```python
-for exposure in analysis.exposures:
-    print(exposure.name, exposure.exposure_type)
+analysis = traj.analyses.first()
 
-    # Listing rows for this exposure
-    rows = exposure.listings.to_dataframe()
+df = analysis.df()                       # results table
+df = analysis.listings.to_dataframe(columns=["timestep", "energy"])
+analysis.listings.to_csv("out.csv")
 
-    # A sub-listing table at a given timestep
-    segments = exposure.sub_listings("dislocation_segments", timestep=5000)
-
-    # GLB 3D model for this exposure at a timestep
-    exposure.download_glb(timestep=5000, dest="out/")
+# 3D model for a frame, and the raw artifact bundle:
+frame.download_glb(analysis_id=analysis.id, dest="out/")
+analysis.download_artifacts(dest="out/")
 ```
 
 ## Plugin Hub
