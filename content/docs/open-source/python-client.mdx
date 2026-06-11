@@ -238,21 +238,22 @@ By default the viewer opens against `https://app.voltcloud.dev`; override it wit
 
 ### `SpatialAssembler`
 
-Build GLBs locally from Volt exporter payloads (`AtomisticExporter`, `MeshExporter`, `DislocationExporter`). It accepts the full artifact file (`.json` or `.parquet`) or the raw nested payload.
+Build GLBs locally from Volt exporter payloads (`AtomisticExporter`, `MeshExporter`, `LineExporter`). It accepts the full artifact file (`.json` or a line-entity-table `.parquet`) or the raw nested payload.
 
 ```python
 from voltsdk import SpatialAssembler, open_in_volt
 
 assembler = SpatialAssembler()
-glb_path = assembler.dislocations_glb(
-    "out/ptm-dxa_dislocations.json",
+glb_path = assembler.lines_glb(
+    "out/ptm-dxa_dislocations.parquet",
     output_path="out/ptm-dxa_dislocations.glb",
+    color_by="burgers_family",
 )
 
 open_in_volt(glb_path)
 ```
 
-`assembler.glb(source, output_path=..., exporter=...)` dispatches to the right exporter automatically; `atomistic_glb`, `mesh_glb`, and `dislocations_glb` are the per-exporter entry points.
+`assembler.glb(source, output_path=..., exporter=...)` dispatches to the right exporter automatically; `atomistic_glb`, `mesh_glb`, and `lines_glb` are the per-exporter entry points.
 
 ### `view_glb(file_path)`
 

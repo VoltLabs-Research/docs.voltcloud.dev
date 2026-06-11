@@ -21,78 +21,32 @@ The binary also accepts `--tessellationGhostLayerScale` (default `3.5`) and `--t
 
 ### `{outputBase}_dislocations.parquet`
 
-The primary result surfaced in the UI ("Dislocation Lines"), exported to GLB via `DislocationExporter`.
+The primary result surfaced in the UI ("Dislocation Lines"), exported to GLB via the generic
+`LineExporter`. A standard VOLT **line entity table** (one row per reconstructed,
+PBC-clipped line): fixed columns `id` and `points`, every other column is a per-line
+property that VOLT discovers, queries and styles generically.
 
-```ts
-type Vec3 = [float, float, float];
-
-interface Burgers {
-    vector: Vec3;
-    vector_local: Vec3;
-    vector_global: Vec3;
-    magnitude: float;
-}
-
-interface DislocationLine {
-    line_id: int;
-    points: Vec3[];
-    num_points: int;
-    length: float;
-    burgers_vector: Vec3;
-    burgers_vector_local: Vec3;
-    burgers_vector_global: Vec3;
-    burgers: Burgers;
-    magnitude: float;
-    cluster_id: int;
-    structure_type: int;
-    is_closed: bool;
-    dislocation_type_id: int;
-}
-
-interface DislocationsOutput {
-    main_listing: {
-        dislocations: int;
-        total_points: int;
-        total_length: float;
-    };
-    sub_listings: {
-        dislocations: DislocationLine[];
-    };
-}
-```
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | uint64 | Line entity id. |
+| `points` | list&lt;list&lt;double&gt;&gt; | Polyline vertices, each `[x, y, z]`. |
+| `length` | double | Line length. |
+| `num_points` | int64 | Vertex count. |
+| `magnitude` | double | Length of the local Burgers vector. |
+| `burgers_vector_local` | list&lt;double&gt; | Burgers vector in the cluster lattice frame. |
+| `burgers_vector_global` | list&lt;double&gt; | Burgers vector in the spatial frame. |
+| `crystal_structure` | string | Structure name of the owning cluster. |
+| `burgers_family` | string | Burgers family (classified via opendxa). |
+| `burgers_family_label` | string | Display label. |
+| `cluster_id` | int64 | Owning cluster id. |
+| `is_closed` | int64 | 1 when the reconstructed line is a closed loop. |
+| `dislocation_type_id` | int64 | Internal reconstruction type id. |
 
 ### `{outputBase}_dislocation_segments.parquet`
 
-Individual line segments (PBC-clipped chunks) carrying the same Burgers data plus their stage of reconstruction.
-
-```ts
-interface DislocationSegment {
-    segment_id: int;
-    points: Vec3[];
-    num_points: int;
-    length: float;
-    position1: Vec3;
-    position2: Vec3;
-    burgers_vector: Vec3;
-    burgers_vector_local: Vec3;
-    burgers_vector_global: Vec3;
-    burgers: Burgers;
-    magnitude: float;
-    cluster_id: int;
-    structure_type: int;
-    stage: int;
-}
-
-interface DislocationSegmentsOutput {
-    main_listing: {
-        dislocation_segments: int;
-        dislocations: int;
-    };
-    sub_listings: {
-        dislocation_segments: DislocationSegment[];
-    };
-}
-```
+Individual raw segments (PBC-clipped chunks) in the same line entity table format, with a
+`stage` property marking the reconstruction stage instead of `is_closed` /
+`dislocation_type_id`. Not exposed in the UI by default.
 
 ### `{outputBase}_unassigned_edges.parquet`
 

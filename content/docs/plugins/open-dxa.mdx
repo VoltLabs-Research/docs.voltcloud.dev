@@ -73,27 +73,33 @@ type Vec3 = [float, float, float];
 
 ### `{outputBase}_dislocations.parquet`
 
-The dislocation network is written in the streaming export path: per-segment data lives
-under `export.DislocationExporter.segments`, Burgers-vector chart series live under
-`export.ChartExporter`, and `sub_listings` is written as `null`.
+A standard VOLT **line entity table** (one row per dislocation segment), consumed by the
+generic `LineExporter`. Fixed columns are `id` and `points`; every other column is a
+per-segment property that VOLT discovers, queries and styles generically.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | uint64 | Segment entity id. |
+| `points` | list&lt;list&lt;double&gt;&gt; | Polyline vertices, each `[x, y, z]`. |
+| `length` | double | Segment length. |
+| `num_points` | int64 | Vertex count. |
+| `magnitude` | double | Length of the local Burgers vector. |
+| `burgers_vector_local` | list&lt;double&gt; | Burgers vector in the cluster lattice frame. |
+| `burgers_vector_global` | list&lt;double&gt; | Burgers vector in the spatial frame. |
+| `crystal_structure` | string | Crystal structure of the owning cluster. |
+| `burgers_family` | string | Burgers family (e.g. `1/2<110>`). |
+| `burgers_family_label` | string | Display label (e.g. `1/2<110> (Perfect)`). |
+| `cluster_id` | int64 | Owning cluster id. |
+
+### `{outputBase}_dislocation_summary.parquet`
+
+Network-level aggregates (JSON payload): `main_listing` statistics, the
+`network_statistics` / `circuit_information` / `junction_information` sub-listings, and the
+Burgers-vector chart series under `export.ChartExporter`.
 
 ```ts
-interface DislocationSegment {
-    segment_id: int;
-    points: Vec3[];
-    length: float;
-    num_points: int;
-    burgers_vector: Vec3;        // local Burgers vector
-    burgers_vector_local: Vec3;
-    burgers_vector_global: Vec3;
-    magnitude: float;            // length of the local Burgers vector
-}
-
-interface DislocationsOutput {
+interface DislocationSummaryOutput {
     export: {
-        DislocationExporter: {
-            segments: DislocationSegment[];
-        };
         ChartExporter: {
             burgers_counts: {
                 burgers_vector: string[];
@@ -113,7 +119,11 @@ interface DislocationsOutput {
         min_segment_length: float;
         total_length: float;
     };
-    sub_listings: null;
+    sub_listings: {
+        network_statistics?: object[];
+        circuit_information?: object[];
+        junction_information?: object[];
+    };
 }
 ```
 
