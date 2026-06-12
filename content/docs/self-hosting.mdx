@@ -1,263 +1,101 @@
 ---
 title: Self-Hosting
-description: "Operating VOLT on your own infrastructure: app deployment, cluster setup, storage, and runbooks."
+description: "Run the full VOLT stack on your own machine with one command, or with the desktop app."
 ---
 
-A self-hosted VOLT deployment has two operational layers:
+VOLT self-hosts as two layers, by default on one machine:
 
-- the **main application deployment** that handles users, teams, APIs, auth, and the browser experience,
-- and the **cluster deployment** that handles storage, runtime execution, notebooks, trajectory preprocessing, plugin jobs, and remote operations.
+- **App layer** — the VOLT server (users, teams, auth, REST + Socket.io APIs) and the web client.
+- **Cluster layer** — a ClusterDaemon that runs the heavy compute: trajectory preprocessing, plugin jobs, notebooks, and container operations.
 
-Both layers must be operational for VOLT to function end-to-end.
+Both must run for an end-to-end workflow. An app with no healthy cluster has no execution target — uploads and analyses queue but never run.
 
-## What the app layer needs
+## Requirements
 
-At minimum, the main application expects:
-
-- a Linux host,
-- Node.js,
-- MongoDB,
-- Redis,
-- MinIO,
-- and a reverse proxy such as nginx in front of the server and client.
-
-Those services support the workspace layer: auth, metadata, object storage, queue state, notifications, and the HTTP or WebSocket surfaces the UI talks to.
-
-## What the cluster layer needs
-
-Each team cluster runs the daemon plus the local services it depends on and requires working Docker support for containers and notebooks. A healthy cluster deployment requires:
-
-- valid cloud connection settings,
-- a working daemon password and enrollment flow,
-- MinIO, MongoDB, and Redis connectivity,
-- and enough free memory and disk to handle trajectory processing and analysis workloads.
-
-## Minimum requirements
+The host needs `docker`, `node`, and `curl`, with the Docker daemon running (`sudo systemctl start docker` on Linux). The deployer checks this and stops early if Docker is unreachable.
 
 | Component | Minimum | Recommended |
 |---|---|---|
-| **OS** | Ubuntu 20.04+ / Debian 11+ | Ubuntu 22.04 LTS |
-| **Node.js** | 22.x | 22.x |
-| **RAM** | 4 GB | 8 GB+ |
-| **Disk** | 20 GB | Sized to your trajectory and artifact volume |
-| **Docker** | 20.x+ | Latest stable |
+| OS | Ubuntu 20.04+ / Debian 11+ / macOS | Ubuntu 22.04 LTS |
+| Node.js | 22.x | 22.x |
+| Docker | 20.x+ | Latest stable |
+| RAM | 4 GB | 8 GB+ |
+| Disk | 20 GB | Sized to your trajectory + artifact volume |
 
-## Supporting services
+## Deploy
 
-| Service | Purpose | Default Port |
-|---|---|---|
-| **MongoDB** | Structured metadata and result projections | 27017 |
-| **Redis** | Queues, cache, and runtime state | 6379 |
-| **MinIO** | Trajectory dumps, models, plugins, previews, and assets | 9000 |
-
-## Quick start for the app stack
-
-For a local or first-pass deployment, Docker Compose is the simplest way to bring up the supporting services.
-
-```yaml
-version: "3.8"
-services:
-  mongo:
-    image: mongo:7
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: volt
-      MONGO_INITDB_ROOT_PASSWORD: changeme
-    volumes:
-      - volt-mongo-data:/data/db
-
-  redis:
-    image: redis:7
-    ports:
-      - "6379:6379"
-    command: --requirepass changeme
-
-  minio:
-    image: minio/minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: voltadmin
-      MINIO_ROOT_PASSWORD: changeme
-    volumes:
-      - volt-minio-data:/data
-    command: server /data --console-address ":9001"
-
-volumes:
-  volt-mongo-data:
-  volt-minio-data:
-```
+One command. It downloads a prebuilt CLI and compose file into `~/.volt-deploy` (no git clone, no build toolchain), then prompts for host/domain, deploy mode, and your account, team, and cluster:
 
 ```bash
-docker compose up -d
+curl -fsSL https://raw.githubusercontent.com/voltlabs-research/volt/main/desktop/scripts/deploy.sh | bash
 ```
 
-## Building the main application
+It builds and starts the full stack — MongoDB, Redis, MinIO, the server, the web client, and (unless you pick server-only) a ClusterDaemon. The account you enter also registers a VOLT Cloud ID at [console.voltcloud.dev](https://console.voltcloud.dev) (best-effort; skipped if unreachable). When it finishes it prints the client and server URLs — open the client (default `http://<host>:5273`) and sign in.
+
+## Desktop app
+
+For a one-click setup, the desktop app launches and manages the same local stack — no terminal needed.
+
+[Download the latest release](https://github.com/VoltLabs-Research/VOLT/releases/latest)
+
+To connect another device to a stack you deployed elsewhere, install the desktop app there and enter your server URL (e.g. `http://<host>:8100`) when prompted.
+
+## Update
+
+Re-run the script with `--update` to pull the latest release and rebuild. Your data (Mongo/Redis/MinIO volumes) is kept, and a deployed daemon is updated too. It runs headless, so it is safe under cron/CI:
 
 ```bash
-git clone https://github.com/VoltLabs-Research/Volt.git
-cd Volt
-cp server/.env.example server/.env
+curl -fsSL https://raw.githubusercontent.com/voltlabs-research/volt/main/desktop/scripts/deploy.sh | bash -s -- --update
 ```
 
-Configure the server environment file with the MongoDB, Redis, MinIO, server URL, client URL, secret-key, and encryption settings. The client has no `.env.example`; it is configured at build time through Vite variables — set `VITE_SERVER_ENDPOINT` (the server origin the browser talks to) and, if you proxy the API through a different host, `VITE_PROXY_API_URL`.
+Re-running the plain command on a machine that already has VOLT offers **Update** (keep data) or **Reset** (wipe and start fresh). Append flags after `bash -s --`:
 
-Two values are operationally critical:
-
-- `SECRET_KEY` signs sensitive server-side tokens.
-- `SSH_ENCRYPTION_KEY` (a legacy key name for `VOLT_SECRET_ENCRYPTION_KEY`) protects credentials at rest, including the SSH access used to install and enroll the daemon on a remote cluster host.
-
-Then build:
-
-```bash
-cd server && npm install && npm run build
-cd ../client && npm install && npm run build
-```
-
-The server listens on port `8000` by default.
-
-## Reverse proxying
-
-You need a reverse proxy in front of the app for three reasons: serving the built client, routing API traffic, and preserving WebSocket support for the real-time layer.
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-
-    ssl_certificate     /etc/ssl/certs/your-domain.crt;
-    ssl_certificate_key /etc/ssl/private/your-domain.key;
-
-    location / {
-        root /path/to/Volt/client/dist;
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        client_max_body_size 0;
-    }
-
-    location /socket.io/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-## Cluster deployment
-
-Once the app is online, the next step is connecting a team cluster. The installer bootstraps Docker support, writes daemon configuration, and waits for the daemon to come online and begin heartbeating.
-
-A healthy app without a healthy cluster has no execution target: trajectory uploads, analysis runs, notebooks, and container operations all fail.
-
-## Verification
-
-Verify the system as a workflow rather than as isolated services:
-
-1. open the app and confirm sign-in works,
-2. connect a cluster and wait for a clean heartbeat,
-3. upload a small trajectory,
-4. make sure it reaches a completed state,
-5. run a lightweight analysis,
-6. open the result and verify the full round-trip.
-
-## Recommended runbooks
-
-### Cluster provisioning runbook
-
-When you connect a new cluster, verify the full bootstrap path instead of stopping at "the installer finished":
-
-1. confirm the install command completed without obvious errors,
-2. verify the local services are up,
-3. check that the daemon reached its startup log cleanly,
-4. confirm the team cluster moved from waiting to connected,
-5. confirm a fresh heartbeat is visible from the server side.
-
-If the cluster never leaves the waiting state, the issue is often not the installer itself but the daemon's ability to reach the control plane afterward.
-
-### Analysis end-to-end runbook
-
-After provisioning, run a small analysis on a small trajectory. This exercises upload, storage, queueing, daemon connectivity, plugin execution, result processing, and UI visibility in one check.
-
-### Notebook runbook
-
-For notebook validation, do not stop at "session created." A new Jupyter session can exist while still warming up. The real check is:
-
-1. create or open a notebook,
-2. wait for the runtime to become ready,
-3. load the proxied Jupyter UI successfully,
-4. and run a simple cell inside the live session.
-
-### Proxied container service runbook
-
-If your deployment runs containerized services or internal tools that you reach through VOLT's "Open :PORT" relay, validate at least one proxied service path from end to end. The relay opens short-lived sessions in the `TEAM_CLUSTER_APP_PROXY_PORT_START`–`TEAM_CLUSTER_APP_PROXY_PORT_END` range, so confirm that range is reachable and that the exposure registry, reverse channel, and relay behavior are all healthy. Cluster remote-access terminals and file explorers share the same reverse channel.
-
-## Common failure points
-
-- The app loads, but no cluster ever reaches connected.
-- The daemon starts, but cannot reach MongoDB, Redis, or MinIO.
-- Native runtime dependencies fail, which breaks parsing, GLB generation, or preview rasterization.
-- Jupyter startup fails because of port availability or Docker issues.
-- The reverse proxy is correct for HTTP but not for WebSockets.
-- A build exists for the app, but the daemon deployment was never completed.
-
-## Troubleshooting by symptom
-
-### Cluster stays in waiting-for-connection
-
-Bootstrap completed but the daemon never reached a healthy control-plane connection. Check daemon logs, VoltCloud URL settings, and network reachability between the machine and the server.
-
-### Cluster becomes disconnected after working earlier
-
-The local services may still run, but the daemon has stopped sending heartbeats or the reverse channel has dropped. Check daemon health and network path.
-
-### Jobs remain queued or delayed
-
-A healthy queue can stall if the daemon is under memory pressure. Workers intentionally delay or requeue work when the process is stressed.
-
-### Jupyter stays in starting
-
-Common causes: no free host ports, Docker problems, incorrect public-base-path settings, or a runtime container that has not reached readiness.
-
-### Proxied container services never appear
-
-Check the container state, the expected labels, and whether the daemon's exposure registry is publishing snapshots. This is typically a discovery issue.
-
-### Update succeeds but the cluster never comes back
-
-Managed update flows depend on the installation mode and on the daemon being able to replace itself. If the deployment was not created in the expected image-driven way, the control plane accepts the request while the runtime-side update path fails.
-
-### Delete gets stuck halfway
-
-Cluster deletion spans the control plane and the runtime host. If remote cleanup does not complete, the control-plane object may be removed while local resources remain, or vice versa.
-
-## Deployment hygiene
-
-- Keep secrets and `.env` files out of version control.
-- Maintain an operator checklist covering cluster connection, upload, analysis, and notebook validation.
-
-## Storage layout and buckets
-
-MinIO is not just a generic object store in this architecture. Different buckets carry different kinds of runtime artifacts.
-
-| Bucket | Content |
+| Flag | Effect |
 |---|---|
-| `volt-models` | Generated 3D models and GLB assets |
-| `volt-rasterizer` | PNG previews and raster outputs |
-| `volt-plugins` | Plugin payloads and many plugin result files |
-| `volt-dumps` | Stored trajectory dumps |
-| `volt-whiteboards` | Whiteboard state and assets |
-| `volt-avatars` | Public avatar images |
-| `volt-chat` | Chat attachments |
-| `volt-latex-assets` | LaTeX document assets |
+| `--update` | Update to the latest release, keeping data |
+| `--check` | Report whether an update is available; change nothing (exit `10` if so) |
+| `--with-cluster` | Run server + daemon (persists the mode) |
+| `--server-only` | Run the server only; stop the daemon (persists the mode) |
+| `--force` | Rebuild even if already on the latest release |
+| `--data-dir <path>` | Target a deployment outside `~/.volt-deploy` |
+
+Set `GITHUB_TOKEN` to raise the GitHub API rate limit for `--update`/`--check`.
+
+## What gets deployed
+
+| Service | Role | Host port |
+|---|---|---|
+| volt-client | Web UI (nginx; proxies `/api` + `/socket.io` to the server) | 5273 |
+| volt-server | REST `/api/*` + Socket.io | 8100 |
+| volt-minio | Object storage (S3) — API / console | 9100 / 9101 |
+| volt-mongodb | Metadata | internal |
+| volt-redis | Queues, cache, runtime state | internal |
+| cluster-daemon | Compute (cluster mode only) | 18080 |
+
+Ports are set via `WEB_PORT`, `SERVER_PORT`, `MINIO_PORT`, and `DAEMON_PORT`. MongoDB and Redis are not published to the host — they are reached over the internal Docker network. MinIO buckets are auto-provisioned; you never create them by hand.
+
+## Secrets
+
+The deployer generates two keys on first run and stores them in `~/.volt-deploy/app-config.json`:
+
+- **`SECRET_KEY`** — signs sensitive server-side tokens.
+- **`SSH_ENCRYPTION_KEY`** — encrypts credentials at rest, including the SSH access used to install and enroll the daemon on a remote cluster host.
+
+Keep `app-config.json` out of version control. Losing these keys invalidates issued tokens and stored credentials.
+
+<Callout type="warn">
+The stack serves plain HTTP with default credentials. Keep it on a trusted network, or front it with your own TLS reverse proxy. If you do, forward the WebSocket `Upgrade`/`Connection` headers and allow long read timeouts on `/socket.io` — real-time collaboration and the live cluster channel break on an HTTP-only proxy.
+</Callout>
+
+## Verify
+
+Check the round-trip, not just that containers are up:
+
+1. open the client URL and sign in,
+2. confirm the cluster reaches **connected** with a fresh heartbeat (cluster mode),
+3. upload a small trajectory and wait for it to complete,
+4. run a lightweight analysis and open the result.
+
+If the app is up but the cluster never leaves **waiting**, the daemon cannot reach the server — check the daemon logs, the VOLT Cloud URL, and network reachability.
+
+For architecture, cluster internals, and contributor setup, see the rest of the [VOLT documentation](https://docs.voltcloud.dev).
