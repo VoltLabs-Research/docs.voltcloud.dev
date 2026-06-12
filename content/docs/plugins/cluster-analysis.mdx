@@ -44,7 +44,7 @@ interface ClusterAnalysisOutput {
 
 ### `{outputBase}_atoms.parquet`
 
-Per-atom data in the canonical AtomisticExporter format consumed by the VOLT viewer. Atoms are grouped into named buckets (`Cluster_<n>` for clustered atoms, `Unclustered` for atoms with no cluster assignment).
+Per-atom data in the canonical AtomisticExporter format consumed by the VOLT viewer. Atoms are grouped into named buckets: `Cluster_<n>` for clustered atoms, `Unclustered` for unassigned atoms.
 
 ```ts
 type Vec3 = [float, float, float];

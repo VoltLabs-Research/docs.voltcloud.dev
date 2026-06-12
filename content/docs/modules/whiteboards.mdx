@@ -9,13 +9,17 @@ Whiteboards support freeform diagramming and note-taking within the team workspa
 
 ## Listing and organization
 
-The listing is a foldered document table: boards appear as title-based rows that you can open, rename, or delete. You can organize boards into folders, create and rename folders, move whiteboards between folders, and navigate the hierarchy through a breadcrumb at the top of the listing.
+Boards appear as title-based rows in a foldered document table. You can:
+
+- open, rename, or delete a board
+- create and rename folders, and move whiteboards between them
+- navigate the hierarchy via the breadcrumb at the top of the listing
 
 ![Whiteboard Listing](/assets/modules/whiteboards/whiteboard-listing.png)
 
 ## Canvas experience
 
-The editor is built on [Excalidraw](https://excalidraw.com/), an infinite-canvas model with shapes, arrows, text, freehand drawing, and background controls. Images are added through a dedicated **Insert image** menu item, or by pasting or dragging files onto the canvas, which uploads them as whiteboard assets. The main menu also offers **Save as image**, **Clear canvas**, **Toggle theme**, and **Change canvas background**.
+The editor is built on [Excalidraw](https://excalidraw.com/), an infinite-canvas model with shapes, arrows, text, freehand drawing, and background controls. Add images via the **Insert image** menu item, or by pasting or dragging files onto the canvas, which uploads them as whiteboard assets. The main menu also offers **Save as image**, **Clear canvas**, **Toggle theme**, and **Change canvas background**.
 
 ![Whiteboard Example](/assets/modules/whiteboards/whiteboard-example-1.png)
 
@@ -27,9 +31,9 @@ The editor is built on [Excalidraw](https://excalidraw.com/), an infinite-canvas
 
 ## Real-time collaboration and sync behavior
 
-Whiteboards synchronize board state in real time over Socket.io and show present collaborators. When you open a board, the client subscribes and receives a snapshot, then exchanges debounced delta patches as edits happen. Each board carries a monotonically increasing revision number, and clients send patches against the revision they last saw (`baseRevision`).
+Whiteboards synchronize board state in real time over Socket.io and show present collaborators. On open, the client subscribes and receives a snapshot, then exchanges debounced delta patches as edits happen. Each board carries a monotonically increasing revision number, and clients send patches against the revision they last saw (`baseRevision`).
 
-Conflicts are resolved automatically with no user-facing prompt: edits are merged per element using a last-writer-wins rule based on each element's version (falling back to its update timestamp and version nonce). There is no "keep local or apply remote" dialog.
+Conflicts are resolved automatically with no user-facing prompt (no "keep local or apply remote" dialog): edits are merged per element using a last-writer-wins rule based on each element's version, falling back to its update timestamp and version nonce.
 
 ## Persistence and storage
 

@@ -3,7 +3,7 @@ title: Scripting
 description: Run Jupyter-based custom workflows on your team clusters.
 ---
 
-The Scripting module runs Jupyter sessions on team clusters for custom analysis, plotting, and data preparation. It supports general notebooks and notebooks linked to a specific trajectory, and ships with the scientific Python stack preinstalled.
+Scripting runs Jupyter sessions on team clusters for custom analysis, plotting, and data preparation. It supports general notebooks and notebooks linked to a specific trajectory, with the scientific Python stack preinstalled.
 
 ![Scripting Overview](/assets/overviews/overviews_scripting.png)
 
@@ -16,11 +16,16 @@ The Scripting module runs Jupyter sessions on team clusters for custom analysis,
 
 ## How sessions are created
 
-Opening a notebook coordinates a Jupyter runtime on the cluster. The backend resolves a suitable team cluster, deduplicates concurrent startups for the same session, provisions or reuses the notebook runtime container, and proxies the Jupyter interface back into the app. Notebook startup runs through this lifecycle before the workspace is ready.
+Opening a notebook coordinates a Jupyter runtime on the cluster. The backend:
+
+- resolves a suitable team cluster,
+- deduplicates concurrent startups for the same session,
+- provisions or reuses the notebook runtime container,
+- proxies the Jupyter interface back into the app.
 
 ## What comes preinstalled
 
-The notebook image is built on the Jupyter `scipy-notebook` base (which provides `numpy`, `scipy`, `matplotlib`, and `pandas`) and adds `jupyterlab`, `voltsdk` (3.1.1), `ovito`, `ase`, `pymatgen`, `MDAnalysis`, `matminer`, `vtk`, `minio`, and `pyarrow`. When a notebook session starts, the cluster injects `VOLT_SECRET_KEY`, `VOLT_BASE_URL`, and `VOLT_TRAJECTORY_ID` into the container, so `VoltClient.from_env()` is authenticated and the linked trajectory is preloaded with no setup.
+The notebook image builds on the Jupyter `scipy-notebook` base (`numpy`, `scipy`, `matplotlib`, `pandas`) and adds `jupyterlab`, `voltsdk` (3.1.1), `ovito`, `ase`, `pymatgen`, `MDAnalysis`, `matminer`, `vtk`, `minio`, and `pyarrow`. When a session starts, the cluster injects `VOLT_SECRET_KEY`, `VOLT_BASE_URL`, and `VOLT_TRAJECTORY_ID` into the container, so `VoltClient.from_env()` is authenticated and the linked trajectory is preloaded with no setup.
 
 ## Trajectory-linked workspaces
 

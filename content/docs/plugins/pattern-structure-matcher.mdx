@@ -3,17 +3,15 @@ title: Pattern Structure Matching
 description: Classify atoms against user-defined lattice patterns and emit a reconstructed-state contract consumable by OpenDXA.
 ---
 
-`PatternStructureMatching` classifies atoms by matching them against lattice
-templates that the user defines directly in the VOLT form. From each pattern it
-derives both a matching lattice and an OpenDXA reference lattice, so it can be
-selected as the upstream structure-identification algorithm for
-[OpenDXA](/docs/plugins/open-dxa).
+`PatternStructureMatching` classifies atoms against lattice templates the user
+defines in the VOLT form. From each pattern it derives a matching lattice and an
+OpenDXA reference lattice, so it can serve as the upstream
+structure-identification algorithm for [OpenDXA](/docs/plugins/open-dxa).
 
 ## Parameters
 
-The form is driven by a required `pattern_definitions` list. Each entry is one
-crystal template, with nested cell-vector tuples and a nested `basis_atoms`
-list. Two top-level options control matrix-phase resolution and clustering.
+The form requires a `pattern_definitions` list, each entry one crystal template.
+Two top-level options control matrix-phase resolution and clustering.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
@@ -36,23 +34,26 @@ Each entry in `pattern_definitions` has these fields:
 | `cell_c` | `tuple` | `{x:0, y:0, z:1}` | — | Third cell vector (`x`, `y`, `z`). |
 | `basis_atoms` | `list` | — (required) | — | Nested list of basis atoms; each has `species` (number, default `1`), `x`, `y`, `z`. |
 
-Matrix-phase resolution order: `matrix_pattern_name` if set, then the single
-pattern marked `is_matrix_phase`, then the only pattern when exactly one is
-defined. If multiple patterns are defined and none is unambiguously the matrix
-phase, execution fails with a validation error.
+Matrix-phase resolution order:
+
+1. `matrix_pattern_name`, if set.
+2. The single pattern marked `is_matrix_phase`.
+3. The only pattern, when exactly one is defined.
+
+If multiple patterns are defined and none is unambiguously the matrix phase,
+execution fails with a validation error.
 
 The wrapper materializes the patterns into generated lattice YAMLs and passes
-them to the binary as `--lattice_dir` and `--reference_lattice_dir`. The
-binary's own CLI options are `--lattice_dir`, `--reference_lattice_dir`,
-`--patterns` (CSV filter) and `--dissolve_small_clusters`.
+them as `--lattice_dir` and `--reference_lattice_dir`. The binary's CLI options
+are `--lattice_dir`, `--reference_lattice_dir`, `--patterns` (CSV filter), and
+`--dissolve_small_clusters`.
 
 ## Output
 
-The binary writes a single parquet result file. Per-atom data is emitted to a
-LAMMPS dump (`{outputBase}_annotated.dump`) and the cluster graph to two text
-tables (`{outputBase}_clusters.table`, `{outputBase}_cluster_transitions.table`)
-that OpenDXA consumes; this plugin does not produce a separate
-`_atoms.parquet`.
+The binary writes a single parquet result file. Per-atom data goes to a LAMMPS
+dump (`{outputBase}_annotated.dump`); the cluster graph goes to two text tables
+(`{outputBase}_clusters.table`, `{outputBase}_cluster_transitions.table`) that
+OpenDXA consumes. No separate `_atoms.parquet` is produced.
 
 ### `{outputBase}_pattern_analysis.parquet`
 

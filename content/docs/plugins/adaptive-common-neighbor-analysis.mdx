@@ -19,9 +19,8 @@ DXA-compatible tools (OpenDXA, LineReconstructionDXA, ElasticStrain) consume.
 
 ### `{outputBase}_cna_analysis.parquet`
 
-Compact analysis summary. The cluster-graph tables are written to disk as
-separate `.table` files; this result records their paths rather than embedding
-their contents.
+Compact analysis summary. The cluster-graph tables are written as separate
+`.table` files; this result records their paths, not their contents.
 
 ```ts
 interface CnaAnalysisOutput {
@@ -41,8 +40,8 @@ interface CnaAnalysisOutput {
 ### `{outputBase}_atoms.parquet`
 
 Per-atom structure identification written by the shared `AtomisticExporter`
-serializer. Atoms are grouped by structure name for 3D rendering, and a flat
-per-atom array is included for downstream consumers.
+serializer. Atoms are grouped by structure name for 3D rendering, plus a flat
+per-atom array for downstream consumers.
 
 ```ts
 type Vec3 = [float, float, float];

@@ -3,7 +3,7 @@ title: Simulation Cells
 description: Inspect the derived box geometry and periodic boundary data extracted from trajectories.
 ---
 
-Simulation cells are derived automatically during trajectory processing. They are read-only: VOLT extracts them from each timestep and uses them across the viewer, analysis plugins, and scripting workflows for box dimensions and periodic boundary conditions.
+VOLT derives simulation cells automatically from each timestep during trajectory processing. They are read-only and supply box dimensions and periodic boundary conditions to the viewer, analysis plugins, and scripting workflows.
 
 ![Simulation Cells Overview](/assets/overviews/overviews_simulation-cells.png)
 
@@ -26,4 +26,4 @@ The listing shows all simulation-cell records for the current team. Each record 
 
 ## Relationship to trajectory processing
 
-VOLT extracts box information frame by frame during dump or data file parsing and stores it alongside the rest of the processed trajectory metadata. Simulation cells reflect the current state of their parent trajectory; replacing the underlying data requires reprocessing the trajectory.
+VOLT extracts box information frame by frame during dump or data file parsing and stores it with the processed trajectory metadata. Cells reflect the current state of their parent trajectory; replacing the underlying data requires reprocessing it.

@@ -3,13 +3,11 @@ title: Volt AI
 description: Multi-provider AI assistant integrated across the entire platform.
 ---
 
-Volt AI is the built-in assistant available across the workspace as a dedicated conversation surface, a floating assistant, and a contextual helper inside modules like [LaTeX](/docs/modules/latex). It supports 13 providers and 12 tools, and operates against team-scoped providers, tools, and permissions. Each team configures its own API keys and selects which models are available.
+Volt AI is the built-in assistant, available across the workspace as a dedicated conversation surface, a floating assistant, and a contextual helper inside modules like [LaTeX](/docs/modules/latex). It supports 13 providers and 12 tools; providers, tools, and permissions are scoped per team. Each team configures its own API keys and selects which models are available.
 
 ![Volt AI Overview](/assets/overviews/overviews_vol-ai.png)
 
 ## Supported Providers
-
-Volt AI currently supports the following providers:
 
 | Provider | Description |
 |---|---|
@@ -37,33 +35,33 @@ Click **Add Provider**, set a name, and enter the API key.
 
 ![Add Provider](/assets/modules/team/ai-integration/add-provider.png)
 
-API keys are encrypted before being stored and are scoped to the team that configured them.
+API keys are encrypted before storage and scoped to the team that configured them.
 
 ### Getting an API Key
 
-Hosted models require an API key generated in the provider's developer console. Self-hosted setups like Ollama require pointing Volt AI at the appropriate base URL and enabling the desired models.
+Hosted models need an API key from the provider's developer console. Self-hosted setups like Ollama need Volt AI pointed at the appropriate base URL with the desired models enabled.
 
 ![xAI API Key](/assets/modules/team/ai-integration/xai-create-api-key.png)
 
 ### Selecting Models
 
-After a provider is added, select which models are available to the team. Only enabled models appear in the Volt AI interface.
+Select which of the provider's models are available to the team. Only enabled models appear in the Volt AI interface.
 
 ![Model Selection](/assets/modules/team/ai-integration/xai-models.png)
 
 ## Chat Interface
 
-The chat experience is persistent and streamed in real time. Conversations are saved, responses arrive incrementally, and the same assistant can follow you across multiple tasks inside the workspace.
+Conversations are saved and streamed incrementally, and the same assistant follows you across tasks in the workspace.
 
 ![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-1.png)
 
-A single conversation persists across tasks and can invoke the assistant's tools to inspect and manage Docker containers and to manage its own conversations.
+A single conversation can invoke tools to inspect and manage Docker containers and to manage its own conversations.
 
 ![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-2.png)
 
 ## Available Tools
 
-Volt AI has access to **12 tools** organized across 2 categories: container management and AI conversation management. Tools cover read operations and workspace mutations such as creating, updating, and deleting Docker containers. Mutating tools require explicit approval before execution.
+Volt AI has **12 tools** in 2 categories: container management and AI conversation management. Mutating tools (create, update, delete) require explicit approval before execution.
 
 ### Containers (9 tools)
 
@@ -98,7 +96,7 @@ Volt AI has access to **12 tools** organized across 2 categories: container mana
 5. Select the models to enable for the team.
 6. Save the provider.
 
-The provider appears in the provider list and its enabled models become available across Volt AI surfaces.
+The provider appears in the list and its enabled models become available across Volt AI surfaces.
 
 ### Manage a container from natural language
 

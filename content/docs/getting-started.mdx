@@ -24,7 +24,7 @@ VOLT does not centralize simulation files on the application server. The server 
 
 ## Create your VoltID
 
-Account creation and access happen at [app.voltcloud.dev/auth/sign-in](https://app.voltcloud.dev/auth/sign-in).
+Account creation and sign-in happen at [app.voltcloud.dev/auth/sign-in](https://app.voltcloud.dev/auth/sign-in).
 
 Supported sign-in methods: **Google**, **GitHub**, **Microsoft**, and email. The email flow signs in existing accounts and creates new ones automatically.
 
@@ -36,13 +36,11 @@ After signing in, VOLT prompts for team creation. Trajectories, clusters, analys
 
 ![Team creation](/assets/getting-started/onboarding-team-creation.png)
 
-Teams can be renamed, additional teams can be created for other projects, and collaborators can be invited once the workspace is ready.
+Teams can be renamed, additional teams created for other projects, and collaborators invited.
 
 ## Connect your first cluster
 
-Processing trajectories and running analyses requires at least one connected cluster.
-
-A cluster can be a laptop, a lab workstation, or a dedicated Linux server.
+Processing trajectories and running analyses requires at least one connected cluster. A cluster can be a laptop, a lab workstation, or a dedicated Linux server.
 
 ![Connect a cluster](/assets/getting-started/onboarding-connect-cluster.png)
 
@@ -75,4 +73,4 @@ With a team and cluster connected, the typical workflow is:
 5. explore results as listings, charts, or 3D artifacts,
 6. move into notebooks, LaTeX, or AI-assisted workflows.
 
-A **Volt desktop launcher** is also available. It is an Electron application that downloads the stack sources from the project's GitHub releases and runs the full local stack (MongoDB, Redis, MinIO, volt-server, volt-client) via Docker Compose on your machine. Installers are built with electron-builder and are available for macOS (dmg), Windows (NSIS exe), and Linux (AppImage) from the project's GitHub releases page.
+A **Volt desktop launcher** is also available — an Electron application that downloads the stack sources from the project's GitHub releases and runs the full local stack (MongoDB, Redis, MinIO, volt-server, volt-client) via Docker Compose on your machine. Installers, built with electron-builder, are available for macOS (dmg), Windows (NSIS exe), and Linux (AppImage) from the GitHub releases page.

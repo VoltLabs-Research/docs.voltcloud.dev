@@ -3,7 +3,7 @@ title: Containers
 description: Run Docker workloads on team clusters with terminals, files, processes, stats, and HTTP port proxying.
 ---
 
-The Containers module runs custom runtimes and services on team clusters. Containers can be created from templates or custom images and provide terminal access, files, processes, stats, and exposed ports. They share the hardware capacity of the underlying cluster.
+The Containers module runs custom runtimes and services on team clusters, from templates or custom images. Each container provides terminal, file, process, stats, and exposed-port access, and shares the hardware capacity of the underlying cluster.
 
 ![Containers Overview](/assets/overviews/overviews_containers.png)
 
@@ -15,7 +15,14 @@ The listing shows existing containers and their running state. The lifecycle cov
 
 ## Creating a container
 
-The creation wizard collects a name, the team, the deployment cluster, CPU and memory limits, optional public port mappings, environment variables, any template-specific custom fields, and an advanced Docker-socket-access toggle.
+The creation wizard collects:
+
+- Name, team, and deployment cluster
+- CPU and memory limits
+- Optional public port mappings
+- Environment variables
+- Any template-specific custom fields
+- An advanced Docker-socket-access toggle
 
 ![Create Container](/assets/modules/containers/create-container.png)
 
@@ -25,11 +32,11 @@ If no command is set and the image's own command is not used, VOLT runs an idle 
 
 ## Interacting with a running container
 
-- **Terminal access** for shell-based work directly in the browser.
+- **Terminal access** for shell work in the browser.
 - **File access** for browsing and reading container content.
 - **Process and stats views** for operational visibility.
 - **Port access** for services routed safely through VOLT.
 
 ## Port proxying and accessible services
 
-VOLT proxies access to containerized services through controlled sessions routed via the team cluster, providing browser entry points for dashboards, internal tools, and other services without exposing host networking directly. When a container exposes an accessible port, the UI surfaces an "Open :PORT" action that opens the proxied HTTP service in a new browser tab.
+VOLT proxies containerized services through controlled sessions routed via the team cluster, giving browser entry points for dashboards, internal tools, and other services without exposing host networking directly. When a container exposes an accessible port, the UI surfaces an "Open :PORT" action that opens the proxied HTTP service in a new browser tab.

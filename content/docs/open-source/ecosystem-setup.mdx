@@ -5,12 +5,10 @@ description: Clone the entire VOLT Labs ecosystem and build all plugins with a s
 
 ## Overview
 
-CoreToolkit ships an **install script** (`scripts/install.sh`) that automates the entire process of cloning every repository in the VOLT Labs ecosystem and building all analysis plugins as statically-linked binaries inside Docker.
+CoreToolkit's **install script** (`scripts/install.sh`) sets up the entire VOLT Labs ecosystem in one command:
 
-With a single command you get:
-
-- Every VOLT Labs repository cloned and organized into `tools/`, `plugins/`, and `app/` directories.
-- All [Foundational Algorithm](/docs/open-source#foundational-algorithms) plugins compiled and ready to use.
+- Clones every VOLT Labs repository, organized into `tools/`, `plugins/`, and `app/` directories.
+- Compiles all [Foundational Algorithm](/docs/open-source#foundational-algorithms) plugins into statically-linked binaries inside Docker, ready to use.
 
 ## Quick Start
 
@@ -18,11 +16,11 @@ With a single command you get:
 curl -sSL https://raw.githubusercontent.com/voltlabs-research/CoreToolkit/main/scripts/install.sh | bash
 ```
 
-This will create a `voltlabs-ecosystem/` directory in your current working directory with the full ecosystem.
+Creates a `voltlabs-ecosystem/` directory in the current working directory with the full ecosystem.
 
 ## Requirements
 
-The script runs on **Ubuntu / Debian** (or Debian-based distros) and will automatically install missing system packages via `apt`. You need:
+Runs on **Ubuntu / Debian** (or Debian-based distros); installs missing system packages via `apt`:
 
 | Requirement | Minimum version |
 |---|---|
@@ -34,12 +32,12 @@ The script runs on **Ubuntu / Debian** (or Debian-based distros) and will automa
 | Python 3 | With `pip` |
 
 <Callout type="info">
-If `cmake`, `conan`, or a C++23 compiler are not found, the script will attempt to install them automatically.
+If `cmake`, `conan`, or a C++23 compiler are not found, the script attempts to install them automatically.
 </Callout>
 
 ## What the Script Does
 
-The install script performs the following steps in order:
+Steps run in order:
 
 ### 1. System Verification
 
@@ -51,7 +49,7 @@ The install script performs the following steps in order:
 
 ### 2. Clone All Repositories
 
-The script clones every VOLT Labs repository into a structured workspace:
+Cloned into a structured workspace:
 
 ```
 voltlabs-ecosystem/
@@ -79,11 +77,11 @@ voltlabs-ecosystem/
     └── ClusterDaemon/
 ```
 
-Existing directories are skipped, so you can safely re-run the script to pick up new repositories.
+Existing directories are skipped, so re-running the script is safe and picks up new repositories.
 
 ### 3. Build All Plugins
 
-For each plugin in the `plugins/` directory, the script runs a **Docker-based build** using `Dockerfile.build` from CoreToolkit:
+For each plugin in `plugins/`, the script runs a **Docker-based build** using CoreToolkit's `Dockerfile.build`:
 
 1. A `gcc:14-bookworm` container installs CMake, Conan, and system dependencies.
 2. CoreToolkit is exported as a Conan package inside the container.
@@ -92,7 +90,7 @@ For each plugin in the `plugins/` directory, the script runs a **Docker-based bu
 
 ## Configuration
 
-You can customize the script behavior with environment variables:
+Environment variables:
 
 | Variable | Default | Description |
 |---|---|---|
@@ -107,19 +105,19 @@ WORK_DIR=~/my-volt BUILD_OUTPUT_DIR=~/my-volt/bin \
 
 ### Rebuild Without Cache
 
-Pass `--no-cache` to instruct Docker to rebuild plugin images without using the layer cache:
+Pass `--no-cache` to rebuild plugin images without the Docker layer cache:
 
 ```bash
 ./voltlabs-ecosystem/tools/CoreToolkit/scripts/install.sh --no-cache
 ```
 
 <Callout type="info">
-Re-running the script always performs the full pipeline: OS and tooling verification, clone-or-skip for each repository, then the Docker-based plugin builds. The `--no-cache` flag only affects how Docker runs those builds — there is no rebuild-only mode that skips the earlier steps.
+Re-running always performs the full pipeline: OS and tooling verification, clone-or-skip per repository, then the Docker-based plugin builds. `--no-cache` only affects how Docker runs those builds — there is no rebuild-only mode that skips the earlier steps.
 </Callout>
 
 ## Build Output
 
-After a successful run, the compiled plugin binaries are placed in the output directory (default: `<script dir>/out/`). Each plugin produces a standalone executable invoked with positional arguments:
+Compiled plugin binaries land in the output directory (default `<script dir>/out/`). Each plugin is a standalone executable invoked with positional arguments:
 
 ```
 <binary> <input_dump> <output_base> [plugin-specific flags]

@@ -3,7 +3,7 @@ title: Line Reconstruction DXA
 description: Reconstruct dislocation lines via DXA from an upstream cluster package and DXA-style geometric parameters.
 ---
 
-This plugin consumes per-atom structure-identification artifacts (an annotated dump plus cluster tables) produced upstream and reconstructs the dislocation network using the Dislocation eXtraction Algorithm (DXA). When upstream cluster tables are not supplied, the Python wrapper runs Polyhedral Template Matching inline to generate them before invoking the binary.
+Reconstructs the dislocation network with the Dislocation eXtraction Algorithm (DXA) from upstream per-atom structure-identification artifacts (an annotated dump plus cluster tables). If cluster tables aren't supplied, the Python wrapper runs Polyhedral Template Matching inline to generate them.
 
 ## Parameters
 
@@ -15,16 +15,13 @@ This plugin consumes per-atom structure-identification artifacts (an annotated d
 | `smoothingIterations` | `number` | `0` | Taubin smoothing iterations applied to the reconstructed lines (min `0`, step `1`). |
 | `linePointInterval` | `number` | `1.2` | Line coarsening interval (min `0`, step `0.1`). |
 
-The binary also accepts `--tessellationGhostLayerScale` (default `3.5`) and `--threads`, but these are not exposed as UI form inputs. The annotated dump, `--clusters-table`, and `--clusters-transitions` are required inputs wired in from the upstream structure-identification step rather than user-entered values.
+The binary also accepts `--tessellationGhostLayerScale` (default `3.5`) and `--threads`, neither exposed as a UI form input. The annotated dump, `--clusters-table`, and `--clusters-transitions` are required inputs wired in from the upstream structure-identification step.
 
 ## Output
 
 ### `{outputBase}_dislocations.parquet`
 
-The primary result surfaced in the UI ("Dislocation Lines"), exported to GLB via the generic
-`LineExporter`. A standard VOLT **line entity table** (one row per reconstructed,
-PBC-clipped line): fixed columns `id` and `points`, every other column is a per-line
-property that VOLT discovers, queries and styles generically.
+Primary result surfaced in the UI ("Dislocation Lines"), exported to GLB via `LineExporter`. A VOLT **line entity table** (one row per reconstructed, PBC-clipped line): fixed columns `id` and `points`; every other column is a per-line property that VOLT discovers, queries and styles generically.
 
 | Column | Type | Description |
 |--------|------|-------------|

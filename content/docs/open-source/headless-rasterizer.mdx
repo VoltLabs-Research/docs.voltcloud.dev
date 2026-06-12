@@ -5,7 +5,7 @@ description: Native Node.js addon for headless GLB to PNG rasterization.
 
 ## Overview
 
-`@voltstack/headless-rasterizer` is a C++ native Node.js addon that renders GLB (glTF Binary) 3D models to PNG images without a GPU or display server. It uses software rasterization with depth buffering, making it ideal for server-side thumbnail generation and batch rendering.
+`@voltstack/headless-rasterizer` is a C++ native Node.js addon that renders GLB (glTF Binary) 3D models to PNG images without a GPU or display server, using software rasterization with depth buffering for server-side thumbnail generation and batch rendering.
 
 | | |
 |---|---|
@@ -23,8 +23,6 @@ npm install @voltstack/headless-rasterizer
 ## API
 
 ### `rasterize(glbPath, pngPath, width, height, azDeg, elDeg, options?)`
-
-Renders a GLB file to a PNG image using software rasterization.
 
 ```typescript
 function rasterize(

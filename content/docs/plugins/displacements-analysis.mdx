@@ -20,8 +20,8 @@ differ, the analysis fails with `Atom count mismatch between current and referen
 The VOLT form sends the affine-mapping keys `none` / `toReference` / `toCurrent`, but the
 compiled binary's CLI flag `--affine_mapping` only recognizes `noMapping` /
 `toReferenceCell` / `toCurrentCell` (default `noMapping`); any other value falls back to no
-mapping. As a result, selecting `toReference` or `toCurrent` in the UI does not currently
-activate affine mapping in the binary.
+mapping, so selecting `toReference` or `toCurrent` in the UI does not activate affine
+mapping in the binary.
 </Callout>
 
 ## Output
@@ -85,7 +85,7 @@ interface AtomsOutput {
 ### GLB export
 
 The `{outputBase}_atoms.parquet` model is also exported as a GLB via the
-`AtomisticExporter`, providing a renderable atomistic model of the displaced configuration.
+`AtomisticExporter` — a renderable atomistic model of the displaced configuration.
 
 ## See Also
 

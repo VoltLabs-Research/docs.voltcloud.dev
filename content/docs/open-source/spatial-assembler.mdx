@@ -5,7 +5,7 @@ description: Native Node.js addon for high-performance GLB assembly from point c
 
 ## Overview
 
-`@voltstack/spatial-assembler` is a C++ native Node.js addon that generates GLB (glTF Binary) 3D models from point clouds, indexed meshes, and typed atomic data. It is the core geometry engine behind VOLT's 3D visualization pipeline.
+Generates GLB (glTF Binary) 3D models from point clouds, indexed meshes, and typed atomic data — the geometry engine behind VOLT's 3D visualization pipeline.
 
 | | |
 |---|---|
@@ -58,13 +58,7 @@ function generateGLBToFile(
 ): boolean
 ```
 
-| Parameter | Type | Description |
-|---|---|---|
-| `positions` | `Float32Array` | Vertex positions as `[x1, y1, z1, x2, y2, z2, ...]` |
-| `types` | `Uint16Array` | Atom type index per vertex (clamped to 0–7 for color selection) |
-| `min` | `number[]` | Bounding box minimum as `[x, y, z]` |
-| `max` | `number[]` | Bounding box maximum as `[x, y, z]` |
-| `filePath` | `string` | Output file path |
+Parameters match `generateGLB`, plus `filePath` (`string`) — output file path.
 
 **Returns:** `boolean` — `true` on success.
 
@@ -179,7 +173,7 @@ function taubinSmooth(
 
 ## Performance
 
-SpatialAssembler is optimized for large atomic datasets:
+Optimized for large atomic datasets:
 
 - **AVX2/BMI2 SIMD** — Runtime CPU feature detection with vectorized operations.
 - **Lock-free parallel radix sort** — Per-thread histograms eliminate atomic operations.

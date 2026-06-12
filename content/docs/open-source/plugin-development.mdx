@@ -4,18 +4,18 @@ description: Build custom analysis plugins for VOLT using CoreToolkit.
 ---
 
 <Callout type="info">
-**TL;DR** — A plugin is a C++23 service that links against CoreToolkit. You write a small service class, register it with the `VOLT_SERVICE_PLUGIN` macro, and the macro turns it into a CLI binary invoked as `myplugin <lammps_file> [output_base] [options]`. Results are written as one or more `*.parquet` files. You ship a `plugin.json` (a workflow DAG describing the UI, frame iteration, entrypoint, and outputs) and a Python wrapper that VOLT actually invokes. Build with Conan + CMake; CI bundles the binary and publishes it.
+**TL;DR** — A plugin is a C++23 service that links CoreToolkit. Register the service class with the `VOLT_SERVICE_PLUGIN` macro, which turns it into a CLI binary invoked as `myplugin <lammps_file> [output_base] [options]`. Results are one or more `*.parquet` files. Ship a `plugin.json` (a workflow DAG describing the UI, frame iteration, entrypoint, and outputs) and a Python wrapper that VOLT invokes. Build with Conan + CMake; CI bundles and publishes the binary.
 </Callout>
 
 ## Overview
 
-VOLT plugins are C++23 analysis algorithms built on top of **CoreToolkit** (`coretoolkit::coretoolkit`). Each plugin:
+VOLT plugins are C++23 analysis algorithms built on **CoreToolkit** (`coretoolkit::coretoolkit`). Each plugin:
 
 1. Reads one or more LAMMPS dump frames.
 2. Runs an analysis algorithm.
 3. Writes results as Apache Parquet (`*.parquet`) files derived from an output base path.
 
-VOLT and the ClusterDaemon do not call the compiled binary directly. They invoke a **Python wrapper** (`scripts/<name>_plugin_wrapper.py`) declared in `plugin.json`, which locates the binary, filters VOLT runtime flags, runs it, and validates the expected outputs. The example throughout this page is `coordination-analysis`, which computes per-atom coordination numbers and a radial distribution function (RDF).
+VOLT and the ClusterDaemon don't call the binary directly; they invoke a **Python wrapper** (`scripts/<name>_plugin_wrapper.py`) declared in `plugin.json`, which locates the binary, filters VOLT runtime flags, runs it, and validates the outputs. Examples here use `coordination-analysis` (per-atom coordination numbers + a radial distribution function, RDF).
 
 ## Prerequisites
 
@@ -25,11 +25,11 @@ VOLT and the ClusterDaemon do not call the compiled binary directly. They invoke
 | CMake | ≥ 3.20 |
 | Conan | ≥ 2.0 |
 
-If you don't have these, the [Ecosystem Setup](/docs/open-source/ecosystem-setup) script can install them for you.
+If you don't have these, the [Ecosystem Setup](/docs/open-source/ecosystem-setup) script can install them.
 
 ## Project Structure
 
-A typical plugin has this layout:
+A typical layout:
 
 ```
 MyPlugin/
@@ -51,7 +51,7 @@ MyPlugin/
 
 ## Step 1: CMakeLists.txt
 
-Plugins use the `volt_add_plugin(...)` macro provided by CoreToolkit's `VoltPlugin.cmake`. The macro sets C++23, finds the required dependencies (Boost, OneTBB, spdlog, nlohmann_json), builds a `<name>_lib` static library plus an executable from `MAIN_SOURCE`, and wires up the install targets. A canonical `CMakeLists.txt` is only a few lines:
+Use the `volt_add_plugin(...)` macro from CoreToolkit's `VoltPlugin.cmake`. It sets C++23, finds the dependencies (Boost, OneTBB, spdlog, nlohmann_json), builds a `<name>_lib` static library plus an executable from `MAIN_SOURCE`, and wires up the install targets:
 
 ```cmake
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
@@ -71,7 +71,7 @@ The macro also accepts `SOURCES`, `DEPENDENCIES`, `PACKAGES`, `INCLUDE_DIRS`, `V
 
 ## Step 2: conanfile.py
 
-A plugin is packaged as a Conan `static-library`. It requires CoreToolkit plus the same third-party libraries the macro links, and sets the `hwloc/*:shared=True` default option. The `package_info()` block exposes the `<name>_lib` library so other plugins can depend on it.
+A plugin is packaged as a Conan `static-library`, requiring CoreToolkit plus the same third-party libraries the macro links, and sets the `hwloc/*:shared=True` default option. `package_info()` exposes the `<name>_lib` library so other plugins can depend on it.
 
 ```python
 from conan import ConanFile
@@ -208,7 +208,7 @@ json MyPluginService::compute(const LammpsParser::Frame& frame, const std::strin
 
 ### Registering the plugin
 
-`src/plugin.cpp` binds each CLI flag to a setter with `opt(...)` and registers the service. The macro is what produces the CLI binary:
+`src/plugin.cpp` binds each CLI flag to a setter with `opt(...)` and registers the service. The macro produces the CLI binary:
 
 ```cpp
 // src/plugin.cpp
@@ -249,7 +249,7 @@ cmake --preset conan-release
 cmake --build build/build/Release -j$(nproc)
 ```
 
-The resulting binary is named after the project (e.g. `build/build/Release/myplugin`). You can run it directly:
+The resulting binary is named after the project (e.g. `build/build/Release/myplugin`). Run it directly:
 
 ```bash
 ./build/build/Release/myplugin <lammps_file> [output_base] [--cutoff 3.2]
@@ -257,7 +257,7 @@ The resulting binary is named after the project (e.g. `build/build/Release/myplu
 
 ## Step 5: plugin.json (the workflow DAG)
 
-Every plugin ships a `plugin.json` describing a `{ workflow: { nodes, edges } }` graph. This is not just metadata — it defines the UI form, how the trajectory is iterated, how the binary is invoked, and which `*.parquet` files are surfaced to the viewer. Edges wire each node's `output` handle to the next node's `input` handle.
+Every plugin ships a `plugin.json` describing a `{ workflow: { nodes, edges } }` graph. It defines the UI form, how the trajectory is iterated, how the binary is invoked, and which `*.parquet` files are surfaced to the viewer. Edges wire each node's `output` handle to the next node's `input` handle.
 
 ### Node types
 
@@ -292,11 +292,20 @@ The entrypoint runs the Python wrapper (`type: "python-script"`) and builds the 
 }
 ```
 
-Here `currentValue.path` is the current frame's dump path (the positional `<lammps_file>`), `outputPath` is the `<output_base>`, and `plugin-arguments.as_str` expands the configured arguments into `--cutoff 3.2 --rdf_bins 500` flags. `timeout: -1` means no timeout.
+Template variables:
+
+- `currentValue.path` — the current frame's dump path (positional `<lammps_file>`).
+- `outputPath` — the `<output_base>`.
+- `plugin-arguments.as_str` — expands the configured arguments into flags, e.g. `--cutoff 3.2 --rdf_bins 500`.
+- `timeout: -1` — no timeout.
 
 ### Exposures and exports
 
-Each `exposure` node references one of the `*.parquet` files the binary writes. For `coordination-analysis`, three exposures surface `coordination.parquet` (the named summary), `atoms.parquet` (the per-atom data, written in the AtomisticExporter shape and exported to GLB), and `rdf_chart.parquet` (the RDF chart, exported via `ChartExporter`).
+Each `exposure` node references one of the `*.parquet` files the binary writes. For `coordination-analysis`, three exposures surface:
+
+- `coordination.parquet` — the named summary.
+- `atoms.parquet` — the per-atom data (AtomisticExporter shape, exported to GLB).
+- `rdf_chart.parquet` — the RDF chart (exported via `ChartExporter`).
 
 <Callout type="info">
 Per-atom data is written to a **separate** `{outputBase}_atoms.parquet` file (the AtomisticExporter shape), not embedded inside the named summary result.
@@ -339,7 +348,7 @@ jobs:
     secrets: inherit
 ```
 
-The reusable workflow's only `workflow_call` inputs are `coretoolkit_ref` (the CoreToolkit ref to build against) and `dependency_repos` (newline-separated plugin repos to export to Conan first, for plugins that depend on other plugins). It has no `plugin_name` input.
+Its only `workflow_call` inputs are `coretoolkit_ref` (the CoreToolkit ref to build against) and `dependency_repos` (newline-separated plugin repos to export to Conan first, for plugins that depend on other plugins); there is no `plugin_name` input.
 
 After a build, the release assets are named:
 
@@ -410,4 +419,4 @@ myplugin <lammps_file> [output_base] [options]
 
 ### Output
 
-The plugin writes one or more Apache Parquet files derived from `output_base`, each declared by an `exposure` node in `plugin.json`. Typically this includes a named summary result and a separate `{outputBase}_atoms.parquet` holding the per-atom data (AtomisticExporter shape). VOLT reads these files, stores them in MinIO, and makes them available for visualization in the 3D viewer (and for chart/GLB export where the `plugin.json` declares it).
+The plugin writes one or more Apache Parquet files derived from `output_base`, each declared by an `exposure` node in `plugin.json` — typically a named summary plus a separate `{outputBase}_atoms.parquet` (per-atom data, AtomisticExporter shape). VOLT reads these files, stores them in MinIO, and serves them to the 3D viewer (and to chart/GLB export where `plugin.json` declares it).

@@ -5,7 +5,7 @@ description: Python SDK for the Volt platform — run native plugins locally, br
 
 ## Overview
 
-`voltsdk` is the official Python SDK for the Volt scientific computing platform. It does more than wrap the REST API: it can download, cache, and run native C++ analysis plugins locally (`PluginHub`), browse Volt resources (trajectories, analyses, frames, listings), assemble and render GLB 3D models (`SpatialAssembler`, `open_in_volt`), and load analysis output into pandas DataFrames.
+`voltsdk` wraps the Volt REST API and also: downloads, caches, and runs native C++ analysis plugins locally (`PluginHub`); browses resources; assembles and renders GLB 3D models (`SpatialAssembler`, `open_in_volt`); and loads analysis output into pandas DataFrames.
 
 | | |
 |---|---|
@@ -19,7 +19,7 @@ description: Python SDK for the Volt platform — run native plugins locally, br
 pip install voltsdk
 ```
 
-Optional extras enable 3D visualization:
+Optional extras:
 
 ```bash
 pip install "voltsdk[visualization]"   # VTK desktop render window for view_glb
@@ -27,10 +27,6 @@ pip install "voltsdk[notebook]"        # VTK + k3d for inline rendering in Jupyt
 pip install "voltsdk[ovito]"           # OVITO pipeline integration
 pip install "voltsdk[all]"             # everything above
 ```
-
-<Callout type="info">
-`voltsdk[visualization]` installs VTK only (desktop viewer). For inline 3D in a Jupyter notebook, install `voltsdk[notebook]`, which adds `k3d`.
-</Callout>
 
 ## Quick Start
 
@@ -52,7 +48,7 @@ for analysis in traj.analyses:
 
 ## Authentication
 
-The authenticated client uses **secret keys** (prefixed with `vsk_`), generated from your Volt team settings. The constructor takes `secret_key` and `base_url`; no network calls are made during construction (the first request happens lazily when you access a resource).
+The authenticated client uses **secret keys** (prefixed with `vsk_`), generated from your Volt team settings. The constructor takes `secret_key` and `base_url`; no network calls happen during construction — the first request fires lazily when you access a resource.
 
 ```python
 from voltsdk import VoltClient
@@ -63,7 +59,7 @@ client = VoltClient(
 )
 ```
 
-The recommended pattern is `VoltClient.from_env()`, which reads `VOLT_SECRET_KEY` and `VOLT_BASE_URL` from the environment. Inside a Volt Jupyter container the base URL is auto-detected from the Jupyter/server proxy configuration, so `from_env()` is zero-config there.
+`VoltClient.from_env()` (recommended) reads `VOLT_SECRET_KEY` and `VOLT_BASE_URL` from the environment. Inside a Volt Jupyter container the base URL is auto-detected from the Jupyter/server proxy configuration, so `from_env()` is zero-config there.
 
 ```python
 client = VoltClient.from_env()
@@ -75,7 +71,7 @@ client = VoltClient.from_env()
 
 ## Resources
 
-`VoltClient` exposes resource collections as lazy, auto-paginating properties. Iterating a collection fetches pages on demand; resources are objects with typed properties (not dicts), so use attribute access (`analysis.status`), not subscripting.
+`VoltClient` exposes resource collections as lazy, auto-paginating properties — iterating fetches pages on demand. Resources are typed objects, not dicts, so use attribute access (`analysis.status`), not subscripting.
 
 | Property | Returns |
 |---|---|
@@ -148,7 +144,7 @@ zip_path = analysis.download_artifacts(dest="out/", unzip=False)
 
 ### Analysis results
 
-`analysis.df()` returns the analysis listing rows (one row per timestep) as a DataFrame — the quickest way to a table. `analysis.listings` exposes the same data with extra controls (`columns=`, `to_csv(...)`).
+`analysis.df()` returns the listing rows (one per timestep) as a DataFrame. `analysis.listings` exposes the same data with extra controls (`columns=`, `to_csv(...)`).
 
 ```python
 analysis = traj.analyses.first()
@@ -164,7 +160,7 @@ analysis.download_artifacts(dest="out/")
 
 ## Plugin Hub
 
-`PluginHub` is the headline feature of VoltSDK 3.0: it downloads, caches, and runs native Volt plugins locally. The same hub is available on an authenticated client via `client.plugins`.
+`PluginHub` (new in VoltSDK 3.0) is also available on an authenticated client via `client.plugins`.
 
 ```python
 from voltsdk import PluginHub
@@ -214,7 +210,7 @@ hub.uninstall("@voltlabs/opendxa")       # drop every cached version
 
 ### `open_in_volt(source, *, title=None, volt_url=None, open_browser=True)`
 
-Renders local GLB files, a GLB sequence, or an existing Volt resource using the Volt web canvas. Inside a Volt notebook it serves files through the Jupyter proxy; on a local machine it starts a tiny background file server. The browser still needs an authenticated Volt session.
+Renders local GLB files, a GLB sequence, or an existing Volt resource using the Volt web canvas. Inside a Volt notebook it serves files through the Jupyter proxy; on a local machine it starts a background file server. The browser still needs an authenticated Volt session.
 
 ```python
 from voltsdk import open_in_volt
@@ -238,7 +234,7 @@ By default the viewer opens against `https://app.voltcloud.dev`; override it wit
 
 ### `SpatialAssembler`
 
-Build GLBs locally from Volt exporter payloads (`AtomisticExporter`, `MeshExporter`, `LineExporter`). It accepts the full artifact file (`.json` or a line-entity-table `.parquet`) or the raw nested payload.
+Builds GLBs locally from Volt exporter payloads (`AtomisticExporter`, `MeshExporter`, `LineExporter`). It accepts the full artifact file (`.json` or a line-entity-table `.parquet`) or the raw nested payload.
 
 ```python
 from voltsdk import SpatialAssembler, open_in_volt
@@ -253,7 +249,7 @@ glb_path = assembler.lines_glb(
 open_in_volt(glb_path)
 ```
 
-`assembler.glb(source, output_path=..., exporter=...)` dispatches to the right exporter automatically; `atomistic_glb`, `mesh_glb`, and `lines_glb` are the per-exporter entry points.
+`assembler.glb(source, output_path=..., exporter=...)` auto-dispatches to the right exporter; `atomistic_glb`, `mesh_glb`, and `lines_glb` are the per-exporter entry points.
 
 ### `view_glb(file_path)`
 
@@ -273,7 +269,7 @@ Requires `voltsdk[visualization]` (VTK desktop window). For the inline notebook 
 
 ### `parquet_as_df(file_path, iterable_key=None)`
 
-Converts a Volt Apache Parquet result file to a pandas DataFrame, transparently merging chunked (streamed) messages.
+Converts a Volt Apache Parquet result file to a pandas DataFrame, merging chunked (streamed) messages.
 
 ```python
 from voltsdk import parquet_as_df
@@ -283,7 +279,7 @@ print(df.head())
 print(df.columns.tolist())
 ```
 
-`iterable_key` is a dot-separated path extracted from each chunk before merging — useful when the result wraps its rows under a named key:
+`iterable_key` is a dot-separated path extracted from each chunk before merging — for results that wrap their rows under a named key:
 
 ```python
 df = parquet_as_df("out/output.parquet", iterable_key="main_listing")

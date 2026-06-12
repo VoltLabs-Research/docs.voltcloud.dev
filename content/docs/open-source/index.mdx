@@ -3,22 +3,22 @@ title: Open Source Ecosystem
 description: Repositories, foundational algorithms, and SDKs published by VOLT Labs.
 ---
 
-The platform depends on a set of open-source repositories that cover 3D model assembly, headless rendering, LAMMPS parsing, the cluster daemon, the SDK, and the foundational scientific algorithms behind the bundled plugins.
+VOLT is built on the open-source repositories below — shared libraries and SDKs, the cluster daemon, and the foundational scientific algorithms behind the bundled plugins.
 
 ## VOLT Labs Ecosystem
 
 | Repository | Description | Links |
 |---|---|---|
-| **SpatialAssembler** | Volt's 3D model assembler. Also available on npm: `npm install @voltstack/spatial-assembler` | [GitHub](https://github.com/VoltLabs-Research/SpatialAssembler) · [npm](https://www.npmjs.com/package/@voltstack/spatial-assembler) |
-| **HeadlessRasterizer** | Rasterize GLB models without a browser! Also available on npm: `npm install @voltstack/headless-rasterizer` | [GitHub](https://github.com/VoltLabs-Research/HeadlessRasterizer) · [npm](https://www.npmjs.com/package/@voltstack/headless-rasterizer) |
+| **SpatialAssembler** | Volt's 3D model assembler. `npm install @voltstack/spatial-assembler` | [GitHub](https://github.com/VoltLabs-Research/SpatialAssembler) · [npm](https://www.npmjs.com/package/@voltstack/spatial-assembler) |
+| **HeadlessRasterizer** | Rasterize GLB models without a browser. `npm install @voltstack/headless-rasterizer` | [GitHub](https://github.com/VoltLabs-Research/HeadlessRasterizer) · [npm](https://www.npmjs.com/package/@voltstack/headless-rasterizer) |
 | **CoreToolkit** | Core C++ library providing math primitives (Vector3, Matrix3, Quaternion), spatial data structures (KD-tree-style nearest-neighbor finder, cutoff/grid neighbor finder), simulation cell handling, and parallel a… | [GitHub](https://github.com/VoltLabs-Research/CoreToolkit) |
-| **LammpsIO** | High-performance parser & utilities for LAMMPS trajectory frames. Also available on npm: `npm install @voltstack/lammps-io` | [GitHub](https://github.com/VoltLabs-Research/LammpsIO) · [npm](https://www.npmjs.com/package/@voltstack/lammps-io) |
-| **VoltSDK** | The SDK to interact with the Volt APIs. Available on npm: `npm install @voltstack/voltclient` and PyPI: `pip install voltsdk` | [GitHub](https://github.com/VoltLabs-Research/VoltSDK) · [npm](https://www.npmjs.com/package/@voltstack/voltclient) · [PyPI](https://pypi.org/project/voltsdk/) |
-| **ClusterDaemon** | The compute node for your Volt Team! The daemon service itself is private/unpublished. To connect to a daemon from code, use the separate SDK client: `npm install @voltstack/daemon-cluster-client` | [GitHub](https://github.com/VoltLabs-Research/ClusterDaemon) · [npm](https://www.npmjs.com/package/@voltstack/daemon-cluster-client) |
-| **Volt** | The next-generation platform designed for high-performance research teams and enthusiastic materials scientists! | [GitHub](https://github.com/VoltLabs-Research/Volt) |
+| **LammpsIO** | High-performance parser & utilities for LAMMPS trajectory frames. `npm install @voltstack/lammps-io` | [GitHub](https://github.com/VoltLabs-Research/LammpsIO) · [npm](https://www.npmjs.com/package/@voltstack/lammps-io) |
+| **VoltSDK** | The SDK to interact with the Volt APIs. `npm install @voltstack/voltclient` (npm) or `pip install voltsdk` (PyPI) | [GitHub](https://github.com/VoltLabs-Research/VoltSDK) · [npm](https://www.npmjs.com/package/@voltstack/voltclient) · [PyPI](https://pypi.org/project/voltsdk/) |
+| **ClusterDaemon** | The compute node for your Volt Team. The daemon service itself is private/unpublished. Connect from code via the separate SDK client: `npm install @voltstack/daemon-cluster-client` | [GitHub](https://github.com/VoltLabs-Research/ClusterDaemon) · [npm](https://www.npmjs.com/package/@voltstack/daemon-cluster-client) |
+| **Volt** | Platform for research teams and materials scientists. | [GitHub](https://github.com/VoltLabs-Research/Volt) |
 | **docs.voltcloud.dev** | Docs for VOLT Labs Open-Source Software Ecosystem. | [GitHub](https://github.com/VoltLabs-Research/docs.voltcloud.dev) |
 
-### Foundational Algorithms 
+### Foundational Algorithms
 | Repository | Description | Links |
 |---|---|---|
 | **OpenDXA** | A modified DXA! Supports multiple structure identification methods including PTM, CNA, and Diamond structure analysis. Identifies dislocation lines, computes Bu… | [GitHub](https://github.com/VoltLabs-Research/OpenDXA) |
@@ -37,11 +37,9 @@ The platform depends on a set of open-source repositories that cover 3D model as
 
 ### Comparison with OVITO
 
-Each plugin executes one of the [Foundational Algorithms](#foundational-algorithms) under the hood. Plugins are distributed through the Registry and pulled on demand by the ClusterDaemon when an analysis is run.
+Each plugin executes one [Foundational Algorithm](#foundational-algorithms), distributed through the Registry and pulled on demand by the ClusterDaemon when an analysis runs.
 
-OVITO is the most widely used and cited tool for analyzing LAMMPS simulations and serves as a reference for result comparison. The Foundational Algorithms — and the plugins built on them — are independent implementations.
-
-For algorithms like **CoordinationAnalysis**, VOLT and OVITO produce identical results. For more complex algorithms such as **OpenDXA** or **ElasticStrain**, results may differ for the following reasons:
+OVITO — the most widely used and cited tool for analyzing LAMMPS simulations — is the reference for result comparison. VOLT's Foundational Algorithms and the plugins built on them are independent implementations. For **CoordinationAnalysis**, VOLT and OVITO produce identical results; for more complex algorithms such as **OpenDXA** or **ElasticStrain**, results may differ:
 
 1. **Independent implementations.** VOLT's algorithms are not 1:1 replicas of OVITO's.
 2. **Compiler optimization flags.** Release builds can introduce small numerical differences.

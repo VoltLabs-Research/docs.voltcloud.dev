@@ -20,17 +20,14 @@ A plugin starts with `Modifier`, `Arguments`, `Context`, `ForEach`, and `Entrypo
 
 ## What a plugin looks like inside
 
-A complete example plugin is available at [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip). The ZIP is packaged as an importable plugin with its `plugin.json` and the binary ZIP expected by the `Entrypoint` node.
+A complete example plugin is at [atomistic-exporter-clusters.zip](/assets/plugins/examples/atomistic-exporter-clusters.zip) — an importable plugin with its `plugin.json` and the binary ZIP the `Entrypoint` node expects.
 
-The script reads atom positions from the current dump and groups them into `Cluster 0`, `Cluster 1`, and `Cluster 2`. Those keys are the groups VOLT uses to color atoms in the viewer. The same exposure exports a per-atom property named `cluster_id`. The grouping rule uses `atom_id % 3` to demonstrate the output format and is meant to be replaced with real clustering logic.
+The script reads atom positions from the current dump and groups them into `Cluster 0`, `Cluster 1`, and `Cluster 2` — the keys VOLT uses to color atoms in the viewer. The same exposure exports a per-atom property named `cluster_id`. The grouping rule (`atom_id % 3`) is a placeholder to demonstrate the output format; replace it with real clustering logic.
 
-The image below shows the result in the canvas, with atoms grouped and colored by the keys exported through `AtomisticExporter`.
-
-Plugin workflow:
 ![Atomistic exporter example workflow](/assets/plugins/atomistic-exporter-example-workflow.png)
 
 
-The script runs in four phases: it reads the current dump and finds the `ITEM: ATOMS` section, validates that the required columns exist, assigns each atom to an example cluster, and builds a single Apache Parquet payload containing listings, `per-atom-properties`, and the grouped `AtomisticExporter` data.
+The script runs in four phases: read the dump and find the `ITEM: ATOMS` section, validate the required columns exist, assign each atom to an example cluster, and build one Apache Parquet payload containing listings, `per-atom-properties`, and the grouped `AtomisticExporter` data.
 
 ```python
 import parquet
@@ -131,17 +128,15 @@ print(f'Wrote {output_base}_example.parquet with {len(export_groups)} atom group
 
 ![Atomistic exporter workflow explanation 2](/assets/plugins/atomistic-exporter-workflow-explanation-2.svg)
 
-All listings exported by plugin analyses are also visible in the dashboard. To find them, go through the sidebar using `Analysis > Plugin Name > Exposure Name`.
-
-The results exported after running the plugin are also visible through the Dashboard:
+All listings from plugin analyses are also visible in the dashboard, via the sidebar path `Analysis > Plugin Name > Exposure Name`.
 
 ![Atomistic exporter workflow data dashboard](/assets/plugins/atomistic-exporter-workflow-data-dashboard.png)
 
-The same visual effect is reproducible without `AtomisticExporter` groups: color coding on the exported `cluster_id` property produces the same cluster-based coloring. `AtomisticExporter` groups and `color coding + cluster_id` are equivalent expressions of the same grouping logic.
+The same coloring is reproducible without `AtomisticExporter` groups: color coding on the exported `cluster_id` property produces the same cluster-based coloring.
 
 ![Atomistic exporter color coding comparison](/assets/plugins/atomistic-exporter-color-coding-comparison.svg)
 
-A scene can contain multiple models simultaneously, allowing comparison of several exported artifacts or addition of plugin-contributed models on top of the base trajectory.
+A scene can hold multiple models at once, to compare exported artifacts or add plugin-contributed models on top of the base trajectory.
 
 ![Multiple models in scene](/assets/plugins/multiple-models-in-scene.svg)
 
@@ -170,8 +165,6 @@ A new plugin must be **published** to appear in the canvas. Plugins in **draft**
 
 The **Modifier** node defines how the plugin appears in VOLT.
 
-Typical configuration:
-
 | Field | Example value | What it does |
 |---|---|---|
 | **Name** | `Hello World Plugin` | Plugin name shown in the UI |
@@ -180,19 +173,14 @@ Typical configuration:
 | **Author** | `Volt Labs` | Plugin author |
 | **Icon** | `TbPlugConnected` | Icon used in the plugin card/editor |
 
-The image below shows a typical `Modifier` node configuration in the builder.
-
 ![Modifier node configuration](/assets/plugins/modifier-node-config.png)
 
 ### `Arguments`
 
 The **Arguments** node defines the parameters that the program receives at runtime.
 
-If your **Entrypoint** arguments template contains `{{ plugin-arguments.as_str }}`, VOLT serializes the configured arguments and passes them to your program.
+If your **Entrypoint** arguments template contains `{{ plugin-arguments.as_str }}`, VOLT serializes the configured arguments and passes them to your program. For Python plugins, those values arrive in `sys.argv` together with the input path and the output base path.
 
-For Python plugins, those values arrive in `sys.argv` together with the input path and the output base path.
-
-Example configuration:
 | Field | Example value | What it does |
 |---|---|---|
 | **Argument** | `cutoff` | CLI parameter name |
@@ -202,51 +190,35 @@ Example configuration:
 | **Min / Max / Step** | `0 / 10 / 0.05` | Numeric constraints |
 | **Options** | `FCC`, `HCP`, `BCC` | Options for select-like inputs |
 
-The image below shows an `Arguments` node with several argument types configured in the builder.
-
 ![Arguments node configuration](/assets/plugins/arguments-node-config.png)
 
 ### `Context`
 
-The **Context** node defines where the workflow gets its runtime data from.
-
-For trajectory-based plugins, the configuration is:
+The **Context** node defines where the workflow gets its runtime data from. Most analysis workflows use `trajectory_dumps`.
 
 | Field | Example value | What it does |
 |---|---|---|
 | **Source** | `trajectory_dumps` | Uses the trajectory frames generated by VOLT |
 
-Most analysis workflows use `trajectory_dumps`.
-
-The image below shows the `Context` node configured with `trajectory_dumps`.
-
 ![Context node configuration](/assets/plugins/context-node-config.png)
 
 ### `ForEach`
 
-The **ForEach** node defines how the workflow iterates over the selected context.
-
-Typical configuration:
+The **ForEach** node defines how the workflow iterates over the selected context. This is what makes most plugins run frame by frame.
 
 | Field | Example value | What it does |
 |---|---|---|
 | **Iterable Source** | `{{ trajectory-context.trajectory_dumps }}` | Iterates through the trajectory dumps one by one |
 
-This is what makes most plugins run frame by frame.
-
-The image below shows the `ForEach` node configured with `{{ trajectory-context.trajectory_dumps }}`.
-
 ![ForEach node configuration](/assets/plugins/foreach-node-config.png)
 
-The next image shows the autocomplete that appears while typing `{{ tra... }}`. The `trajectory_dumps` value comes from the `Context` node and is referenced directly from `ForEach`.
+The autocomplete appears while typing `{{ tra... }}`; the `trajectory_dumps` value comes from the `Context` node and is referenced directly from `ForEach`.
 
 ![ForEach trajectory dumps autocomplete](/assets/plugins/foreach-trajectory-dumps.png)
 
 ### `Entrypoint`
 
-The **Entrypoint** node defines how the uploaded payload is executed.
-
-Main fields:
+The **Entrypoint** node defines how the uploaded payload is executed, and whether the payload is a Python ZIP, a single executable, or a packaged executable with extra runtime files.
 
 | Field | Example value | What it does |
 |---|---|---|
@@ -257,23 +229,15 @@ Main fields:
 | **Arguments** | `{{ foreach-trajectory-dumps.currentValue.path }} {{ foreach-trajectory-dumps.outputPath }} {{ plugin-arguments.as_str }}` | Runtime argument template |
 | **Timeout** | `-1` | Optional execution timeout |
 
-The Entrypoint node selects whether the payload is a Python ZIP, a single executable, or a packaged executable with extra runtime files.
-
-The first image shows an `Entrypoint` node configured for a binary-style payload.
-
 ![Binary entrypoint node configuration](/assets/plugins/binary-entrypoint-node-config.png)
-
-The next image shows the `Entrypoint` node configured as `python-script`.
 
 ![Python script entrypoint node configuration](/assets/plugins/python-script-entrypoint-node-config.png)
 
-When the type is `python-script`, VOLT enables an extra field to specify the PyPI dependencies required by the script. Those dependencies are written in **Requirements File** and are installed before execution.
+When **Type** is `python-script`, VOLT enables a field for the PyPI dependencies the script needs; they go in **Requirements File** and are installed before execution.
 
 ### `Exposure`
 
 The **Exposure** node tells VOLT which output file should be ingested after execution.
-
-Typical configuration:
 
 | Field | Example value | What it does |
 |---|---|---|
@@ -281,19 +245,17 @@ Typical configuration:
 | **Results File Suffix** | `atoms.parquet` | File suffix your program must write |
 | **Icon** | `TbEye` | Optional result icon |
 
-The first image shows one `Entrypoint` connected to several `Exposure` nodes — a single execution can produce multiple result files, each with its own exposure.
+One `Entrypoint` can connect to several `Exposure` nodes: a single execution can produce multiple result files, each with its own exposure.
 
 ![Entrypoint with many exposures](/assets/plugins/entrypoint-with-many-exposures-example.png)
 
-The next image shows several `Exposure` node configurations together with the `Export` node configuration connected to each one. Use this pattern when different result files from the same entrypoint need different exporters.
+Pair each `Exposure` with its own `Export` node when different result files from the same entrypoint need different exporters.
 
 ![Exposure and export configuration examples](/assets/plugins/exposure-export-config.png)
 
 ### `Export`
 
 The **Export** node tells VOLT how to convert the `export` payload from an exposure into an artifact.
-
-Typical configuration:
 
 | Field | Example value | What it does |
 |---|---|---|
@@ -316,16 +278,13 @@ Choose **Executable** when you already have a single runnable binary.
 - You do **not** use `Requirements File`.
 - The daemon runs that binary as-is.
 
-Use this when your plugin payload is already one compiled executable and does not need extra project files around it.
-
 ### `Python Script`
 
 Choose **Python Script** when your plugin is Python code packaged as a ZIP project.
 
 - Upload a **ZIP** file that contains your Python project.
 - Set **Entry Script** to the Python file inside that ZIP, for example `main.py` or `scripts/cna_plugin_wrapper.py`.
-- If your project needs Python dependencies, paste them into **Requirements File**.
-- If it does not need dependencies, leave **Requirements File** empty.
+- Paste any Python dependencies into **Requirements File**, or leave it empty if there are none.
 
 ### `Packaged Executable`
 
@@ -335,9 +294,7 @@ Choose **Packaged Executable** when your runtime is a ZIP bundle that contains a
 - Set **Entry Script** to the executable or launcher inside the archive.
 - Do **not** use **Requirements File**.
 
-At runtime, team clusters extracts the ZIP and resolves the executable path from **Entry Script** before running it.
-
-Use this when your plugin needs more than one file to run. A typical case is a packaged scientific binary with shared libraries. This is the pattern used by the native OpenDXA executable bundle.
+At runtime, team clusters extracts the ZIP and resolves the executable path from **Entry Script** before running it. A typical case is a packaged scientific binary with shared libraries, such as the native OpenDXA executable bundle.
 
 ### A practical rule
 
@@ -383,13 +340,9 @@ The **Exposure** node defines a file contract. Given:
 | Exposure Name | `Structure Identification` |
 | Results File Suffix | `atoms.parquet` |
 
-and an output base of `abc`, the plugin must write the file:
+and an output base of `abc`, the plugin must write `abc_atoms.parquet`. VOLT will not ingest the result if the filename does not match, even when the payload is valid.
 
-`abc_atoms.parquet`
-
-VOLT will not ingest the result if the filename does not match, even when the payload is valid.
-
-For example, if your entrypoint receives the output base in `sys.argv[2]`, the code can write the exposure file like this:
+For example:
 
 ```python
 import parquet
@@ -412,7 +365,7 @@ If `output_base` is `abc`, this writes `abc_atoms.parquet`, which matches the `E
 
 ## What the Exposure node is for
 
-The two essential fields are:
+The two essential fields:
 
 | Exposure field | What it means |
 |---|---|
@@ -421,7 +374,7 @@ The two essential fields are:
 
 ## Entrypoint arguments
 
-The arguments delivered to the entrypoint depend on the node configuration. The common pattern is:
+Arguments delivered to the entrypoint depend on the node configuration. The common pattern:
 
 - input dump path,
 - output base path,
@@ -450,7 +403,7 @@ When the exposure suffix is `results.parquet`, this file is ingested correctly.
 
 ## What can go inside one exposure file
 
-An exposure file is a Apache Parquet object containing one or more of these keys:
+An exposure file is an Apache Parquet object containing one or more of these keys:
 
 ```json
 {
@@ -472,7 +425,7 @@ One exposure can contain only one of these keys, or several at once.
 
 ## Returning listings
 
-If you want VOLT to show summary values and result tables, return `main_listing` and `sub_listings`.
+To show summary values and result tables, return `main_listing` and `sub_listings`.
 
 ```python
 payload = {
@@ -494,13 +447,9 @@ payload = {
 }
 ```
 
-Use this when your result is mostly tabular or summary-oriented.
-
 ## Returning `per-atom-properties`
 
-Use `per-atom-properties` when you want VOLT to attach analysis values back to atoms.
-
-The important rule is that each row must identify the atom with `id`.
+Use `per-atom-properties` when you want VOLT to attach analysis values back to atoms. Each row must identify the atom with `id`, which links the row back to that atom.
 
 ### Row format
 
@@ -543,10 +492,9 @@ VOLT also accepts a columnar shape:
 
 Important details:
 
-- `id` is what links the property row back to the atom.
 - Scalar values work as-is.
 - Array values also work. VOLT flattens them into fields such as `strain[0]`, `strain[1]`, and `strain[2]` when needed.
-- If you want users to filter atoms, color by a numeric property, or inspect analysis values in the particles table, this is the key to use.
+- Use this key to let users filter atoms, color by a numeric property, or inspect analysis values in the particles table.
 
 ## Using `AtomisticExporter`
 
@@ -607,8 +555,7 @@ Then write the export payload inside the same Apache Parquet file under `export`
 Important details:
 
 - VOLT accepts both envelopes: one exporter object, or an array of exporter objects.
-- In the single-object form, the payload is a grouped object where each key is a group name.
-- Those group names drive the colouring in the viewer.
+- In the single-object form, the payload is a grouped object where each key is a group name, and those names drive the colouring in the viewer.
 - Names like `FCC`, `BCC`, `HCP`, `Other`, or `Cluster 7` map directly to existing palettes.
 - The `pos` field is required for each atom.
 - The array form produces one artifact per array entry.
@@ -646,15 +593,9 @@ A single exposure can return:
 }
 ```
 
-That pattern is often the most useful one: one exposure file, several ways for the user to inspect the same analysis.
-
 ## Downloadable example plugins
 
-Most ZIP files below are meant to be used as small entrypoint examples.
-
-Those entrypoint-only examples contain the plugin code, while the workflow itself is still something you configure from the UI with nodes.
-
-Included examples:
+Most of the ZIPs below are small entrypoint examples that contain only the plugin code; you still configure the workflow itself from the UI with nodes.
 
 - [hello-world-plugin.zip](/assets/plugins/examples/hello-world-plugin.zip)
 - [arguments-example.zip](/assets/plugins/examples/arguments-example.zip)
@@ -666,7 +607,7 @@ Included examples:
 
 - Download: [hello-world-plugin.zip](/assets/plugins/examples/hello-world-plugin.zip)
 - This is the smallest possible example of an **Entrypoint** node.
-- Its purpose is to show that VOLT executes your script and that anything you `print(...)` appears in the execution log.
+- Shows that VOLT executes your script and that anything you `print(...)` appears in the execution log.
 - Does not write an exposure file. Useful for verifying entrypoint execution before adding `Exposure` outputs.
 
 **Flow in the builder**
@@ -675,15 +616,11 @@ Included examples:
 
 The **Arguments** node can stay empty for this example.
 
-The first image shows the full workflow in the builder. The example stops at **Entrypoint** and does not add an **Exposure** node.
-
 ![Hello World workflow](/assets/plugins/hello-world-example-workflow.png)
 
-The next image shows the **Entrypoint** node configuration. This is where the ZIP is uploaded and where VOLT is told how to execute the Python script inside it.
+The **Entrypoint** node is where you upload the ZIP and tell VOLT how to execute the Python script inside it.
 
 ![Hello World entrypoint configuration](/assets/plugins/hello-world-example-entrypoint.png)
-
-The Python code inside the ZIP prints information to verify that execution happened.
 
 ```python
 import sys
@@ -696,7 +633,7 @@ input_file = sys.argv[1]
 print(f'Input file: {input_file}')
 ```
 
-The last image shows the execution log. This is the expected result of the example: the `print(...)` output appears in the log after the **Entrypoint** node runs.
+The execution log is the expected result: the `print(...)` output appears after the **Entrypoint** node runs.
 
 ![Hello World execution log](/assets/plugins/hello-world-example-log.png)
 
@@ -714,8 +651,6 @@ The image below shows the full example: user-facing arguments at the top, the wo
 
 ![Arguments plugin example](/assets/plugins/arguments-pugin-example.png)
 
-The Python code inside `arguments-example.zip` prints the received arguments directly:
-
 ```python
 import sys
 
@@ -724,15 +659,14 @@ for idx, arg in enumerate(sys.argv):
     print(idx, arg)
 ```
 
-The next image shows the execution log for this example. This is the expected result: the script lists the received arguments one by one, which makes it easy to verify the final runtime values.
+The execution log lists the received arguments one by one.
 
 ![Arguments plugin example log](/assets/plugins/arguments-plugin-example-log.png)
 
 ### `listing-example`
 
 - Download: [listing-example.zip](/assets/plugins/examples/listing-example.zip)
-- This example shows how an **Exposure** node can return `main_listing` and `sub_listings`.
-- Its purpose is to teach the result shape VOLT reads to render summary values and result tables.
+- Shows how an **Exposure** node returns `main_listing` and `sub_listings` — the result shape VOLT reads to render summary values and result tables.
 - If the Exposure node uses `example.parquet` as its results suffix, this script writes the correct file: `{outputBase}_example.parquet`.
 - Once the run finishes, the output is visible through the exposure result in VOLT rather than only in the execution log.
 
@@ -740,17 +674,13 @@ The next image shows the execution log for this example. This is the expected re
 
 `Modifier -> Arguments -> Context -> ForEach -> Entrypoint -> Exposure`
 
-Here the important node is **Exposure**, because it tells VOLT to ingest the Apache Parquet file written by the program and render the listing output in the UI.
-
-The first image shows the full workflow. The important part is the last node: **Exposure**. That is the node that reads the file exported by the code.
+The key node is **Exposure**: it tells VOLT to ingest the Apache Parquet file written by the program and render the listing output in the UI.
 
 ![Listing Example workflow](/assets/plugins/listing-example-workflow.png)
 
-The next image shows the **Exposure** node configuration used by this example. This is where the results file suffix is defined, so it must match the filename written by the Python code.
+The **Exposure** node configuration is where the results file suffix is defined, so it must match the filename written by the Python code.
 
 ![Listing Example exposure configuration](/assets/plugins/listing-example-exposure-config.png)
-
-The Python code below writes the Apache Parquet file consumed by that **Exposure** node.
 
 ```python
 import parquet
@@ -802,7 +732,7 @@ print(f'Wrote {output_base}_example.parquet')
 
 Once the plugin is created and **published**, it becomes available in the trajectory canvas.
 
-The image below shows `hello-world-plugin` selected in the canvas. Two runtime inputs appear by default:
+Two runtime inputs appear by default when a plugin is selected in the canvas:
 
 - **Cluster**: the cluster where the plugin will run.
 - **Selected timesteps**: the timesteps that will be executed.
@@ -827,17 +757,15 @@ An executed plugin exposes a right-click menu in the canvas with the following a
 
 ![Executed plugin right click menu](/assets/plugins/canvas-executed-plugin-right-click-menu.png)
 
-When a plugin has execution output, the canvas timeline enables a new tab named **Log**. That tab shows the execution output for the currently selected timestep.
+When a plugin has execution output, the canvas timeline enables a new tab named **Log**, showing the execution output for the currently selected timestep.
 
 ![Canvas plugin log](/assets/plugins/canvas-plugin-log.png)
 
-If the plugin returns an exposure with `main_listing`, the canvas also enables a new tab named after that exposure. In the `listing-example`, that tab corresponds to the exposure we already configured earlier in the workflow.
-
-The image below shows the listing output for the selected timestep. Because the example uses hardcoded values, every timestep shows the same `main_listing` rows.
+If the plugin returns an exposure with `main_listing`, the canvas also enables a new tab named after that exposure. In the `listing-example`, that tab corresponds to the exposure configured earlier in the workflow. Because the example uses hardcoded values, every timestep shows the same `main_listing` rows.
 
 ![Canvas plugin example listing](/assets/plugins/canvas-plugin-example-listing.png)
 
-Each `main_listing` row also has its own right-click menu. The image below shows the available actions:
+Each `main_listing` row also has its own right-click menu, with these actions:
 
 - **View inspect atoms**
 - **Delete**
@@ -850,23 +778,22 @@ In this example, the code exports two sub-listings:
 
 ![Canvas plugin main listing row right click menu](/assets/plugins/canvas-plugin-main-listing-row-right-click-menu.png)
 
-The last image shows one of those sub-listings, in this case `circuit_information`, for the selected timestep.
+The last image shows one of those sub-listings, `circuit_information`, for the selected timestep.
 
 ![Canvas plugin sub listing example](/assets/plugins/canvas-plugin-sub-listing-example.png)
 
 ### `per-atom-properties`
 
 - Download: [per-atom-properties.zip](/assets/plugins/examples/per-atom-properties.zip)
-- This example shows how to return `per-atom-properties` from an **Exposure** node.
-- Its purpose is to attach derived values back to atoms by `id`.
+- Shows how to return `per-atom-properties` from an **Exposure** node, attaching derived values back to atoms by `id`.
 - Those values can then be used in the particles table, filters, and color coding workflows.
-- It does not create a GLB by itself. It teaches the per-atom data contract, not a 3D exporter.
+- It does not create a GLB by itself; it teaches the per-atom data contract, not a 3D exporter.
 
 **Flow in the builder**
 
 `Modifier -> Arguments -> Context -> ForEach -> Entrypoint -> Exposure`
 
-This flow looks similar to the listing example, but the exposure payload is different: instead of `main_listing` / `sub_listings`, it returns `per-atom-properties` keyed by atom `id`.
+Same flow as the listing example, but the payload returns `per-atom-properties` keyed by atom `id` instead of `main_listing` / `sub_listings`.
 
 ```python
 import math

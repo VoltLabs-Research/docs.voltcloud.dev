@@ -3,7 +3,7 @@ title: Polyhedral Template Matching
 description: Classify atoms by local crystal structure with PTM and export per-atom orientation plus the cluster graph consumed by OpenDXA.
 ---
 
-Polyhedral Template Matching (PTM) identifies the local crystalline structure around each atom by matching its neighbor shell against a set of reference templates. Besides the structure type, it recovers per-atom orientation, RMSD, interatomic distance and deformation gradient, and emits the reconstructed cluster graph that downstream DXA-compatible tools (OpenDXA, LineReconstructionDXA, ElasticStrain) consume.
+Polyhedral Template Matching (PTM) identifies each atom's local crystal structure by matching its neighbor shell against reference templates. It also recovers per-atom orientation, RMSD, interatomic distance and deformation gradient, and emits the reconstructed cluster graph consumed by DXA-compatible tools (OpenDXA, LineReconstructionDXA, ElasticStrain).
 
 ## Parameters
 
@@ -100,7 +100,7 @@ interface AtomsOutput {
 }
 ```
 
-In addition to the parquet files, the entrypoint emits plain-text artifacts: `{outputBase}_annotated.dump` (per-atom structure-annotated LAMMPS dump) and the cluster graph tables `{outputBase}_clusters.table` and `{outputBase}_cluster_transitions.table`, which are required inputs for OpenDXA and other DXA-compatible plugins.
+Beyond the parquet files, the entrypoint emits plain-text artifacts: `{outputBase}_annotated.dump` (per-atom structure-annotated LAMMPS dump) and the cluster graph tables `{outputBase}_clusters.table` and `{outputBase}_cluster_transitions.table`, which are required inputs for OpenDXA and other DXA-compatible plugins.
 
 ## See Also
 

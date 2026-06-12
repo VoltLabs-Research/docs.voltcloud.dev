@@ -5,7 +5,7 @@ description: TypeScript HTTP client for the VOLT REST API.
 
 ## Overview
 
-`@voltstack/voltclient` is the official TypeScript HTTP client for the VOLT REST API. It supports both browser and Node.js environments, provides typed response unwrapping, in-flight GET deduplication, RBAC team scoping, and paginated responses.
+`@voltstack/voltclient` works in both browser and Node.js environments and provides typed response unwrapping, in-flight GET deduplication, RBAC team scoping, and paginated responses.
 
 ## Installation
 
@@ -32,8 +32,6 @@ const trajectories = await team.getUnwrapped('/trajectory');
 ## Factory Function
 
 ### `createVoltClient(baseUrl, options?)`
-
-Creates a new `VoltClient` instance scoped to `baseUrl`. The base URL is a positional first argument; configuration is passed in the optional second argument.
 
 ```typescript
 const volt = createVoltClient('https://api.voltcloud.dev/api', {
@@ -85,8 +83,6 @@ const creds = dynamicToken(async () => {
 
 ## HTTP Adapters
 
-The client ships with two HTTP adapters:
-
 | Adapter | Dependency | Environment |
 |---|---|---|
 | `FetchHttpClient` | None (native `fetch`) | Browser, Node.js 18+ |
@@ -122,7 +118,7 @@ class VoltClient {
 }
 ```
 
-In most cases, use `createVoltClient()` instead of calling the constructor directly.
+Prefer `createVoltClient()` over calling the constructor directly.
 
 ## Methods
 
@@ -130,7 +126,7 @@ In most cases, use `createVoltClient()` instead of calling the constructor direc
 
 #### `withTeam(teamId: string): VoltClient`
 
-Returns a new client instance scoped to a team. All subsequent requests will include the team ID in the URL path for RBAC resolution.
+Returns a new client; subsequent requests include the team ID in the URL path for RBAC resolution.
 
 ```typescript
 const teamClient = volt.withTeam('abc123');
@@ -148,7 +144,7 @@ const trajectoryClient = volt.withBasePath('/trajectory');
 
 #### `get<T>(path, query?): Promise<T>`
 
-Performs a GET request. Identical concurrent requests are deduplicated — the same promise is shared.
+Identical concurrent GET requests are deduplicated — the same promise is shared.
 
 ```typescript
 const data = await volt.get('/trajectory', { page: 1, limit: 10 });
@@ -174,7 +170,7 @@ await volt.delete('/trajectory/abc123');
 
 ### Envelope Unwrappers
 
-The VOLT API wraps responses in a `{ status, data }` envelope. These methods automatically extract the inner data.
+The VOLT API wraps responses in a `{ status, data }` envelope; these methods extract the inner data.
 
 #### `getUnwrapped<T>(path, query?): Promise<T>`
 
@@ -233,23 +229,19 @@ console.log(page.data, page.pagination.totalPages);
 
 #### `exportFile(path, params?): Promise<Blob>`
 
-Downloads a file as a `Blob`.
-
 ```typescript
 const blob = await volt.exportFile('/analysis/abc123/export');
 ```
 
 ## Service DSL
 
-The SDK includes a declarative DSL for defining typed API services.
-
-`createService(config, methods, factory)` takes three arguments:
+`createService(config, methods, factory)`:
 
 - `config` — a base-path string (e.g. `'/trajectory'`), or a `SingleClientConfig` / `MultiClientConfig` object.
 - `methods` — a map of endpoint descriptors built with the helpers below. Path templates use `':param'` placeholders (e.g. `'/:id'`).
-- `factory` — a `ClientFactory`, `(basePath, opts?) => VoltClient`, that creates the scoped clients (decoupling the DSL from any particular HTTP configuration).
+- `factory` — a `ClientFactory`, `(basePath, opts?) => VoltClient`, that creates the scoped clients.
 
-It returns a built service whose methods are called directly — `service.method(params)` — with no second application.
+Methods on the returned service are invoked directly — `service.method(params)` — with no second application.
 
 ```typescript
 import { createService, get, post, patch, del, paginated } from '@voltstack/voltclient';
@@ -288,7 +280,7 @@ const trajectory = await TrajectoryService.getById({ id: 'abc123' });
 
 ## Error Handling
 
-`ApiError` exposes a string `code` (e.g. `'Network::Timeout'`, `'Auth::Unauthorized'`) as its primary discriminator, alongside an optional HTTP `status` and `message`. It also provides `getFriendlyMessage()`, `isPermissionDenied()`, and the static `ApiError.isRBACError(err)` helper, so consumers can branch on error codes rather than HTTP status alone.
+`ApiError` exposes a string `code` (e.g. `'Network::Timeout'`, `'Auth::Unauthorized'`) as its primary discriminator, alongside an optional HTTP `status` and `message`. It also provides `getFriendlyMessage()`, `isPermissionDenied()`, and the static `ApiError.isRBACError(err)` helper.
 
 ```typescript
 import { ApiError } from '@voltstack/voltclient';

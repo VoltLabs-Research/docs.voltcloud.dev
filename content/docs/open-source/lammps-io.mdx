@@ -5,7 +5,7 @@ description: Native Node.js addon for high-performance LAMMPS file parsing and s
 
 ## Overview
 
-`@voltstack/lammps-io` is a C++ native Node.js addon that parses LAMMPS data files and dump files at high speed. It extracts atom positions, types, IDs, simulation box bounds, and column headers, returning everything as typed arrays for zero-copy performance.
+Parses LAMMPS data and dump files, extracting atom positions, types, IDs, simulation box bounds, and column headers as zero-copy typed arrays.
 
 | | |
 |---|---|
@@ -21,8 +21,6 @@ npm install @voltstack/lammps-io
 ```
 
 ## Modules
-
-The package exports three native modules:
 
 ```javascript
 const { dataParser, dumpParser, statsParser } = require('@voltstack/lammps-io');
@@ -40,7 +38,7 @@ const { dataParser, dumpParser, statsParser } = require('@voltstack/lammps-io');
 
 ### `dataParser.parseData(filepath, options?)`
 
-Parses a LAMMPS data file and returns atom positions, types, and metadata.
+Parses a LAMMPS data file.
 
 ```typescript
 function parseData(
@@ -83,7 +81,7 @@ interface ParseResult {
 For LAMMPS data files, `metadata.timestep` is always `0` and `metadata.headers` is always an empty array — data files have no `ITEM: TIMESTEP` or `ITEM: ATOMS` column-header line. These fields are only meaningful for `parseDump`.
 </Callout>
 
-The function throws on unreadable or invalid input (e.g., `"Failed to open file"`, `"Invalid LAMMPS data format"`, `"No atoms parsed"`). Callers should handle errors appropriately.
+Throws on unreadable or invalid input (e.g., `"Failed to open file"`, `"Invalid LAMMPS data format"`, `"No atoms parsed"`).
 
 ---
 
@@ -91,7 +89,7 @@ The function throws on unreadable or invalid input (e.g., `"Failed to open file"
 
 ### `dumpParser.parseDump(filepath, options?)`
 
-Parses a LAMMPS dump file (single timestep snapshot) and returns atom data with full header information.
+Parses a LAMMPS dump file (single timestep snapshot).
 
 ```typescript
 function parseDump(
@@ -127,7 +125,7 @@ const result2 = dumpParser.parseDump('dump.lammpstrj', {
 });
 ```
 
-The function throws on unreadable or invalid input (e.g., `"Failed to open file"`, `"Invalid LAMMPS dump format"`). The typed contract returns `NativeParseResult | null`; callers should guard against a null result.
+Throws on unreadable or invalid input (e.g., `"Failed to open file"`, `"Invalid LAMMPS dump format"`). The typed contract returns `NativeParseResult | null`.
 
 <Callout type="info">
 For files with more than 50,000 atoms, the dump parser automatically uses multi-threaded parsing with hardware concurrency detection.
@@ -139,7 +137,7 @@ For files with more than 50,000 atoms, the dump parser automatically uses multi-
 
 ### `statsParser.getStatsForProperty(filepath, propertyIndex)`
 
-Computes the min and max values for a specific column in a LAMMPS dump file.
+Computes the min and max for a column in a dump file.
 
 ```typescript
 function getStatsForProperty(
@@ -155,7 +153,7 @@ function getStatsForProperty(
 
 ### `statsParser.getMinMaxFromTypedArray(typedArray)`
 
-Computes the min and max values from a typed array.
+Computes the min and max from a typed array.
 
 ```typescript
 function getMinMaxFromTypedArray(
@@ -165,7 +163,7 @@ function getMinMaxFromTypedArray(
 
 ### `statsParser.computeMagnitudes(vectorArray)`
 
-Computes the magnitude (`√(x² + y² + z²)`) of each vector in an array.
+Computes the magnitude (`√(x² + y² + z²)`) of each vector.
 
 ```typescript
 function computeMagnitudes(
@@ -175,7 +173,7 @@ function computeMagnitudes(
 
 ### `statsParser.getUniqueValuesForProperty(filepath, propertyIndex, maxValues?)`
 
-Returns the sorted unique values for a specific column in a dump file.
+Returns the sorted unique values for a column in a dump file.
 
 ```typescript
 function getUniqueValuesForProperty(

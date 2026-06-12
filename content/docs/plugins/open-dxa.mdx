@@ -4,16 +4,15 @@ description: A modified Dislocation Extraction Algorithm pipeline that reconstru
 ---
 
 OpenDXA (UI name **Dislocation Analysis**, plugin key `opendxa`) reconstructs dislocation
-networks from atomistic data. It is **decoupled from the upstream structure-identification
-algorithm**: rather than classifying local structure itself, it consumes a pre-computed
-annotated dump plus cluster tables and runs the Dislocation Extraction Algorithm on top of
-them.
+networks. It is **decoupled from structure identification**: rather than classifying local
+structure itself, it runs the Dislocation Extraction Algorithm on a pre-computed annotated
+dump plus cluster tables.
 
 <Callout type="info">
-In the VOLT workflow, OpenDXA chains a structure-analysis plugin through a required
+In the VOLT workflow, OpenDXA chains a structure-analysis plugin via the required
 `structure_analysis_plugin` reference (Polyhedral Template Matching or Adaptive Common
-Neighbor Analysis). That upstream plugin produces the annotated dump and the
-`*_clusters.table` / `*_cluster_transitions.table` files OpenDXA reads.
+Neighbor Analysis), which produces the annotated dump and the `*_clusters.table` /
+`*_cluster_transitions.table` files OpenDXA reads.
 </Callout>
 
 <Callout type="warn">
@@ -23,12 +22,12 @@ OpenDXA incorporates OVITO-derived code and ships a `LICENSE.OVITO` alongside it
 
 ## Parameters
 
-The UI form (and the CLI) use snake_case argument keys.
+The UI form and the CLI use snake_case argument keys.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `structure_analysis_plugin` | `pluginReference` | — (required) | The chained structure-analysis plugin that produces OpenDXA's inputs. Filtered to `polyhedral-template-matching` and `adaptive-common-neighbor-analysis`. |
-| `reference_topology` | `select` | `fcc` | Matrix-phase topology name, resolved from the lattice YAMLs. Options: `fcc`, `bcc`, `hcp`, `sc`, `cubic_diamond`, `hex_diamond`. Its value is mapped onto the chained plugin's `crystal_structure`. |
+| `structure_analysis_plugin` | `pluginReference` | — (required) | Chained structure-analysis plugin that produces OpenDXA's inputs. Filtered to `polyhedral-template-matching` and `adaptive-common-neighbor-analysis`. |
+| `reference_topology` | `select` | `fcc` | Matrix-phase topology name, resolved from the lattice YAMLs. Options: `fcc`, `bcc`, `hcp`, `sc`, `cubic_diamond`, `hex_diamond`. Mapped onto the chained plugin's `crystal_structure`. |
 | `max_trial_circuit_size` | `number` | `14` | Maximum Burgers circuit size. |
 | `circuit_stretchability` | `number` | `9` | Circuit stretchability factor. |
 | `line_smoothing_level` | `number` | `1.0` | Dislocation line smoothing level. |
@@ -36,12 +35,12 @@ The UI form (and the CLI) use snake_case argument keys.
 
 ### Additional CLI options
 
-These are exposed by the OpenDXA binary and can be passed when invoking it directly (the
-VOLT entrypoint sets several `--export_*` toggles for you).
+Exposed by the OpenDXA binary, passable when invoking it directly (the VOLT entrypoint
+sets several `--export_*` toggles for you).
 
 | Option | Default | Description |
 |---|---|---|
-| `--lattice_dir <path>` | package lattice dir | Directory containing lattice topology YAMLs. |
+| `--lattice_dir <path>` | package lattice dir | Directory of lattice topology YAMLs. |
 | `--clusters_table <path>` | — | Path to the upstream `*_clusters.table`. |
 | `--clusters_transitions <path>` | — | Path to the upstream `*_cluster_transitions.table`. |
 | `--ghost_layer_scale <float>` | `3.5` | Multiplier on the reconstructed max neighbor distance when building ghost atoms for the Delaunay tessellation. |

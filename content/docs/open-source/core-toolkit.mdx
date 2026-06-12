@@ -4,12 +4,12 @@ description: Core C++ library powering VOLT's atomistic simulation analysis. Pro
 ---
 
 <Callout type="info">
-**TL;DR** — CoreToolkit is the C++23 static library every VOLT plugin links against. It provides math primitives, neighbor search algorithms, LAMMPS parsing, and CLI scaffolding. Build with CMake + Conan 2.
+**TL;DR** — CoreToolkit is the C++23 static library every VOLT plugin links against. Build with CMake + Conan 2.
 </Callout>
 
 ## Overview
 
-**CoreToolkit** is the foundational C++23 static library that every VOLT analysis plugin links against. It provides the math primitives, spatial data structures, neighbor-search algorithms, LAMMPS parsing, simulation cell handling, and CLI scaffolding that the [Foundational Algorithms](/docs/open-source#foundational-algorithms) rely on.
+The [Foundational Algorithms](/docs/open-source#foundational-algorithms) rely on CoreToolkit.
 
 | | |
 |---|---|
@@ -21,11 +21,11 @@ description: Core C++ library powering VOLT's atomistic simulation analysis. Pro
 
 ## Modules
 
-CoreToolkit is organized into seven modules under the `include/volt/` namespace:
+Seven modules under the `include/volt/` namespace:
 
 ### `volt/math`
 
-Linear algebra and geometry primitives optimized for atomistic simulation.
+Linear algebra and geometry primitives.
 
 | Header | Description |
 |---|---|
@@ -44,7 +44,7 @@ Linear algebra and geometry primitives optimized for atomistic simulation.
 
 ### `volt/core`
 
-Core data model for atomistic simulations.
+Data model for atomistic simulations.
 
 | Header | Description |
 |---|---|
@@ -54,7 +54,7 @@ Core data model for atomistic simulations.
 | `particle_property.h` | Per-particle property storage |
 | `property_base.h` | Type-erased property base class |
 | `analysis_result.h` | Standard result type for analysis plugins |
-| `volt.h` | Precompiled header (std lib + spdlog + `boost::dynamic_bitset` + `math/lin_alg.h` + common constants and forward declarations) used as the PCH for the library and all plugins |
+| `volt.h` | Precompiled header (std lib + spdlog + `boost::dynamic_bitset` + `math/lin_alg.h` + common constants and forward declarations) for the library and all plugins |
 
 ### `volt/analysis`
 
@@ -95,7 +95,7 @@ CLI scaffolding for plugin executables.
 
 ### `volt/plugin`
 
-The plugin-authoring API. These headers wrap the boilerplate of a plugin executable — argument parsing, frame loading, thread control, and result serialization — so an algorithm only needs to implement its `compute()` step.
+The plugin-authoring API. These headers wrap plugin-executable boilerplate so an algorithm only implements its `compute()` step.
 
 | Header | Description |
 |---|---|
@@ -107,7 +107,7 @@ The plugin-authoring API. These headers wrap the boilerplate of a plugin executa
 
 ## Dependencies
 
-CoreToolkit manages its dependencies via [Conan 2](https://conan.io/):
+Managed via [Conan 2](https://conan.io/):
 
 | Dependency | Version | Purpose |
 |---|---|---|
@@ -116,7 +116,7 @@ CoreToolkit manages its dependencies via [Conan 2](https://conan.io/):
 | spdlog | 1.14.1 | Structured logging |
 | nlohmann_json | 3.11.3 | JSON I/O |
 
-Additionally, three libraries are vendored under `dependencies/`. `MWM_CSP` and `Geogram` are compiled as static libraries; `fast_float` is header-only and installed as headers:
+Three more libraries are vendored under `dependencies/`: `MWM_CSP` and `Geogram` are compiled as static libraries, `fast_float` is header-only (installed as headers):
 
 | Library | Purpose |
 |---|---|
@@ -126,16 +126,16 @@ Additionally, three libraries are vendored under `dependencies/`. `MWM_CSP` and 
 
 ## Build Flags
 
-For GCC/Clang Release builds, CoreToolkit applies HPC-tuned compiler flags (propagated to all consumers via `PUBLIC`):
+GCC/Clang Release builds apply these flags, propagated to all consumers via `PUBLIC`:
 
 ```
 -O3 -mtune=generic -fno-math-errno -fno-trapping-math -ffp-contract=fast
 ```
 
-CPU-specific tuning is opt-in. Configure with `-DVOLT_ENABLE_NATIVE_OPTIMIZATIONS=ON` (the option defaults to `OFF`) to swap `-mtune=generic` for `-march=native`.
+CPU-specific tuning is opt-in: `-DVOLT_ENABLE_NATIVE_OPTIMIZATIONS=ON` (default `OFF`) swaps `-mtune=generic` for `-march=native`.
 
 <Callout type="info">
-CoreToolkit deliberately avoids `-ffast-math` globally to preserve strict IEEE compliance on geometry-critical code paths.
+Avoids `-ffast-math` globally to preserve strict IEEE compliance on geometry-critical code paths.
 </Callout>
 
 ## CI / GitHub Actions

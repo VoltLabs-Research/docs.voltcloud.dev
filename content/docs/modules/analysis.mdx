@@ -3,7 +3,7 @@ title: Analysis & Jobs
 description: Run plugin workflows on trajectories and follow the execution model behind them.
 ---
 
-An analysis is a persisted run of a plugin workflow against a trajectory. Every run is stored as a record with linked trajectory context, status, progress, and result exposures. Runs can be revisited to compare results, retry failed frames, inspect listings, or load a generated 3D artifact into the viewer.
+An analysis is a persisted run of a plugin workflow against a trajectory, stored as a record with linked trajectory context, status, progress, and result exposures. Runs can be revisited to compare results, retry failed frames, inspect listings, or load a generated 3D artifact into the viewer.
 
 ![Analysis & Jobs Overview](/assets/overviews/overviews_analysis-and-jobs.png)
 
@@ -30,7 +30,7 @@ Real-time updates arrive over the same event-driven layer used by the rest of VO
 
 ## Retrying failed frames
 
-VOLT requeues only the failed frames for a given analysis. This avoids re-running already-completed frame work for heavier plugins.
+VOLT requeues only the failed frames for a given analysis, avoiding re-running already-completed frame work for heavier plugins.
 
 ## Results, exposures, and exports
 
@@ -47,7 +47,7 @@ Most of these start as Apache Parquet data and are transformed into the represen
 
 ## Jobs layer
 
-The Jobs system is the operational side of analysis. It tracks work across the team and provides a dedicated view for queue activity, running jobs, and retries.
+The Jobs system is the operational side of analysis, tracking work across the team with a dedicated view for queue activity, running jobs, and retries.
 
 The hierarchy is:
 
@@ -55,7 +55,7 @@ The hierarchy is:
 2. Frame-level groups within that trajectory.
 3. Individual per-frame jobs performing the processing.
 
-The Jobs panel is team-wide and reports queue activity across all workspace members in real time.
+The Jobs panel is team-wide, reporting queue activity across all workspace members in real time.
 
 ## Team-wide job actions
 

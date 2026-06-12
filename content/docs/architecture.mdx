@@ -5,13 +5,13 @@ description: Application server, cluster daemon, storage, workflows, and native 
 
 ## The mental model
 
-VOLT is organized in three layers:
+VOLT has three layers:
 
-- the **workspace layer** is the application the team interacts with,
-- the **runtime layer** is the daemon running on connected machines,
-- and the **native/tooling layer** is the C++ and SDK ecosystem powering parsing, analysis, 3D export, and automation.
+- the **workspace layer** — the application the team interacts with,
+- the **runtime layer** — the daemon on connected machines,
+- the **native/tooling layer** — the C++ and SDK ecosystem for parsing, analysis, 3D export, and automation.
 
-This separation enables coordinated operations across distributed infrastructure while keeping data and execution local to team-controlled machines.
+Coordination is central; data and execution stay local to team-controlled machines.
 
 ## System overview
 
@@ -61,17 +61,11 @@ graph TB
 
 ## The workspace layer
 
-At the top is the main VOLT application: a React client and an Express-based server. This layer handles the things you would expect from a team workspace: authentication, team state, permissions, conversations, routes, APIs, and the real-time event flow the UI depends on.
-
-It is also where domain modules such as trajectories, analysis, containers, scripting, LaTeX, chat, notifications, and AI are coordinated.
-
-This layer coordinates operations but does not store simulation data permanently.
+The main VOLT application — a React client and an Express-based server. It handles authentication, team state, permissions, conversations, routes, APIs, and real-time events, and coordinates domain modules: trajectories, analysis, containers, scripting, LaTeX, chat, notifications, and AI. It does not store simulation data permanently.
 
 ## The cluster daemon layer
 
-ClusterDaemon is the runtime that executes operations on cluster infrastructure.
-
-It connects outward to VOLT over a reverse control channel, so the cluster does not need to expose inbound HTTP services. Once connected, it can:
+ClusterDaemon executes operations on cluster infrastructure. It connects outward to VOLT over a reverse control channel, so the cluster needs no inbound HTTP services. Once connected, it can:
 
 - receive analysis requests,
 - maintain heartbeats and metrics,
@@ -81,8 +75,6 @@ It connects outward to VOLT over a reverse control channel, so the cluster does 
 - create Jupyter runtimes,
 - proxy access to managed data services (MinIO, MongoDB, and Redis explorers) and container HTTP/WebSocket ports,
 - and coordinate artifacts and exports.
-
-The server coordinates operations; the daemon executes them on cluster infrastructure.
 
 ## Data flow for analysis
 
@@ -109,15 +101,13 @@ The daemon transforms plugin output into Apache Parquet data, listings, exports,
 
 ## Data flow for trajectories
 
-Trajectory handling follows the same layered pattern. The full processing pipeline is documented in [Trajectories](/docs/modules/trajectories#processing-pipeline).
+Trajectory handling follows the same layered pattern; the full pipeline is documented in [Trajectories](/docs/modules/trajectories#processing-pipeline).
 
 ## Workflow runtime versus plugin binaries
 
-In VOLT, a plugin is a node-based workflow with arguments, context, iteration, exposures, and exports. The runtime resolves that workflow into one or more binary or Python execution steps. The workflow engine handles the structural logic around `context`, `forEach`, `arguments`, and branching nodes. The job runtime turns the plan into frame-level work: it downloads inputs, resolves the plugin payload, executes it, and processes the resulting artifacts. See [Plugin System](/docs/plugins) for node-level details.
+A plugin is a node-based workflow with arguments, context, iteration, exposures, and exports. The runtime resolves it into one or more binary or Python execution steps: the workflow engine handles structural logic around `context`, `forEach`, `arguments`, and branching nodes; the job runtime turns the plan into frame-level work — download inputs, resolve the plugin payload, execute it, process the artifacts. See [Plugin System](/docs/plugins) for node-level details.
 
 ## Native tooling and open-source layers
-
-Several capabilities are powered by the open-source ecosystem around VOLT.
 
 | Tool | Role in the Runtime |
 |---|---|
@@ -126,8 +116,6 @@ Several capabilities are powered by the open-source ecosystem around VOLT.
 | **SpatialAssembler** | Conversion of structured output into GLB geometry |
 | **HeadlessRasterizer** | Rendering of GLB assets into PNG previews |
 | **VoltSDK** | Programmatic access for external automation and notebooks |
-
-Documentation covers both the application and the native tooling ecosystem.
 
 ## Networking and operational shape
 
@@ -140,18 +128,16 @@ Documentation covers both the application and the native tooling ecosystem.
 | Daemon to Redis | TCP | Queues, state, and caching |
 | Daemon to Docker | Unix socket | Containers and Jupyter runtimes |
 
-The reverse channel between the server and the daemon eliminates the need to open inbound ports on the cluster.
-
 ## Bootstrap plane vs control plane
 
 The cluster lifecycle has two phases:
 
-- The **bootstrap plane** installs and enrolls the cluster.
-- The **control plane** keeps it operational after enrollment.
+| Phase | Role | Covers |
+|---|---|---|
+| **Bootstrap plane** | Installs and enrolls the cluster | Install material generation, environment and compose file writing, local service startup, and initial daemon announcement |
+| **Control plane** | Keeps it operational after enrollment | Heartbeats, reverse-channel commands, job dispatch, remote access, notebook sessions, exposure registry updates, and lifecycle events through the daemon connection |
 
-Bootstrap covers install material generation, environment and compose file writing, local service startup, and initial daemon announcement. The control plane handles heartbeats, reverse-channel commands, job dispatch, remote access, notebook sessions, exposure registry updates, and lifecycle events through the daemon connection.
-
-A cluster can fail in one phase but not the other: a machine may install correctly yet never become a healthy control-plane participant, or it may bootstrap once and later disconnect.
+The two phases fail independently: a machine may install correctly yet never become a healthy control-plane participant, or it may bootstrap once and later disconnect.
 
 ## Daemon startup order
 
@@ -170,7 +156,7 @@ If MongoDB, Redis, MinIO, or Docker are unavailable locally, the daemon fails be
 
 ## Memory-aware runtime behavior
 
-The daemon launcher (`scripts/start.js`) sizes the V8 heap from the available memory before the process starts: it reads the cgroup limit when running under Docker (falling back to the host's total RAM otherwise) and sets `--max-old-space-size` to roughly 80% of that budget, bounded by a floor and a ceiling. It also injects `--expose-gc` so manual garbage collection is available. This keeps the heap inside the container's memory budget and avoids the daemon being OOM-killed for sizing its heap against host RAM.
+The daemon launcher (`scripts/start.js`) sizes the V8 heap before the process starts: it reads the cgroup limit under Docker (falling back to the host's total RAM) and sets `--max-old-space-size` to roughly 80% of that budget, bounded by a floor and a ceiling. It also injects `--expose-gc` for manual garbage collection. This keeps the heap inside the container's budget and avoids OOM-kills from sizing against host RAM.
 
 ## Exposure registry and service discovery
 
@@ -178,7 +164,19 @@ The exposure registry inspects managed containers, reads their labels, determine
 
 ## Shutdown behavior
 
-On shutdown the daemon shuts down debug sessions, stops its compute workers, removes its own exposure and stops the exposure registry, stops the object-gateway server, disconnects the cloud, event-channel, and object-gateway connections, stops the heartbeat plane, closes queue state, shuts down the plugin process pool, and releases its local dependencies. A clean stop looks different from a crash in the logs.
+On shutdown the daemon:
+
+- shuts down debug sessions,
+- stops its compute workers,
+- removes its own exposure and stops the exposure registry,
+- stops the object-gateway server,
+- disconnects the cloud, event-channel, and object-gateway connections,
+- stops the heartbeat plane,
+- closes queue state,
+- shuts down the plugin process pool,
+- releases its local dependencies.
+
+A clean stop looks different from a crash in the logs.
 
 ## Failure checklist
 

@@ -3,11 +3,11 @@ title: Teams
 description: "Manage the workspace itself: members, roles, invitations, secret keys, and integrations."
 ---
 
-A team is the workspace boundary in VOLT. Trajectories, clusters, containers, notebooks, chats, LaTeX projects, AI providers, secret keys, and permissions all belong to a team. Switching teams swaps the entire workspace context.
+A team is the workspace boundary in VOLT. Trajectories, clusters, containers, notebooks, chats, LaTeX projects, AI providers, secret keys, and permissions all belong to a team, and switching teams swaps the entire workspace context.
 
 ## Creating and structuring workspaces
 
-A user can create multiple teams for different labs, projects, collaborations, or client boundaries. After creation, the next operations are inviting members, assigning roles, and connecting infrastructure.
+Create multiple teams to separate labs, projects, collaborations, or clients. After creation, you invite members, assign roles, and connect infrastructure.
 
 ## Invitations
 
@@ -29,7 +29,7 @@ The team module includes an RBAC layer that maps roles to specific resources and
 
 ## Secret keys and programmatic access
 
-Teams issue secret keys for API and SDK access through tools such as `voltsdk` or `@voltstack/voltclient`. Each key is assigned a team role and inherits that role's permissions, so keys can be scoped to exactly the access required. Keys use a `vsk_` prefix and are shown once at creation time; only a prefix and hash are retained. Store keys securely and revoke them when no longer needed.
+Teams issue secret keys for API and SDK access through tools such as `voltsdk` or `@voltstack/voltclient`. Each key is assigned a team role and inherits that role's permissions, so keys can be scoped to exactly the access required. Keys use a `vsk_` prefix and are shown once at creation time; only a prefix and hash are retained.
 
 <Callout type="warn">
 Team secret keys grant programmatic access to the workspace. Store them securely, rotate them when needed, and revoke them on suspected exposure.
@@ -37,4 +37,4 @@ Team secret keys grant programmatic access to the workspace. Store them securely
 
 ## AI integrations
 
-Volt AI provider management is part of team administration. Provider keys, model availability, and AI configuration belong to the team, not to individual user profiles.
+Volt AI provider management is part of team administration: provider keys, model availability, and AI configuration belong to the team, not to individual user profiles.

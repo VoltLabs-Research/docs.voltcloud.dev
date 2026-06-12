@@ -5,9 +5,9 @@ description: TypeScript WebSocket client for cluster daemon communication with t
 
 ## Overview
 
-`@voltstack/daemon-cluster-client` is the TypeScript client that cluster daemons use to communicate with the VOLT server over WebSocket (socket.io). It handles enrollment, heartbeat, bidirectional command dispatch, and real-time messaging.
+`@voltstack/daemon-cluster-client` lets cluster daemons communicate with the VOLT server over WebSocket (socket.io): enrollment, heartbeat, bidirectional command dispatch, and real-time messaging.
 
-This package is used internally by the VOLT cluster daemon. If you are building a custom daemon or integrating cluster-level services, this is the client you need.
+Used internally by the VOLT cluster daemon; use it directly to build a custom daemon or integrate cluster-level services.
 
 ## Installation
 
@@ -121,11 +121,11 @@ interface SocketOptions {
 
 ### `connect(): Promise<void>`
 
-Performs the full connection sequence:
+Runs the full connection sequence:
 
-1. **Enrollment** (only when `enrollment.url` is configured and a `credentials.enrollmentToken` is present, unless `enrollment.enabled === false`): performs an HTTP POST to the healthcheck endpoint. The server may rotate the daemon password.
-2. **Socket connection**: Establishes a socket.io connection to the control socket and completes registration.
-3. **Heartbeat**: Starts a periodic heartbeat loop that sends `runtime.heartbeat` commands.
+1. **Enrollment** (only when `enrollment.url` is configured and a `credentials.enrollmentToken` is present, unless `enrollment.enabled === false`): HTTP POST to the healthcheck endpoint. The server may rotate the daemon password.
+2. **Socket connection**: establishes a socket.io connection to the control socket and completes registration.
+3. **Heartbeat**: starts a periodic loop that sends `runtime.heartbeat` commands.
 
 ```typescript
 const client = new ClusterDaemonClient({
@@ -166,7 +166,7 @@ if (client.isReady()) {
 
 ### `sendCommand<T>(command, payload?, timeout?): Promise<T | undefined>`
 
-Sends a request to the VOLT server and waits for a response. Uses a UUID-keyed request/response pattern with timeout.
+Sends a request to the VOLT server and waits for a response, using a UUID-keyed request/response pattern with timeout.
 
 ```typescript
 // Send a command and wait for response
@@ -188,7 +188,7 @@ const result = await client.sendCommand('long-operation', payload, 60000);
 
 ### `emit(message): void`
 
-Sends a fire-and-forget message on the control socket. Used for notifications that do not require a response.
+Sends a fire-and-forget message on the control socket, for notifications that do not require a response.
 
 ```typescript
 client.emit({
@@ -199,18 +199,21 @@ client.emit({
 
 ## Handling Inbound Commands
 
-The VOLT server can send commands to the daemon (e.g., "run this plugin", "list container files"). Register handlers to respond to these commands.
+The VOLT server can send commands to the daemon (e.g., "run this plugin", "list container files"). Register handlers to respond.
 
 ### `registerHandler(command, handler): this`
 
 Registers a handler for a specific inbound command. Handlers survive reconnections.
 
-A handler is a `ReverseChannelHandler` object with a `handle(payload, context)` method. The
-method returns a `CommandResult` — an object with optional `status` (HTTP-style status code,
-default `200`), `data` (JSON-serialisable response data), `body` (a raw `Buffer`), `headers`,
-and `stream` (a `ReadableStream<Uint8Array>`). The `body`, `data`, and `stream` fields are
-mutually exclusive. The bridge wraps the result into a response envelope and sends it back to
-the server automatically.
+A handler is a `ReverseChannelHandler` object with a `handle(payload, context)` method returning a `CommandResult` (all fields optional):
+
+- `status` — HTTP-style status code (default `200`)
+- `data` — JSON-serialisable response data
+- `body` — a raw `Buffer`
+- `headers`
+- `stream` — a `ReadableStream<Uint8Array>`
+
+`body`, `data`, and `stream` are mutually exclusive. The bridge wraps the result into a response envelope and sends it back to the server automatically.
 
 ```typescript
 client.registerHandler('execute-plugin', {
@@ -227,8 +230,7 @@ client.registerHandler('list-files', {
 });
 ```
 
-The `context` argument provides the originating `command` name and the `requestId` from the
-incoming command envelope.
+The `context` argument provides the originating `command` name and the `requestId` from the incoming command envelope.
 
 ### `unregisterHandler(command): this`
 
@@ -242,9 +244,7 @@ client.unregisterHandler('execute-plugin');
 
 Subscribes to all inbound non-command messages (e.g., session input, tunnel events, exposure snapshots).
 
-Each message is a member of the `TeamClusterDaemonMessage` union, discriminated by its `type`
-field (e.g. `session-input`, `session-data`, `tunnel-open`, `tunnel-state`, `exposure-snapshot`).
-Narrow on `message.type` to access the type-specific fields.
+Each message is a member of the `TeamClusterDaemonMessage` union, discriminated by `type` (e.g. `session-input`, `session-data`, `tunnel-open`, `tunnel-state`, `exposure-snapshot`); narrow on `message.type` to access the type-specific fields.
 
 ```typescript
 client.onMessage((message) => {
@@ -322,8 +322,7 @@ try {
 
 ### Error Codes
 
-The `code` value on a `DaemonClientError` is the string returned below (the corresponding
-`DaemonClientErrorCode` enum member is shown for reference).
+`err.code` is the string value below; the corresponding `DaemonClientErrorCode` enum member is shown for reference.
 
 | `err.code` value | Enum member | Description |
 |---|---|---|

@@ -4,12 +4,12 @@ description: The VOLT Cloud plugin registry CLI — authenticate, publish, insta
 ---
 
 <Callout type="info">
-**TL;DR** — `vpm` is the npm-installed CLI for the VOLT plugin Registry. It logs in via a device-code flow, publishes multi-platform plugin bundles, and installs them into a shared on-disk cache that the [Python SDK](/docs/open-source/python-client) and ClusterDaemon read from. Requires Node ≥ 20.
+**TL;DR** — `vpm` is the npm-installed CLI for the VOLT plugin Registry. It logs in via a device-code flow, publishes multi-platform plugin bundles, and installs them into a shared on-disk cache that the [Python SDK](/docs/open-source/python-client) and ClusterDaemon read from.
 </Callout>
 
 ## Overview
 
-**vpm** (VOLT Package Manager) is a Node CLI that talks to two services: the **Registry** (package metadata, bundles, search) and the **Console** (authentication, personal access tokens). It is the tool the CI workflow in [plugin-development](/docs/open-source/plugin-development) calls to publish a plugin on tag pushes, and it can also be used directly to discover and install plugins.
+**vpm** (VOLT Package Manager) is a Node CLI for two services: the **Registry** (package metadata, bundles, search) and the **Console** (authentication, personal access tokens). CI publishes plugins with it on tag pushes (see [plugin-development](/docs/open-source/plugin-development)); run it directly to discover and install plugins.
 
 | | |
 |---|---|
@@ -32,7 +32,7 @@ vpm --version
 
 ### `vpm login`
 
-Runs an OAuth-style **device-code flow** against the Console: it requests a code, prints a verification URL + user code, opens the browser (unless `--no-browser`), then polls until you approve. On success it stores the access/refresh tokens and your profile.
+Runs an OAuth-style **device-code flow** against the Console: requests a code, prints a verification URL and user code, opens the browser (unless `--no-browser`), then polls until you approve. On success, stores the access/refresh tokens and your profile.
 
 ```bash
 vpm login
@@ -41,11 +41,11 @@ vpm login --no-browser   # print the URL/code, don't auto-open
 
 ### `vpm whoami`
 
-Resolves the current bearer token against the Console and prints account id, email, and username. Exits non-zero if not logged in.
+Resolves the current bearer token against the Console; prints account id, email, and username. Exits non-zero if not logged in.
 
 ### `vpm logout`
 
-Revokes the refresh token on the Console and clears stored credentials. Pass `--keep-remote` to clear locally without revoking the server session.
+Revokes the refresh token on the Console and clears stored credentials. `--keep-remote` clears locally without revoking the server session.
 
 ### Personal access tokens
 
@@ -66,7 +66,7 @@ vpm token revoke <id>
 |---|---|
 | OS keyring (default, via `keytar`) | service `voltcloud`, account `default` |
 
-vpm falls back to the file backend when the keyring is unavailable or when `VPM_NO_KEYRING=1`. The bearer token used for requests is the PAT if present, otherwise the stored access token.
+Falls back to the file backend when the keyring is unavailable or `VPM_NO_KEYRING=1`. Requests use the PAT if present, otherwise the stored access token.
 
 ## Command reference
 
@@ -100,7 +100,7 @@ vpm deprecate <@user/name@version> "<message>" [--token <t>]
 
 ## The manifest (`vpm.json`)
 
-`init` scaffolds a `vpm.json`; `pack` and `publish` discover it by walking up from the target directory. It is validated with Zod before any publish.
+`init` scaffolds a `vpm.json`; `pack` and `publish` find it by walking up from the target directory. Validated with Zod before any publish.
 
 | Field | Required | Notes |
 |---|---|---|
@@ -124,13 +124,13 @@ vpm deprecate <@user/name@version> "<message>" [--token <t>]
 `vpm publish` builds a multipart `PUT /packages/:user/:name` request:
 
 1. **Resolve the manifest** and confirm `name` is `@user/name`.
-2. **Collect platform bundles.** Either pass `--bundle <tag>=<path>` (repeatable), or let vpm auto-discover `*.tgz` / `*.tar.gz` / `*.tar.zst` files in `./bundles` (override with `--bundle-dir`). The bundle's **tag** is the filename up to the first dot — so name files after their platform tag, e.g. `linux-x86_64.tar.zst`.
+2. **Collect platform bundles.** Pass `--bundle <tag>=<path>` (repeatable), or let vpm auto-discover `*.tgz` / `*.tar.gz` / `*.tar.zst` files in `./bundles` (override with `--bundle-dir`). A bundle's **tag** is its filename up to the first dot, so name files after their platform tag, e.g. `linux-x86_64.tar.zst`.
 3. **Validate coverage.** If the manifest lists `platforms`, every listed tag must have a bundle; otherwise at least one bundle is required.
 4. **Attach `README.md`** if present (becomes the rendered package readme).
 5. **Authenticate** with the stored token or `--token`.
 6. **Upload** — manifest JSON + readme + each bundle blob. `--dry-run` reports what would be sent and uploads nothing.
 
-Server responses map to clear errors: `409` version already exists, `403` not authorized for that scope, `422` invalid manifest, `401` bad/missing token.
+Server responses map to errors: `409` version already exists, `403` not authorized for that scope, `422` invalid manifest, `401` bad/missing token.
 
 <Callout type="warn">
 The Registry never serves bundles inline. `install` expects a `307` redirect to a signed URL; an inline `200` is treated as an error.
@@ -138,11 +138,11 @@ The Registry never serves bundles inline. `install` expects a `307` redirect to 
 
 ### Building bundles
 
-`vpm pack` produces a single gzipped tarball of the package directory (`vpm.json`, `README.md`, `LICENSE`, `dist`, `bin` by default, or `vpm.json` + the manifest's `files`). It is useful for inspection and library packages. For native plugins, the per-platform `.tar.zst` bundles are produced by CoreToolkit's reusable CI workflow and uploaded by `publish` — see [plugin-development](/docs/open-source/plugin-development).
+`vpm pack` produces a single gzipped tarball of the package directory (`vpm.json`, `README.md`, `LICENSE`, `dist`, `bin` by default, or `vpm.json` + the manifest's `files`). Use it for inspection and library packages. For native plugins, the per-platform `.tar.zst` bundles are produced by CoreToolkit's reusable CI workflow and uploaded by `publish` — see [plugin-development](/docs/open-source/plugin-development).
 
 ## Reference resolution
 
-Plugin references use a single canonical form, with an optional version suffix:
+Plugin references, with an optional version suffix:
 
 | Input | Meaning |
 |---|---|
