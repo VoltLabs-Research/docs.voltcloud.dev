@@ -241,9 +241,30 @@ The **Exposure** node tells VOLT which output file should be ingested after exec
 
 | Field | Example value | What it does |
 |---|---|---|
-| **Exposure Name** | `Structure Identification` | Result name shown in VOLT |
-| **Results File Suffix** | `atoms.parquet` | File suffix your program must write |
+| **Exposure Name** | `Structure Identification` | The label shown in VOLT for that result |
+| **Results File Suffix** | `atoms.parquet` | The exact suffix the plugin writes after the output base (e.g. `atoms.parquet`, `defect_mesh.parquet`, `dislocations.parquet`) |
 | **Icon** | `TbEye` | Optional result icon |
+
+**File naming contract.** Given an output base of `abc` and a Results File Suffix of `atoms.parquet`, the plugin must write `abc_atoms.parquet`. VOLT will not ingest the result if the filename does not match, even when the payload is valid.
+
+```python
+import parquet
+import sys
+
+output_base = sys.argv[2]
+
+payload = {
+    "main_listing": {
+        "identified_atoms": 9211,
+        "defect_atoms": 314
+    }
+}
+
+with open(f"{output_base}_atoms.parquet", "wb") as f:
+    f.write(parquet.packb(payload, use_bin_type=True))
+```
+
+If `output_base` is `abc`, this writes `abc_atoms.parquet`, which matches the `Exposure` node contract.
 
 One `Entrypoint` can connect to several `Exposure` nodes: a single execution can produce multiple result files, each with its own exposure.
 
@@ -306,7 +327,11 @@ At runtime, team clusters extracts the ZIP and resolves the executable path from
 
 ### What to put in `Arguments`
 
-The **Arguments** field is the command template passed to the selected runtime.
+The **Arguments** field is the command template passed to the selected runtime. The arguments delivered to the entrypoint follow a common pattern:
+
+- input dump path,
+- output base path,
+- optional serialized parameters.
 
 | Variable | Resolves to |
 |---|---|
@@ -327,60 +352,7 @@ A packaged executable typically uses:
 {{ foreach-trajectory-dumps.outputPath }}_annotated.dump {{ foreach-trajectory-dumps.outputPath }} --lattice_dir {{ analysis-entrypoint.projectPath }}/share/volt/lattices {{ plugin-arguments.as_str }}
 ```
 
-<Callout type="info">
-The upload button in the **Entrypoint** editor is enabled only after the plugin has been saved at least once. Save the workflow before uploading the binary or ZIP.
-</Callout>
-
-## Exposure file naming contract
-
-The **Exposure** node defines a file contract. Given:
-
-| Field | Value |
-|---|---|
-| Exposure Name | `Structure Identification` |
-| Results File Suffix | `atoms.parquet` |
-
-and an output base of `abc`, the plugin must write `abc_atoms.parquet`. VOLT will not ingest the result if the filename does not match, even when the payload is valid.
-
-For example:
-
-```python
-import parquet
-import sys
-
-output_base = sys.argv[2]
-
-payload = {
-    "main_listing": {
-        "identified_atoms": 9211,
-        "defect_atoms": 314
-    }
-}
-
-with open(f"{output_base}_atoms.parquet", "wb") as f:
-    f.write(parquet.packb(payload, use_bin_type=True))
-```
-
-If `output_base` is `abc`, this writes `abc_atoms.parquet`, which matches the `Exposure` node contract.
-
-## What the Exposure node is for
-
-The two essential fields:
-
-| Exposure field | What it means |
-|---|---|
-| **Exposure Name** | The label shown in VOLT for that result. |
-| **Results File Suffix** | The exact suffix the plugin writes after the output base (e.g. `atoms.parquet`, `defect_mesh.parquet`, `dislocations.parquet`). |
-
-## Entrypoint arguments
-
-Arguments delivered to the entrypoint depend on the node configuration. The common pattern:
-
-- input dump path,
-- output base path,
-- optional serialized parameters.
-
-For example:
+The script reads the input dump from `sys.argv[1]`, the output base from `sys.argv[2]`, and writes a parquet file whose name matches the exposure suffix:
 
 ```python
 import sys
@@ -400,6 +372,10 @@ with open(f"{output_base}_results.parquet", "wb") as f:
 ```
 
 When the exposure suffix is `results.parquet`, this file is ingested correctly.
+
+<Callout type="info">
+The upload button in the **Entrypoint** editor is enabled only after the plugin has been saved at least once. Save the workflow before uploading the binary or ZIP.
+</Callout>
 
 ## What can go inside one exposure file
 
