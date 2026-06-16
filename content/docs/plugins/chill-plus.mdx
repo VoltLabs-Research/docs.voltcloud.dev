@@ -1,0 +1,79 @@
+---
+title: Chill+ Ice & Hydrate Classifier
+description: Classify hexagonal ice, cubic ice, interfacial ice, and hydrate phases using Chill+ bond-order correlation.
+---
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `cutoff` | `float` | `3.5` | O-O neighbor cutoff in angstroms used to build the bond network. Range `2.0`–`10.0`. |
+
+## Output
+
+The plugin writes two parquet files per frame.
+
+### `{outputBase}_atoms.parquet`
+
+Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are grouped into buckets by their Chill+ classification (`HEXAGONAL_ICE`, `CUBIC_ICE`, `INTERFACIAL_ICE`, `HYDRATE`, `INTERFACIAL_HYDRATE`, `OTHER`). Each atom carries a `structure_type` code identifying its phase.
+
+```ts
+interface Atom {
+    id: int;
+    pos: [float, float, float];
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    // 0 OTHER, 1 HEXAGONAL_ICE, 2 CUBIC_ICE,
+    // 3 INTERFACIAL_ICE, 4 HYDRATE, 5 INTERFACIAL_HYDRATE
+    structure_type: int64;
+}
+
+interface AtomsOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+    };
+    sub_listings: {
+        structures: Array<{
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }>;
+    };
+    export: {
+        AtomisticExporter: {
+            [bucketName: string]: Atom[];
+        };
+    };
+}
+```
+
+Surfaced in VOLT as the **Chill+ Structure** exposure and exported as a `.glb` scene.
+
+### `{outputBase}_chill_plus.parquet`
+
+Frame-level summary of the classification. Reports the atom count for each Chill+ phase alongside the cutoff used.
+
+```ts
+interface ChillPlusSummaryOutput {
+    main_listing: {
+        total_atoms: int;
+        cutoff: float;
+        OTHER: int;
+        HEXAGONAL_ICE: int;
+        CUBIC_ICE: int;
+        INTERFACIAL_ICE: int;
+        HYDRATE: int;
+        INTERFACIAL_HYDRATE: int;
+    };
+}
+```
+
+Surfaced in VOLT as the **Chill+ Summary** exposure (listing-only; no 3D or chart artifact).
+
+## See Also
+
+- [Identify Diamond](/docs/plugins/identify-diamond) — classifies tetrahedral diamond/ice-like networks
+- [Steinhardt Order Parameters](/docs/plugins/steinhardt-order-parameters) — the bond-order parameters Chill+ builds on
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — local crystal structure labels

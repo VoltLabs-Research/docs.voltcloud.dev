@@ -1,0 +1,97 @@
+---
+title: Steinhardt Order Parameters
+description: Compute per-atom bond-orientational order parameters for crystallinity, nucleation, and liquid/solid discrimination.
+---
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `qlist` | `string` | `4,6,8,10,12` | Comma-separated list of orders `l` to compute. |
+| `nnn` | `int` | `12` | Fixed number of nearest neighbors. Set to `0` to use `cutoff` instead. |
+| `cutoff` | `float` | `0` | Cutoff radius for neighbor search. Only used when `nnn` is `0`. |
+| `wl` | `bool` | `false` | Also compute the Wigner-3j invariants `w_l`. |
+| `wlHat` | `bool` | `false` | Also compute the normalized `w_l_hat = w_l / q_l^3` (dimensionless). |
+| `components` | `int` | `-1` | Emit the `2l+1` complex `Q_l^m / |Q_l|` components for a single order `l`. Disabled when `< 0`. |
+| `onlySelected` | `bool` | `false` | Only classify atoms flagged by a `Selection` column. |
+
+## Output
+
+The plugin writes two parquet files per frame.
+
+### `{outputBase}_steinhardt.parquet`
+
+Summary statistics for the frame, including the `q_6`-derived structure breakdown.
+
+```ts
+interface SteinhardtOutput {
+    main_listing: {
+        total_atoms: int;
+        qlist: int[];
+        nnn: int;
+        cutoff: float;
+        wl: bool;
+        wl_hat: bool;
+        components: int;
+        liquid_like: int;
+        interface: int;
+        crystal_like: int;
+    };
+    sub_listings: {
+        structures: Array<{
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }>;
+    };
+}
+```
+
+### `{outputBase}_atoms.parquet`
+
+Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are bucketed by their `q_6`-derived structure label under group names `Liquid-like`, `Interface`, and `Crystal-like`. Each atom carries one scalar column per order in `qlist`, the classifying `q6` scalar, and the full `q_l` set as a single `list<double>` for downstream analysis.
+
+```ts
+interface Atom {
+    id: int;
+    pos: [float, float, float];
+    bucket: string;
+    // one scalar column per order l in qlist (e.g. q_4, q_6, q_8, q_10, q_12)
+    [q_l: `q_${number}`]: float;
+    q6: float;
+    q: float[];
+    // emitted only when wl = true (one per order l)
+    [w_l: `w_${number}`]?: float;
+    // emitted only when wlHat = true (one per order l)
+    [w_hat_l: `w_hat_${number}`]?: float;
+    // emitted only when components >= 0: the 2*(2l+1) real/imag parts
+    components?: float[];
+}
+
+interface AtomsOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+    };
+    sub_listings: {
+        structures: Array<{
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }>;
+    };
+    export: {
+        AtomisticExporter: {
+            [bucketName: string]: Atom[];
+        };
+    };
+}
+```
+
+Surfaced in VOLT as the **Steinhardt Model** exposure and exported as a `.glb` scene.
+
+## See Also
+
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — local crystal structure classification
+- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — robust per-atom structure labels and orientation
+- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — fast disorder and defect highlighting

@@ -1,0 +1,111 @@
+---
+title: Interfacial Line Defect Analysis
+description: Extract interfacial dislocations and disconnections at a semi-coherent interface as line segments annotated with Burgers vector and step height.
+---
+
+## Parameters
+
+This plugin consumes the per-atom and per-grain tables produced by an upstream [Grain Segmentation](/docs/plugins/grain-segmentation) step (inferred from context).
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `grain-atoms` | `string` | inferred | Per-atom annotated parquet (grain id, structure type, orientation) from the upstream grain-segmentation step. |
+| `grains` | `string` | inferred | Per-grain table (structure type, orientation) from the upstream grain-segmentation step. |
+| `atomA` | `int` | `0` | Atom A particle identifier. |
+| `atomB` | `int` | `0` | Atom B particle identifier. |
+| `aA` | `float` | `1.0` | Lattice constant a (Grain A). |
+| `cA` | `float` | `0.0` | Lattice constant c (Grain A). |
+| `aB` | `float` | `1.0` | Lattice constant a (Grain B). |
+| `cB` | `float` | `0.0` | Lattice constant c (Grain B). |
+| `typeA` | `int` | `-1` | Structure type A (`-1` = derive). |
+| `typeB` | `int` | `-1` | Structure type B (`-1` = derive). |
+| `Rsphere` | `float` | `10.0` | Probe sphere radius. |
+| `htol` | `float` | `0.5` | Step height tolerance. |
+| `btol` | `float` | `0.01` | Burgers length tolerance. |
+| `angtol` | `float` | `5.0` | Burgers angular tolerance (deg). |
+| `distF` | `float` | `10.0` | Interface skin distance. |
+| `cis_tol` | `float` | `0.0` | Co-incidence site tolerance. |
+| `rmsd` | `float` | `0.1` | PTM RMSD cutoff. |
+| `estimateF` | `bool` | `true` | Estimate the coherent reference frame. |
+| `single_circuit` | `bool` | `false` | Trace a single circuit. |
+| `extract_lines` | `bool` | `false` | Extract line segments. |
+| `selection_only` | `bool` | `false` | Use only selected particles. |
+| `print_results` | `bool` | `false` | Print a results summary. |
+| `circuitAtom1` | `int` | `0` | Single-circuit atom 1. |
+| `circuitAtom2` | `int` | `0` | Single-circuit atom 2. |
+| `n` | `tuple` | `0, 0, 1` | Interface plane normal `(x, y, z)`. |
+| `xA` | `tuple` | `0, 0, 0` | Orientation x (Grain A); used when `estimateF` is `false`. |
+| `yA` | `tuple` | `0, 0, 0` | Orientation y (Grain A); used when `estimateF` is `false`. |
+| `xB` | `tuple` | `0, 0, 0` | Orientation x (Grain B); used when `estimateF` is `false`. |
+| `yB` | `tuple` | `0, 0, 0` | Orientation y (Grain B); used when `estimateF` is `false`. |
+| `EcohA` | `list` | — | Coherency strain (Grain A, 3x3 rows); used when `estimateF` is `false`. |
+| `EcohB` | `list` | — | Coherency strain (Grain B, 3x3 rows); used when `estimateF` is `false`. |
+
+## Output
+
+The plugin writes two parquet files per frame.
+
+### `{outputBase}_bonds.parquet`
+
+Per-segment line model in BondExporter format, consumed by the VOLT viewer for 3D rendering. Each row is one interfacial line segment between two interface nodes, annotated with its Burgers vector and step height.
+
+```ts
+interface LineSegment {
+    id: int;
+    atom_a: int;
+    atom_b: int;
+    distance: float;
+    burgers_vector: [float, float, float];
+    terrace_plane: [float, float, float];
+    color: [float, float, float];
+    burgers_id: int;
+    magnitude: float;
+    step_height: float;
+    ideal_step_height_a: float;
+    ideal_step_height_b: float;
+    length: float;
+}
+```
+
+Surfaced in VOLT as the **Line Defects** exposure and exported as a `.glb` scene.
+
+### `{outputBase}_disconnection_summary.parquet`
+
+Per-mode summary of the distinct disconnection modes (and their variants) found across the interface.
+
+```ts
+interface DisconnectionVariant {
+    ID: int;
+    Variant: int;
+    Length: float;
+    "Avg b": float;
+    "Avg bx": float;
+    "Avg by": float;
+    "Avg bz": float;
+    "Std bx": float;
+    "Std by": float;
+    "Std bz": float;
+    "Ideal hA": float;
+    "Ideal hB": float;
+    "Avg h": float;
+}
+
+interface DisconnectionSummaryOutput {
+    main_listing: {
+        disconnection_modes: int;
+        variants: int;
+        total_line_length: float;
+    };
+    sub_listings: {
+        disconnection_modes: DisconnectionVariant[];
+    };
+}
+```
+
+Surfaced in VOLT as the **Disconnection Modes** exposure (listing only — no 3D or chart artifact).
+
+## See Also
+
+- [Grain Segmentation](/docs/plugins/grain-segmentation) — required upstream step that produces the per-atom and per-grain tables
+- [OpenDXA](/docs/plugins/open-dxa) — DXA-style dislocation-network reconstruction in the bulk
+- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — local structure and orientation labeling used to build the reference frame

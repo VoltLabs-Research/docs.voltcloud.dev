@@ -1,0 +1,59 @@
+---
+title: Identify Diamond Structure
+description: Identify cubic and hexagonal diamond cores and their neighbor shells using 2nd-nearest-neighbor shell CNA.
+---
+
+## Parameters
+
+This plugin takes no configurable parameters. It runs a fixed 4-nearest-neighbor diamond classifier over each frame.
+
+## Output
+
+The plugin writes two parquet files per frame.
+
+### `{outputBase}_atoms.parquet`
+
+Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are bucketed by their diamond structure name (e.g. `CUBIC_DIAMOND`, `HEX_DIAMOND`, `OTHER`).
+
+```ts
+interface Atom {
+    id: int;
+    pos: [float, float, float];
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    // 0=OTHER, 5=CUBIC_DIAMOND, 6=HEX_DIAMOND,
+    // 9=CUBIC_DIAMOND_FIRST_NEIGH, 10=CUBIC_DIAMOND_SECOND_NEIGH,
+    // 11=HEX_DIAMOND_FIRST_NEIGH, 12=HEX_DIAMOND_SECOND_NEIGH
+    structure_type: int64;
+}
+```
+
+Surfaced in VOLT as the **Diamond Structure** exposure and exported as a `.glb` scene.
+
+### `{outputBase}_identify_diamond.parquet`
+
+Frame-level summary counts (listing-only; no exported artifact).
+
+```ts
+interface IdentifyDiamondOutput {
+    main_listing: {
+        total_atoms: int;
+        OTHER: int;
+        CUBIC_DIAMOND: int;
+        CUBIC_DIAMOND_FIRST_NEIGH: int;
+        CUBIC_DIAMOND_SECOND_NEIGH: int;
+        HEX_DIAMOND: int;
+        HEX_DIAMOND_FIRST_NEIGH: int;
+        HEX_DIAMOND_SECOND_NEIGH: int;
+    };
+}
+```
+
+Surfaced in VOLT as the **Diamond Summary** exposure.
+
+## See Also
+
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — CNA-based local structure classification
+- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — robust structure identification under thermal noise
+- [CHILL+](/docs/plugins/chill-plus) — identifies ice-like and tetrahedral structures

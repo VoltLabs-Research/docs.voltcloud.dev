@@ -1,0 +1,60 @@
+---
+title: Wigner-Seitz Defect Analysis
+description: Identify vacancies, interstitials and antisites by comparing the current configuration against a reference lattice using Wigner-Seitz cells.
+---
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `reference` | `frame` | — | Reference frame defining the lattice sites. Required; its atom count generally differs from the current frame, which is how vacancies and interstitials are detected. |
+| `affineMapping` | `select` | `off` | Affine mapping applied before site assignment. Options: `off`, `toReference` (map to reference cell), `toCurrent` (map to current cell). |
+| `eliminateCellDeformation` | `boolean` | `false` | Eliminate cell deformation before site assignment. |
+| `minimumImageConvention` | `boolean` | `true` | Use the minimum image convention for site assignment. |
+
+## Output
+
+The plugin writes two parquet files per frame.
+
+### `{outputBase}_wigner_seitz.parquet`
+
+Per-site summary for the frame. `main_listing` holds the defect tallies; `per-site-properties` lists every reference site with its occupancy.
+
+```ts
+interface WignerSeitzSite {
+    site_index: int;
+    site_id: int;
+    pos: [float, float, float];
+    occupancy: int;
+}
+
+interface WignerSeitzOutput {
+    main_listing: {
+        vacancy_count: int;
+        interstitial_count: int;
+        antisite_count: int;
+        occupied_count: int;
+        total_sites: int;
+        total_current_atoms: int;
+    };
+    "per-site-properties": WignerSeitzSite[];
+}
+```
+
+### `{outputBase}_atoms.parquet`
+
+Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. The rows are a synthetic frame built from the reference sites (plus one extra record per excess occupant), so vacancies — which have no current atom — are still rendered. Atoms are bucketed by defect role under group names `Vacancy`, `Occupied`, `Antisite`, and `Interstitial`. Each atom entry includes the standard atomistic fields plus:
+
+```ts
+interface WignerSeitzAtomFields {
+    occupancy: int;
+}
+```
+
+Surfaced in VOLT as the **Wigner-Seitz Model** exposure and exported as a `.glb` scene.
+
+## See Also
+
+- [Displacements Analysis](/docs/plugins/displacements-analysis) — per-atom displacement vectors against a reference frame
+- [Atomic Strain](/docs/plugins/atomic-strain) — deformation measures relative to a reference configuration
+- [Voronoi Analysis](/docs/plugins/voronoi-analysis) — atomic volumes and cavities as an alternative defect signature

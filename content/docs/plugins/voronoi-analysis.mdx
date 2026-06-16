@@ -1,0 +1,60 @@
+---
+title: Voronoi Analysis
+description: Compute a per-atom Voronoi tessellation reporting topological coordination, atomic volume, and cavity radius.
+---
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `cutoff` | `float` | `0` | Neighbor search cutoff radius. `0` requests an automatic estimate from the mean atomic volume. |
+| `edgeThreshold` | `float` | `0` | Minimum edge length for a face to contribute to the coordination count. |
+| `faceThreshold` | `float` | `0` | Minimum face area for a face to contribute to the coordination count. |
+| `useRadii` | `boolean` | `false` | Build a radical (power) Voronoi tessellation using the `Radius` column. |
+| `onlySelected` | `boolean` | `false` | Only tessellate atoms whose `Selection` column is non-zero. |
+
+## Output
+
+The plugin writes two parquet files per frame.
+
+### `{outputBase}_voronoi.parquet`
+
+Summary statistics and aggregate face-order metrics for the frame.
+
+```ts
+interface VoronoiOutput {
+    main_listing: {
+        total_atoms: int;
+        mean_atomic_volume: float;
+        mean_coordination: float;
+        effective_cutoff: float;
+        edge_threshold: float;
+        face_threshold: float;
+        use_radii: boolean;
+        mean_face_order: float;
+        max_face_order_observed: int;
+        polyhedra_mesh_count: int;
+    };
+}
+```
+
+### `{outputBase}_atoms.parquet`
+
+Per-atom data written by the AtomisticExporter. Atoms are bucketed by topological coordination number under group names `Coordination_<n>`. No crystal-structure classification is produced, so `structure_id` / `structure_name` are intentionally omitted to avoid clobbering an upstream PTM/CNA stage during the pipeline merge. Each atom entry includes the standard atomistic fields plus:
+
+```ts
+interface VoronoiAtomFields {
+    coordination: int;
+    atomic_volume: float;
+    cavity_radius: float;
+    face_indices: float[];
+}
+```
+
+`cavity_radius` is the largest empty sphere centred on the atom that fits inside its cell, and `face_indices` is the sorted vector of face orders (3, 4, 5, …) of the cell's valid Voronoi faces. Surfaced in VOLT as the **Voronoi Model** exposure and exported as a `.glb` scene.
+
+## See Also
+
+- [Coordination Analysis](/docs/plugins/coordination-analysis) — neighbor counts within a fixed cutoff and the radial distribution function
+- [Wigner-Seitz Defect Analysis](/docs/plugins/wigner-seitz-defect-analysis) — cell-based occupancy for vacancy and interstitial detection
+- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — local crystal structure classification

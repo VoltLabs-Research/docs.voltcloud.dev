@@ -1,0 +1,75 @@
+---
+title: MultiSOM
+description: Unsupervised structural identification that clusters atoms with a multilayer Self-Organizing Map over features from selected feature plugins.
+---
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `feature_plugins` | `pluginReference` | — | Feature plugins whose per-atom outputs train the map. Choose from `coordination-analysis`, `centrosymmetry-parameter`, `steinhardt-order-parameters`. Multiple selection. |
+| `layers` | `list` | 2 layers | SOM layers. Each layer has `label`, `features` (a subset of the selected feature plugins' properties), `scaling` (`normal`/`standard`/`robust`), `f` (training fraction, `1`), `sigma` (neighborhood width, `0.5`), `eta` (learning rate, `0.5`), `N` (output neurons / sub-clusters, `5`), `batched` (`true`), and `batch_size` (`100`). |
+| `training` | `string` | `reference` | `reference` trains on the first selected frame and relabels the rest for stable cluster IDs across the trajectory; `per_frame` retrains each frame. |
+| `mapping` | `string` | `linear` | Cluster ID mapping scheme. Options: `linear`, `godel`, `default`. |
+| `seed` | `int` | `1982` | Random seed for reproducible training. |
+
+## Output
+
+The plugin writes two parquet files per frame.
+
+### `{outputBase}_multisom.parquet`
+
+Summary statistics for the frame, stored as a single JSON `payload` column.
+
+```ts
+interface MultiSomOutput {
+    main_listing: {
+        total_atoms: int;
+        num_clusters: int;
+        num_layers: int;
+        features: string[];
+    };
+    sub_listings: {
+        clusters: Array<{
+            cluster_id: int;
+            count: int;
+        }>;
+    };
+}
+```
+
+### `{outputBase}_atoms.parquet`
+
+Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are grouped into `Cluster_<id>` buckets, one per SOM cluster. Each atom carries the identity fields plus one float column per SOM layer (`layer_1`, `layer_2`, …) holding that layer's group assignment.
+
+```ts
+interface Atom {
+    atom_index: int;
+    id: int;
+    x: float;
+    y: float;
+    z: float;
+    bucket: string;
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    // one column per SOM layer, e.g. layer_1, layer_2
+    [layer: string]: float;
+}
+
+interface AtomsOutput {
+    export: {
+        AtomisticExporter: {
+            [bucketName: string]: Atom[];
+        };
+    };
+}
+```
+
+Surfaced in VOLT as the **MultiSOM Model** exposure and exported as a `.glb` scene.
+
+## See Also
+
+- [Kmeans Clustering](/docs/plugins/kmeans-clustering) — alternative unsupervised per-atom clustering
+- [Coordination Analysis](/docs/plugins/coordination-analysis) — feature provider for the map
+- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — feature provider for the map

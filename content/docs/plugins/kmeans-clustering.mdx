@@ -1,0 +1,92 @@
+---
+title: K-means Clustering
+description: Identify crystal structure and grain boundaries by K-means clustering over per-atom von Mises stress, potential energy, and atomic volume.
+---
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `n_clusters` | `int` | `2` | Number of K-means clusters (minimum 2). With the default of 2 the atoms split into FCC vs. grain-boundary populations. |
+| `n_init` | `int` | `50` | Number of K-means initializations; the best inertia run is kept. |
+| `seed` | `int` | `36` | Random seed for reproducible cluster assignments. |
+| `col_svm` | `string` | `Svm` | Per-atom column holding the von Mises stress feature. |
+| `col_epot` | `string` | `Epot` | Per-atom column holding the potential energy feature. |
+| `col_vol` | `string` | `Vol` | Per-atom column holding the atomic volume feature. |
+
+## Output
+
+The plugin writes two parquet files per frame.
+
+### `{outputBase}_kmeans.parquet`
+
+Per-cluster summary statistics for the frame.
+
+```ts
+interface KmeansClusterStats {
+    cluster_id: int;
+    label: string;
+    count: int;
+    percentage: float;
+    svm_min: float;
+    svm_max: float;
+    svm_mean: float;
+}
+
+interface KmeansOutput {
+    main_listing: {
+        total_atoms: int;
+        num_clusters: int;
+        feature_column: string;
+    };
+    sub_listings: {
+        clusters: KmeansClusterStats[];
+    };
+}
+```
+
+Surfaced in VOLT as the **K-means Clustering** exposure (listing-only, no exported artifact).
+
+### `{outputBase}_atoms.parquet`
+
+Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are grouped into buckets by their cluster label.
+
+```ts
+interface Atom {
+    id: int;
+    pos: [float, float, float];
+    structure_id: int;
+    structure_name: string;
+    cluster_id: int;
+    Svm: float;
+    Epot: float;
+    Vol: float;
+}
+
+interface AtomsOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+    };
+    sub_listings: {
+        structures: Array<{
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }>;
+    };
+    export: {
+        AtomisticExporter: {
+            [bucketName: string]: Atom[];
+        };
+    };
+}
+```
+
+The `Svm`, `Epot`, and `Vol` fields carry the names given by `col_svm`, `col_epot`, and `col_vol`. Surfaced in VOLT as the **K-means Model** exposure and exported as a `.glb` scene.
+
+## See Also
+
+- [MultiSOM](/docs/plugins/multisom) — unsupervised per-atom clustering with self-organizing maps
+- [Grain Segmentation](/docs/plugins/grain-segmentation) — partition the structure into grains and grain boundaries
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — geometric FCC/HCP/BCC structure classification

@@ -1,0 +1,82 @@
+---
+title: Ackland-Jones Analysis
+description: Classify FCC, HCP, BCC and ICO crystal structures with adaptive nearest-neighbor bond-angle analysis — no cutoff parameter required.
+---
+
+Ackland-Jones Analysis assigns each atom a structure type (`FCC`, `HCP`,
+`BCC`, `ICO`, or `OTHER`) from the bond-angle distribution of its nearest
+neighbors (Ackland & Jones, PRB 2006). The neighbor shell is determined
+adaptively from the local mean squared distance, so classification is fully
+parameter-free.
+
+## Parameters
+
+This plugin takes no parameters — structure classification is adaptive and
+parameter-free. Just point it at a trajectory.
+
+## Output
+
+The plugin writes two parquet files per frame.
+
+### `{outputBase}_atoms.parquet`
+
+Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D
+rendering. Atoms are grouped into buckets keyed by structure name (`FCC`,
+`HCP`, `BCC`, `ICO`, `OTHER`).
+
+```ts
+interface Atom {
+    id: int;
+    pos: [float, float, float];
+    structure_id: int;
+    structure_name: string;       // "FCC" | "HCP" | "BCC" | "ICO" | "OTHER"
+    cluster_id: int;
+    structure_type: int;          // 0 OTHER | 1 FCC | 2 HCP | 3 BCC | 4 ICO
+}
+
+interface AtomsOutput {
+    main_listing: {
+        total_atoms: int;
+        structure_count: int;
+    };
+    sub_listings: {
+        structures: Array<{
+            structure_id: int;
+            structure_name: string;
+            atom_count: int;
+        }>;
+    };
+    export: {
+        AtomisticExporter: {
+            [bucketName: string]: Atom[];
+        };
+    };
+}
+```
+
+Surfaced in VOLT as the **Ackland-Jones Structure** exposure and exported as a
+`.glb` scene.
+
+### `{outputBase}_ackland_jones.parquet`
+
+Per-frame summary of the structure-type counts (listing-only — no per-atom
+sub-listing).
+
+```ts
+interface AcklandJonesSummary {
+    main_listing: {
+        total_atoms: int;
+        OTHER: int;
+        FCC: int;
+        HCP: int;
+        BCC: int;
+        ICO: int;
+    };
+}
+```
+
+## See Also
+
+- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — CNA-based structure classifier that also emits DXA cluster-graph artifacts
+- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — robust structure classifier that additionally handles simple-cubic and icosahedral environments
+- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — continuous per-atom disorder measure for the same defect-identification workflows
