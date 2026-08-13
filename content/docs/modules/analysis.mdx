@@ -1,19 +1,54 @@
 ---
 title: Analysis & Jobs
-description: Run plugin workflows on trajectories and follow the execution model behind them.
+description: Run pipelines of plugin, slice, and expression stages on trajectories, and follow the execution model behind them.
 ---
 
-An analysis is a persisted run of a plugin workflow against a trajectory, stored as a record with linked trajectory context, status, progress, and result exposures. Runs can be revisited to compare results, retry failed frames, inspect listings, or load a generated 3D artifact into the viewer.
+An analysis is a persisted run of one plugin against a trajectory, stored with its trajectory context, status, progress, and result exposures. Analyses are never started on their own: they are **stages of a pipeline run**, submitted together from the [Canvas](/docs/modules/canvas) and executed on the cluster runtime.
 
 ![Analysis & Jobs Overview](/assets/overviews/overviews_analysis-and-jobs.png)
 
-## Starting a run
+## Pipelines, runs, and stages
 
-The analysis tab inside a trajectory selects a plugin, configures parameters, and launches the run. Execution is dispatched to the cluster runtime: the workflow is planned, frame work is queued, and progress streams back into the UI.
+`executePipeline` is the single entry point for analysis — the canvas uses it, and so does [Volt AI](/docs/modules/volt-ai) through its `execute_pipeline` tool. One submission creates one **pipeline run**: an ordered, recorded chain of stages against a chosen set of timesteps.
+
+Stages are ordered, and each one sees the dump the stages before it produced:
+
+| Stage | Submitted as | Produces an analysis? | What it does |
+|---|---|---|---|
+| **Analysis** | `plugin` | Yes — one per stage | Runs a plugin workflow and writes result exposures |
+| **Slice Plane** | `slice` | No | Cuts the structure with a plane, so later stages only see what survives |
+| **Expression Select** | `expression` | No | Keeps or removes atoms by a property expression |
+| **Color Coding** | *not submitted* | No | A local visual mapping — it changes what you see, never what the cluster computes |
+
+Only `plugin` stages become analyses. Slice and expression stages leave no analysis behind, but they are still recorded on the run, because without them a result cannot explain how it was obtained.
+
+<Callout type="info">
+An expression stage is stored **negated** relative to what you typed. The daemon keeps what the expression matches, while the UI asks what to remove, so `x > 10` is submitted as `!(x > 10)`. Restoring a run into the editor un-wraps it again — the round trip is lossless, but the stored form reads inverted if you inspect it directly.
+</Callout>
+
+## Stage caching
+
+Before planning a stage, the runtime hashes its configuration together with its inputs. On a hit, the stage is served from the analysis that already computed it and **no new analysis is created** — the run records which analysis it borrowed from.
+
+This means two useful things and one surprising one:
+
+- re-running an unchanged pipeline is close to free,
+- changing stage 3 re-runs only stage 3 onward,
+- and a run whose every stage was cached still appears in the sidebar, reporting that nothing was computed.
+
+## Following a run
+
+The right sidebar of the canvas groups results **by run**, newest first, so a result sits underneath the chain that produced it rather than in a flat list. Within a run each row is one stage; the selectable leaf is still the exposure.
+
+Grouping degrades rather than dropping rows:
+
+- analyses from before pipeline runs existed, or whose run is outside the fetched page, collect in one trailing ungrouped section,
+- a plugin stage whose analysis is off-page renders as a disabled row carrying the plugin name, so the chain never loses a link,
+- and the public/shared canvas — which has no runs endpoint — simply shows everything ungrouped.
 
 ## Listing
 
-The analysis listing is a history of executions, not a library of templates. Each row reports the plugin, the target trajectory, the progress, and the final state.
+The analysis listing at **Analysis Configurations** is a history of executions, not a library of templates. Each row reports the plugin, the target trajectory, the progress, and the final state.
 
 | Status | Meaning |
 |---|---|
@@ -22,9 +57,16 @@ The analysis listing is a history of executions, not a library of templates. Eac
 | **Completed** | The full run finished successfully |
 | **Failed** | Some frame work failed and can be retried selectively |
 
+A run's own status is derived from its analyses rather than stored, so the two can never disagree.
+
 ## Frame-based progress
 
 Most analyses are frame-aware workloads. A run can represent many individual frame jobs, and the progress bar reflects that breakdown. A partially successful run is still useful: only the failed portion needs to be retried.
+
+Two details are worth knowing when reading progress:
+
+- **Retrying counts as queued, not running.** The attempt that failed has already ended, so a frame waiting on a retry is reported as queued.
+- **Artifact uploads are excluded from an analysis' own progress.** "How far along is this analysis" and "is anything happening on this frame" are different questions, and upload work only answers the second.
 
 Real-time updates arrive over the same event-driven layer used by the rest of VOLT.
 
@@ -41,9 +83,9 @@ Completed analyses write results into cluster storage and project them into VOLT
 | **Listings** | Structured tabular views of the output |
 | **Sub-listings** | Focused slices of a larger result |
 | **Charts** | Visual summaries exported by the plugin |
-| **3D artifacts** | Overlays loaded back into the trajectory viewer |
+| **3D artifacts** | Overlays loaded back into the canvas scene |
 
-Most of these start as Apache Parquet data and are transformed into the representation the UI requires.
+These start as Apache Parquet files in the cluster's object store and are queried in place with DuckDB, so opening a listing does not require materializing the whole result.
 
 ## Jobs layer
 
@@ -55,7 +97,7 @@ The hierarchy is:
 2. Frame-level groups within that trajectory.
 3. Individual per-frame jobs performing the processing.
 
-The Jobs panel is team-wide, reporting queue activity across all workspace members in real time.
+The Jobs panel is team-wide, reporting queue activity across all workspace members in real time. On the cluster the work is spread across named queues — `analysis_processing` and `pipeline_processing` for computation, plus `artifact_upload`, `plugin_warmup`, and the trajectory queues — each drained by its own workers.
 
 ## Team-wide job actions
 

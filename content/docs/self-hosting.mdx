@@ -30,7 +30,7 @@ One command. It downloads a prebuilt CLI and compose file into `~/.volt-deploy` 
 curl -fsSL https://raw.githubusercontent.com/voltlabs-research/volt/main/desktop/scripts/deploy.sh | bash
 ```
 
-It builds and starts the full stack — MongoDB, Redis, MinIO, the server, the web client, and (unless you pick server-only) a ClusterDaemon. The account you enter also registers a VOLT Cloud ID at [console.voltcloud.dev](https://console.voltcloud.dev) (best-effort; skipped if unreachable). When it finishes it prints the client and server URLs — open the client (default `http://<host>:5273`) and sign in.
+It builds and starts the full stack — PostgreSQL, the server, the web client, and (unless you pick server-only) a ClusterDaemon. The account you enter also registers a VOLT Cloud ID at [console.voltcloud.dev](https://console.voltcloud.dev) (best-effort; skipped if unreachable). When it finishes it prints the client and server URLs — open the client (default `http://<host>:5273`) and sign in.
 
 ## Desktop app
 
@@ -42,7 +42,7 @@ To connect another device to a stack you deployed elsewhere, install the desktop
 
 ## Update
 
-Re-run the script with `--update` to pull the latest release and rebuild. Your data (Mongo/Redis/MinIO volumes) is kept, and a deployed daemon is updated too. It runs headless, so it is safe under cron/CI:
+Re-run the script with `--update` to pull the latest release and rebuild. Your data — the PostgreSQL volume and the daemon's object store — is kept, and a deployed daemon is updated too. It runs headless, so it is safe under cron/CI:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/voltlabs-research/volt/main/desktop/scripts/deploy.sh | bash -s -- --update
@@ -67,12 +67,16 @@ Set `GITHUB_TOKEN` to raise the GitHub API rate limit for `--update`/`--check`.
 |---|---|---|
 | volt-client | Web UI (nginx; proxies `/api` + `/socket.io` to the server) | 5273 |
 | volt-server | REST `/api/*` + Socket.io | 8100 |
-| volt-minio | Object storage (S3) — API / console | 9100 / 9101 |
-| volt-mongodb | Metadata | internal |
-| volt-redis | Queues, cache, runtime state | internal |
-| cluster-daemon | Compute (cluster mode only) | 18080 |
+| volt-postgres | Metadata, job queues, event spool, key-value state | internal |
+| cluster-daemon | Compute + object gateway (cluster mode only) | 18080 |
 
-Ports are set via `WEB_PORT`, `SERVER_PORT`, `MINIO_PORT`, and `DAEMON_PORT`. MongoDB and Redis are not published to the host — they are reached over the internal Docker network. MinIO buckets are auto-provisioned; you never create them by hand.
+Ports are set via `WEB_PORT`, `SERVER_PORT`, and `DAEMON_PORT`. PostgreSQL is not published to the host — it is reached over the internal Docker network, and the server and the daemon use **separate databases** on it (`volt` and `volt-cluster`). Object-store buckets are created by the daemon on startup; you never create them by hand.
+
+Two named volumes hold everything you care about: `volt-postgres-data` (all metadata) and `cluster-daemon-data` (the object store — dumps, Parquet exposures, GLB models, rasters). `volt-server-data` holds server-served files such as avatars.
+
+<Callout type="info">
+Deployments from before the storage migration also ran `volt-mongodb`, `volt-redis`, and `volt-minio`. Those services no longer exist, and `MINIO_PORT` is no longer read.
+</Callout>
 
 ## Secrets
 

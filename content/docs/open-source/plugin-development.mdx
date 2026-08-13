@@ -417,4 +417,4 @@ myplugin <lammps_file> [output_base] [options]
 
 ### Output
 
-The plugin writes one or more Apache Parquet files derived from `output_base`, each declared by an `exposure` node in `plugin.json` — typically a named summary plus a separate `{outputBase}_atoms.parquet` (per-atom data, AtomisticExporter shape). VOLT reads these files, stores them in MinIO, and serves them to the 3D viewer (and to chart/GLB export where `plugin.json` declares it).
+The plugin writes one or more Apache Parquet files derived from `output_base`, each declared by an `exposure` node in `plugin.json` — typically a named summary plus a separate `{outputBase}_atoms.parquet` (per-atom data, AtomisticExporter shape). VOLT reads these files, stores them in the cluster's object store, and serves them to the canvas (and to chart/GLB export where `plugin.json` declares it).

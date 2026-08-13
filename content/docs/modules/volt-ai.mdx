@@ -3,7 +3,7 @@ title: Volt AI
 description: Multi-provider AI assistant integrated across the entire platform.
 ---
 
-Volt AI is the built-in assistant, available across the workspace as a dedicated conversation surface, a floating assistant, and a contextual helper inside modules like [LaTeX](/docs/modules/latex). It supports 13 providers and 12 tools; providers, tools, and permissions are scoped per team. Each team configures its own API keys and selects which models are available.
+Volt AI is the built-in assistant, available across the workspace as a dedicated conversation surface and as a floating assistant that follows you between modules. It supports 13 providers and roughly 110 tools; providers, tools, and permissions are scoped per team. Each team configures its own API keys and selects which models are available.
 
 ![Volt AI Overview](/assets/overviews/overviews_vol-ai.png)
 
@@ -49,41 +49,54 @@ Select which of the provider's models are available to the team. Only enabled mo
 
 ![Model Selection](/assets/modules/team/ai-integration/xai-models.png)
 
-## Chat Interface
+## Conversation interface
 
 Conversations are saved and streamed incrementally, and the same assistant follows you across tasks in the workspace.
 
 ![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-1.png)
 
-A single conversation can invoke tools to inspect and manage Docker containers and to manage its own conversations.
+A single conversation can reach across the whole workspace — reading trajectories, running an analysis pipeline, inspecting a cluster, managing containers, and driving the canvas.
 
 ![Conversation Example](/assets/modules/team/ai-integration/volt-ai-conversation-example-2.png)
 
-## Available Tools
+## Available tools
 
-Volt AI has **12 tools** in 2 categories: container management and AI conversation management. Mutating tools (create, update, delete) require explicit approval before execution.
+Tools come in two families. **Server tools** act on workspace data through the same services and permission checks as the UI. **Client tools** act on your open canvas — they move the camera, toggle layers, or seek a frame, and only work while a canvas is on screen.
 
-### Containers (9 tools)
+Mutating tools (create, update, delete) require explicit approval before execution, and every tool is subject to the caller's team permissions: the assistant cannot do anything the user could not do by hand.
 
-| Tool | Description |
+### Server tools
+
+| Domain | Tools | Examples |
+|---|---|---|
+| **Plugins & pipelines** | 17 | `execute_pipeline`, `install_plugin`, `search_registry_plugins`, `validate_workflow`, `publish_plugin`, `read_analysis_result_rows`, `export_analysis_result` |
+| **Clusters** | 12 | `list_clusters`, `get_cluster_health_summary`, `get_cluster_runtime_snapshot`, `update_cluster_queue_concurrency`, `reveal_cluster_credentials` |
+| **Containers** | 11 | `create_container`, `list_containers`, `get_container_stats`, `read_container_file`, `get_container_port_access_url` |
+| **Analyses** | 10 | `list_analyses`, `get_analysis_frame_log`, `summarize_analysis_run`, `compare_analyses`, `retry_failed_analysis_frames` |
+| **Trajectories** | 10 | `list_trajectories`, `get_trajectory`, `clone_trajectory`, `move_trajectory`, `get_trajectory_team_metrics` |
+| **Whiteboards** | 8 | `create_whiteboard`, `get_whiteboard_state`, `move_whiteboard`, `delete_whiteboard_folder` |
+| **Scripting** | 7 | `create_scripting_notebook`, `start_scripting_jupyter_session`, `get_scripting_session_status` |
+| **AI conversations** | 3 | `list_conversations`, `update_conversation`, `delete_conversation` |
+| **Dashboard** | 2 | `get_dashboard_metrics`, `global_search` |
+| **Jobs** | 2 | `retry_team_failed_jobs`, `remove_team_running_jobs` |
+| **Rendering** | 1 | `render_scene_screenshot` |
+| **Other** | 6 | `get_team_context`, `get_simulation_cell`, `get_notifications`, `get_activity_summary`, `manage_sessions`, `update_profile` |
+
+`execute_pipeline` is the same entry point the canvas uses, so an AI-started analysis is an ordinary [pipeline run](/docs/modules/analysis#pipelines-runs-and-stages) — it appears in the result tree, obeys stage caching, and is indistinguishable from one you submitted yourself.
+
+### Client tools
+
+About twenty tools drive the open canvas directly, including:
+
+| Area | Examples |
 |---|---|
-| `list_containers` | List all Docker containers in the team |
-| `get_container_by_id` | Get detailed information about a specific container |
-| `create_container` | Create a new Docker container |
-| `update_container` | Update a Docker container |
-| `delete_container` | Delete a Docker container |
-| `get_container_processes` | List running processes in a container |
-| `get_container_stats` | Get resource usage stats for a container |
-| `list_container_files` | List files in a container directory |
-| `read_container_file` | Read a file from a container |
+| **Playback** | `control_playback`, `set_playback`, `seek_frame` |
+| **Camera & view** | `set_camera_view`, `reset_camera`, `reset_view_settings`, `set_appearance`, `set_environment` |
+| **Scene** | `set_visible_layers`, `configure_color_coding`, `push_expression_select`, `open_in_viewer`, `focus_result` |
+| **Navigation** | `navigate_to`, `open_panel`, `open_command_palette`, `switch_team`, `set_theme` |
+| **Inspection** | `get_viewer_state` |
 
-### AI Conversations (3 tools)
-
-| Tool | Description |
-|---|---|
-| `list_conversations` | List all AI conversations for the current user |
-| `update_conversation` | Update an AI conversation title |
-| `delete_conversation` | Delete an AI conversation |
+This is what lets a request like *"colour by von Mises stress and jump to the frame where it peaks"* work as a single instruction.
 
 ## Common tasks
 

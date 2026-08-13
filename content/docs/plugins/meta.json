@@ -22,6 +22,7 @@
     "displacements-analysis",
     "---Defects & Microstructure---",
     "open-dxa",
+    "line-reconstruction-dxa",
     "grain-segmentation",
     "wigner-seitz-defect-analysis",
     "ilda",

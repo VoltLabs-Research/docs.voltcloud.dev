@@ -37,4 +37,4 @@ Conflicts are resolved automatically with no user-facing prompt (no "keep local 
 
 ## Persistence and storage
 
-The scene state (elements and app state) and image assets are stored as objects in the team's storage cluster, while whiteboard metadata such as title, folder, and last editor lives in MongoDB. Edits are persisted on a short debounce after the in-memory board state changes.
+The scene state (elements and app state) and image assets are stored as objects in the team's storage cluster, while whiteboard metadata such as title, folder, and last editor lives in PostgreSQL. Edits are persisted on a short debounce after the in-memory board state changes.

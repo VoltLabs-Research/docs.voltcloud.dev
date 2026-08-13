@@ -9,16 +9,19 @@ A cluster is a machine enrolled into a team workspace to run the daemon, maintai
 
 ## What lives on a cluster
 
-The default setup runs four services:
+A cluster runs the daemon plus a PostgreSQL database:
 
-| Service | Purpose |
+| Component | Purpose |
 |---|---|
-| **MongoDB** | Stores structured metadata, listings, and result projections |
-| **MinIO** | Stores trajectory dumps, GLB models, raster previews, plugins, and other binary artifacts |
-| **Redis** | Handles queue state, caching, and several real-time runtime concerns |
 | **ClusterDaemon** | Maintains the connection to VOLT and orchestrates processing, notebooks, remote access, and job execution |
+| **PostgreSQL** | The daemon's own database (`volt-cluster`): metadata, listings, and its job queues |
+| **Object store** | A filesystem tree in the daemon's data directory holding dumps, Parquet exposures, GLB models, and rasters, served over the daemon's object gateway |
 
 The cloud side of VOLT coordinates and routes; the cluster side runs the workload.
+
+<Callout type="info">
+Clusters used to run MongoDB, MinIO, and Redis as separate services. All three are gone — metadata is in PostgreSQL, objects are on the filesystem behind the object gateway, and queues are Postgres-backed.
+</Callout>
 
 ## Enrollment and lifecycle
 
@@ -61,9 +64,16 @@ The monitoring view reports resource usage, connection quality, and service beha
 - storage utilization,
 - and worker availability.
 
-## Remote access and data explorers
+## Operations
 
-Clusters expose diagnostic and remote-access tools: host terminal access and explorer-style views into Redis, MongoDB, and MinIO. These views are scoped to support, debugging, and verification, and provide narrower functionality than the native tooling.
+Beyond monitoring, the cluster views cover day-to-day maintenance:
+
+- **Queue concurrency** — how many jobs each queue drains in parallel on this cluster.
+- **Role** — whether the cluster takes compute work, storage, or both, which decides which workers start.
+- **Credentials** — reveal the enrollment credentials for a cluster you already own.
+- **Install command** — regenerate install material and enrollment tokens.
+- **Transfers** — copy objects between clusters, tracked as transfer jobs.
+- **Disk operations** — inspect and reclaim storage.
 
 ## Cluster health and platform impact
 

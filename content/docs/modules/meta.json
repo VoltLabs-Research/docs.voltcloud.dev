@@ -4,6 +4,7 @@
     "index",
     "---Core Workflow---",
     "trajectories",
+    "canvas",
     "analysis",
     "simulation-cells",
     "---Compute & Infrastructure---",
@@ -14,8 +15,6 @@
     "volt-ai",
     "---Collaboration---",
     "teams",
-    "chat",
-    "latex",
     "whiteboards",
     "notifications"
   ]

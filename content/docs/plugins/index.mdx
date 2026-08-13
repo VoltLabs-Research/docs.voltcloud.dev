@@ -3,11 +3,25 @@ title: Plugins
 description: Browse the analysis plugins published to the VOLT Registry, and learn how the plugin system works.
 ---
 
-Plugins are node-based analysis workflows that run scientific binaries on your cluster and feed results back into VOLT as listings, charts, and 3D artifacts. Install any of them with [vpm](/docs/open-source/vpm) — for example `vpm install @voltlabs/opendxa`.
+Plugins are node-based analysis workflows that run scientific binaries on your cluster and feed results back into VOLT as listings, charts, and 3D artifacts. A plugin becomes available to a trajectory as an **Analysis stage** in the [canvas pipeline](/docs/modules/canvas#the-pipeline-editor).
 
 <Cards>
   <Card title="Plugin System" href="/docs/plugins/plugin-system" description="How a plugin is built node by node — Modifier, Arguments, Context, Entrypoint, Exposure, and Export — with runnable examples and downloadable templates." />
 </Cards>
+
+## Where plugins live in the app
+
+The plugin module has three surfaces:
+
+| Surface | Path | What it is for |
+|---|---|---|
+| **Installed** | `/dashboard/plugins/list` | The team's plugins, their draft/published state, and per-plugin actions (edit, clone, export, publish, delete) |
+| **Marketplace** | `/dashboard/plugins/marketplace` | Browse and install published plugins from the VOLT Registry |
+| **Builder** | `/plugins/builder` | The node editor for authoring or editing a workflow, with debug panels for arguments and context |
+
+Installing is also scriptable: [vpm](/docs/open-source/vpm) installs from the command line (`vpm install @voltlabs/opendxa`), and Volt AI can do it through its `install_plugin` and `search_registry_plugins` tools.
+
+A plugin must be **published** to appear as a pipeline stage; drafts stay hidden.
 
 ## Structural Analysis
 
@@ -45,6 +59,7 @@ Plugins are node-based analysis workflows that run scientific binaries on your c
   <Card title="Grain Segmentation" href="/docs/plugins/grain-segmentation" description="Segment crystalline grains from local PTM, merging similar orientations into grain regions." />
   <Card title="Wigner-Seitz Defect Analysis" href="/docs/plugins/wigner-seitz-defect-analysis" description="Identify vacancies, interstitials, and antisites by comparing against a reference lattice with Wigner-Seitz cells." />
   <Card title="Interfacial Line Defect Analysis" href="/docs/plugins/ilda" description="Detect interfacial line defects and disconnections, exporting bond and disconnection-summary data." />
+  <Card title="Line Reconstruction DXA" href="/docs/plugins/line-reconstruction-dxa" description="Reconstruct dislocation lines via DXA from upstream structure-identification artifacts, or from PTM run inline." />
 </Cards>
 
 ## Clustering & Machine Learning
