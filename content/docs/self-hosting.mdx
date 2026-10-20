@@ -27,7 +27,7 @@ The host needs `docker`, `node`, and `curl`, with the Docker daemon running (`su
 One command. It downloads a prebuilt CLI and compose file into `~/.volt-deploy` (no git clone, no build toolchain), then prompts for host/domain, deploy mode, and your account, team, and cluster:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/voltlabs-research/volt/main/desktop/scripts/deploy.sh | bash
+curl -fsSL https://raw.githubusercontent.com/voltlabs-research/volt/main/packages/apps/desktop/scripts/deploy.sh | bash
 ```
 
 It builds and starts the full stack — PostgreSQL, the server, the web client, and (unless you pick server-only) a ClusterDaemon. The account you enter also registers a VOLT Cloud ID at [console.voltcloud.dev](https://console.voltcloud.dev) (best-effort; skipped if unreachable). When it finishes it prints the client and server URLs — open the client (default `http://<host>:5273`) and sign in.
@@ -45,7 +45,7 @@ To connect another device to a stack you deployed elsewhere, install the desktop
 Re-run the script with `--update` to pull the latest release and rebuild. Your data — the PostgreSQL volume and the daemon's object store — is kept, and a deployed daemon is updated too. It runs headless, so it is safe under cron/CI:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/voltlabs-research/volt/main/desktop/scripts/deploy.sh | bash -s -- --update
+curl -fsSL https://raw.githubusercontent.com/voltlabs-research/volt/main/packages/apps/desktop/scripts/deploy.sh | bash -s -- --update
 ```
 
 Re-running the plain command on a machine that already has VOLT offers **Update** (keep data) or **Reset** (wipe and start fresh). Append flags after `bash -s --`:
