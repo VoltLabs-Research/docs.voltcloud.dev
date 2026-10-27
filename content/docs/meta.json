@@ -1,13 +1,13 @@
 {
   "title": "Documentation",
   "pages": [
-    "getting-started",
-    "modules",
-    "architecture",
-    "---Resources---",
+    "index",
+    "quickstart",
+    "concepts",
+    "run",
+    "guides",
     "plugins",
-    "open-source",
-    "---Guides---",
-    "self-hosting"
+    "develop",
+    "architecture"
   ]
 }
