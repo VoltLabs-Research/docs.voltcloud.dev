@@ -1,0 +1,51 @@
+---
+title: Pattern Structure Matching
+description: Classify atoms against lattice patterns defined in YAML files, including ordered and non-cubic phases.
+---
+
+Pattern Structure Matching (PSM) assigns each atom to one of a set of lattice patterns, each defined in a YAML file by its unit cell, basis and coordination number. It covers structures the classic methods don't, such as ordered alloys and tetragonal or rhombohedral phases. Use it when your material isn't a plain FCC, BCC or HCP crystal.
+
+| Key | Version | Builds |
+|---|---|---|
+| `pattern-structure-matching` | 2.1.0 | Linux, macOS, Windows, browser |
+
+## How it works
+
+The plugin loads its pattern files and compiles, for each pattern, the ideal neighbor shell of its sites. It then compares each atom's neighbor shell with the shells of the selected patterns and labels the atom with the pattern it matches, or `OTHER`. Patterns whose basis names species (for example `L12`) need atom types to match. Finally it groups the matched atoms into crystal clusters.
+
+The plugin ships these pattern files:
+
+`9R`, `L12`, `a7`, `bcc`, `bct`, `cubic_diamond`, `fcc`, `fct`, `hcp`, `hex_diamond`, `omega`, `sc`, `st`
+
+A pattern the plugin can't build a local matcher for is skipped.
+
+## Inputs
+
+- Atom positions and the simulation cell.
+- Atom types, for patterns defined with species.
+
+## Arguments
+
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Lattice Filter** `patterns` | string | (none) | Comma-separated pattern names, or `all` | Which patterns to match, for example `fcc,hcp`. Names are the ones listed above. Leave it empty, or write `all`, to use every pattern that supports local matching. An unknown name fails the stage with `Unknown pattern in --patterns`. |
+| **Dissolve Small Clusters** `dissolve_small_clusters` | boolean | `false` | | After clustering, mark atoms that belong to small crystal clusters as `OTHER`. |
+
+## Outputs
+
+| Exposure | What you get |
+|---|---|
+| **Structure Identification** | A listing, and a 3D model of the atoms colored by pattern. |
+| **Pattern Analysis** | The frame's summary: atoms per structure and per pattern, the selected patterns and the lattice folders used. Stored with the analysis. No listing. |
+| **Neighbor Lattice** | A file shared with later stages as `neighbor_lattice`. No listing. |
+
+The per-atom table has `structure_id` and `structure_name` (the pattern name, or `OTHER`).
+
+## Feeds
+
+- Later stages read the `structure_type` column of the annotated frame it writes.
+- OpenDXA, Elastic Strain and Line Reconstruction DXA list this plugin as a source, but they also need the `clusters_table` and `clusters_transitions` files, which this workflow doesn't share. Use [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) or [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) in front of them.
+
+## Reference
+
+PSM has no separate publication. The pattern files are in the plugin bundle under `share/volt/lattices`.
