@@ -13,11 +13,16 @@ export function baseOptions(): BaseLayoutProps {
     },
     links: [
       {
-        text: 'API Spec',
-        url: 'https://server.voltcloud.dev/api-docs',
+        text: 'Download',
+        url: 'https://github.com/VoltLabs-Research/VOLT/releases/latest',
+        external: true,
+      },
+      {
+        text: 'Plugin registry',
+        url: 'https://packages.voltcloud.dev',
         external: true,
       },
     ],
-    githubUrl: 'https://github.com/voltlabs-research/',
+    githubUrl: 'https://github.com/VoltLabs-Research/VOLT',
   };
 }
