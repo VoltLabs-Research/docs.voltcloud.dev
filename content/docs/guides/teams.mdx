@@ -1,0 +1,118 @@
+---
+title: Teams
+description: Create and switch teams, invite people by email or code, and control what each member can do with roles.
+---
+
+A team is the workspace everything in VOLT belongs to: trajectories, analyses, plugins, clusters, notebooks, whiteboards, AI providers and secret keys. The header always shows the selected team, and every page works within it. You can belong to several teams and switch between them.
+
+What a member can do in a team depends on their role. A role is a set of permissions, such as `trajectory:read` or `plugin:create`, checked by the server on every request.
+
+<Callout type="info">
+A single-user deployment (the [browser runtime](/docs/run/browser), the [desktop app](/docs/run/desktop), or a server in `local` mode) has one account and one team. It hides the team selector, the team actions, invitations, **My Team** and **Manage Roles**.
+</Callout>
+
+## Create, join and switch teams
+
+- **Create a team.** During onboarding, after you first sign in, **Let's create a team for you!** asks for a **Team name**. Later, open **Team actions** (the **+** next to the team selector in the header) › **Create team**. The **Create Team** dialog takes a **Team Name** and an optional **Description (Optional)**. You become the team's **Owner**, and the team starts with the four system roles.
+- **Join a team with a code.** **Team actions** › **Join existing team** opens **Join a Team**: enter the 5-character **Invite code** and click **Join Team**. On the onboarding pages, the same dialog opens from **Have an invite code?**
+- **Switch teams.** Pick another team in the team selector (**Switch team**).
+- **Leave a team.** Use the leave button next to the team in the selector, or **Leave team** in your own row on **My Team**. Confirm with **Leave team**.
+
+When the last member leaves a team, VOLT deletes the team. When the last member with the **Owner** role leaves or is removed, VOLT makes one of the remaining members an Owner.
+
+A new team needs a [cluster](/docs/guides/clusters) before you can work in it. Onboarding takes you to cluster setup right after you create one.
+
+## My Team
+
+**My Team** (`/dashboard/my-team`) shows the team's name, an activity heatmap and the members.
+
+| Column | Shows |
+|---|---|
+| **User** | The member's name and email. |
+| **Role** | Their role. The team's creator shows **Owner**. If you can invite members, other members' roles are a menu you can change here. |
+| **Status** | Online, or offline with **Seen … ago**. |
+| **Time (7d)** | Time spent online in the team over the last seven days. |
+| **Joined At** | When they joined. |
+
+If you can invite members, another member's row menu has **Remove from Team**, which removes them after confirmation (select several rows to remove them together), and you can click the team's name to rename it. Your own row's menu has **Leave team**.
+
+The page needs `team:read`. Its member list needs `team-member:read`, changing a role needs `team-member:update`, removing a member needs `team-member:delete` and renaming the team needs `team:update`. Among the built-in roles, only **Owner** has all of these: a **Member** can open the page, but the server refuses to list the members; an **Admin** cannot open the page at all.
+
+## Invite people
+
+People with `team-invitation:create` (with the built-in roles, **Owner** and **Admin**) get the **Invite members** button in the header. For everyone else, the button is disabled. The panel has three tabs.
+
+| Tab | Use it to |
+|---|---|
+| **Share** | Invite by email, see and cancel pending invitations, and **Copy link**, which copies the team's invite-code link. |
+| **Invitation Code** | Generate, copy, regenerate or delete the team's invite code. |
+| **Public Trajectories** | Copy the link to the team's public trajectories page (`/discover/teams/:teamId`). Anyone can open it, signed in or not. See [Trajectories](/docs/guides/trajectories). |
+
+<Callout type="warn">
+New members join as **Owner**, the role with every permission, by either way of joining. If someone should have less access, change their role on **My Team** after they join.
+</Callout>
+
+### By email
+
+In **Share**, type an address in **Add people by email...** and click **Invite**.
+
+- The address must belong to an existing VOLT account. VOLT sends no email: the person gets a **Team Invitation** [notification](/docs/guides/notifications) in VOLT.
+- You cannot invite someone who is already a member, or send a second invitation to an address that has one pending.
+- An invitation expires 24 hours after it is sent. Pending invitations are listed under the field with when they were sent and a **Cancel** button.
+
+The notification opens `/team-invitation/:invitationId`. That page shows the team, who sent the invitation, the **Email**, when it was **Invited** and when it **Expires**, with **Accept Invitation** and **Reject Invitation**. Only the invited account can answer it. An expired invitation shows **Invitation Expired**.
+
+### By invite code
+
+Under **Invitation Code**, **Generate Invite Code** creates a 5-character code of letters and digits. Anyone with the code can join the team. Its menu has **Copy** (copies the link `/team-invitation/code/:code`), **Regenerate** (replaces the code, so the old one stops working) and **Delete** (turns joining by code off).
+
+The link opens **Join this team?** with the **Team**, its **Owner** and the **Invite code**. **Join Team** adds you. Typing the code in **Join a Team** does the same.
+
+Managing the code needs `team-invitation:create` and, because the request goes to the team itself, `team:create` (generate) or `team:delete` (delete). With the built-in roles, that is the **Owner**.
+
+## Roles and permissions
+
+### System roles
+
+Every team has four system roles. You cannot rename or delete them, and **Manage Roles** shows them read-only: their permissions are built into VOLT.
+
+| Role | Permissions |
+|---|---|
+| **Owner** | Everything (`*`). |
+| **Admin** | Read, create, update and delete trajectories, analyses, plugins, notebooks (`scripting`), activity, invitations, members, roles, simulation cells, AI conversations and whiteboards. No `team`, `team-secret-key` or `raster` permissions. |
+| **Member** | Read the team. Read, create, update and delete trajectories, analyses, notebooks, AI conversations and whiteboards. Read and create plugins. Read activity and simulation cells. |
+| **Viewer** | Read trajectories, analyses, plugins, notebooks, activity, simulation cells and whiteboards. |
+
+### The permission catalog
+
+A permission is `resource:action`, where the action is `read`, `create`, `update` or `delete`. The server derives the action from the request's HTTP method: `GET` is read, `POST` is create, `PUT` and `PATCH` are update, `DELETE` is delete. So an operation sent as a `POST`, such as deleting a cluster or revoking a secret key, needs the `create` action.
+
+| Resource (as **Manage Roles** labels it) | Key | Guards | Owner | Admin | Member | Viewer |
+|---|---|---|---|---|---|---|
+| **Analysis** | `analysis` | Analysis configurations, results and provenance | all | all | all | read |
+| **Daily Activity** | `daily-activity` | Activity data (heatmaps, time online) | all | all | read | read |
+| **Plugin** | `plugin` | Plugins, the marketplace, the builder, result listings, running pipelines | all | all | read, create | read |
+| **Scripting** | `scripting` | Notebooks | all | all | all | read |
+| **Team Invitation** | `team-invitation` | Email invitations; with `team`, invite codes | all | all | — | — |
+| **Team Member** | `team-member` | Listing members, changing their roles, removing them | all | all | — | — |
+| **Team Role** | `team-role` | Roles | all | all | — | — |
+| **Team Secret Key** | `team-secret-key` | [Secret keys](/docs/guides/secret-keys) and their metrics | all | — | — | — |
+| **Team** | `team` | The team itself, [clusters](/docs/guides/clusters), [AI providers](/docs/guides/volt-ai#connect-a-provider), invite codes | all | — | read | — |
+| **Trajectory** | `trajectory` | Trajectories and jobs | all | all | all | read |
+| **Raster** | `raster` | Nothing checks it today | all | — | — | — |
+| **Simulation Cell** | `simulation-cell` | Simulation cells | all | all | read | read |
+| **Ai Conversation** | `ai-conversation` | [VOLT AI](/docs/guides/volt-ai) | all | all | all | — |
+| **Whiteboard** | `whiteboard` | Whiteboards | all | all | all | read |
+
+VOLT AI uses the same permissions. It is offered only the tools your role allows; see [VOLT AI permissions](/docs/guides/volt-ai#permissions).
+
+### Manage Roles
+
+**Manage Roles** (`/dashboard/manage-roles`, needs `team-role:read`) lists the team's roles with **Role Name**, **Type** (**System** or **Custom**), **Permissions** (a count, or **All Permissions**) and **Created**.
+
+- **New Role** opens **Create New Role**. Enter a **Role Name** and tick permissions in the grid: one row per resource, one column per action. Click a resource's name to toggle its whole row. **Create Role** saves it (`team-role:create`).
+- **Edit** opens a custom role for changes; **Save Changes** saves them (`team-role:update`).
+- **View** shows a system role read-only.
+- **Delete** removes custom roles after confirmation (`team-role:delete`). Members who had a deleted role get **Member**.
+
+To give someone a role, change it in their row on **My Team**. A [secret key](/docs/guides/secret-keys) also takes a role, which limits what the key can do.

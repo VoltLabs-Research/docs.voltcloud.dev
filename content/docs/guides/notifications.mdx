@@ -1,0 +1,52 @@
+---
+title: Notifications
+description: The messages VOLT sends to your account, where they appear, and how read state works.
+---
+
+Notifications are short messages addressed to your account, each with a title, a line of text and, usually,
+a link to the page it concerns. They are personal: you see only your own, whichever team you have selected.
+
+## What sends a notification
+
+VOLT creates a notification in these cases:
+
+| When | Title | Opens |
+| --- | --- | --- |
+| You create an account (email and password, or a first sign-in with an OAuth provider) | **Welcome to the platform!** | `/dashboard` |
+| You create an account and the deployment does not add new users to a default team | **Create your first team** | `/onboarding` |
+| Someone invites your email address to a team | **Team Invitation** | `/team-invitation/:invitationId`, with **Accept Invitation** and **Reject Invitation** |
+
+An invitation by email reaches only people who already have an account on the deployment; VOLT does not send
+email. Joining with an invitation code does not create a notification. See
+[Teams](/docs/guides/teams) for both ways of inviting.
+
+Jobs, analyses and uploads do not send notifications. Follow them in [Jobs](/docs/guides/jobs).
+
+## The popover
+
+The bell in the dashboard header opens **Notifications**. The bell is also at the bottom right of the
+onboarding pages, so an invitation is reachable before you belong to a team.
+
+- A badge on the bell shows the number of unread notifications, up to **99+**.
+- The list is newest first. Unread notifications have a tinted background and a dot.
+- Click a notification to go to its link. The popover closes.
+- Scroll to the bottom to load older notifications, 20 at a time.
+- With nothing to show, the popover reads **No notifications**.
+
+The list loads when a page with the bell opens and reloads every time you open the popover. Open it to check
+for anything new.
+
+## Read state
+
+**Mark all as read** at the top of the popover marks every unread notification on your account as read. It
+appears only while you have unread notifications.
+
+Opening a notification does not mark it as read, and there is no way to mark a single notification or to
+delete one. The unread badge counts the unread notifications among those loaded in the popover.
+
+Notifications are kept until your account is deleted, which deletes them with it.
+
+## From VOLT AI
+
+The [VOLT AI](/docs/guides/volt-ai) assistant can read your notifications (newest first, optionally only the
+unread ones) when you ask about them. It cannot mark them as read.
