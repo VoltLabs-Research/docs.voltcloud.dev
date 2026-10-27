@@ -1,0 +1,76 @@
+---
+title: Run VOLT
+description: The three ways to get a running VOLT, what each one is good for, and how to connect a client to a server that already exists.
+---
+
+A running VOLT has three parts: the **server** (accounts, teams, the REST API and the realtime channel), the **web client** you work in, and at least one **cluster daemon**, which stores your trajectories and runs the analyses. You can run all three in three ways:
+
+<Cards>
+  <Card title="In this browser" href="/docs/run/browser" description="The server and a daemon run inside one browser tab, compiled to WebAssembly. Nothing to install." />
+  <Card title="Desktop app" href="/docs/run/desktop" description="The same stack in a window of its own, with storage the browser can't clear. No Docker." />
+  <Card title="Self-hosted server" href="/docs/run/self-hosting" description="A Docker Compose stack for a group: accounts, teams, and as many machines as you enroll." />
+</Cards>
+
+The browser tab and the desktop app run the same programs a self-hosted server runs, unmodified. What changes is where they run and what they can reach.
+
+## Compare them
+
+|  | Browser tab | Desktop app | Self-hosted server |
+| --- | --- | --- | --- |
+| What you install | Nothing | An installer for Windows, macOS or Linux | Docker on a host, then one deploy command |
+| Users | One local account, signed in automatically | One local account, signed in automatically | Accounts, teams, roles and invitations |
+| Where analyses run | Workers of the tab | Workers of the app's window | Cluster daemons on the machines you enroll |
+| Plugins it can run | Plugins with a `wasm-wasm32` build | Plugins with a `wasm-wasm32` build | The build for each machine's platform |
+| Notebooks | Kernels in the page, Python on Pyodide | Kernels in the window, Python on Pyodide | Jupyter on one of the team's clusters |
+| Where data lives | The browser's storage for that address | The app's data folder | Docker volumes on the host and on each cluster |
+| Other machines | None | None | Enroll workstations, servers, HPC nodes |
+| Stops when | You close the tab | You close the window | You stop the containers |
+
+## Which one to pick
+
+- **To try VOLT**, look at a trajectory, or teach a short session: run it in the browser. You can start in seconds and nothing stays on the machine except the browser's own storage.
+- **To work alone on your own computer**: use the desktop app. It's the browser runtime with persistent storage and no tab to keep open.
+- **To work as a group**, share trajectories and results, use bigger machines, run plugins that only publish native builds, or run notebooks in Jupyter: self-host a server and enroll the machines that will compute.
+
+The browser and the desktop app hold one workspace each. Data doesn't move between them and a server by itself.
+
+## Connect to an existing server
+
+A web client that isn't tied to a server asks which one to use: its root address opens **Connect to a server** at `/connect`. (A client that knows its server opens the sign-in page instead, which takes a signed-in user on to the dashboard.)
+
+<Steps>
+  <Step>
+    Enter the server's address in **Server address** and choose **Continue**. Without a scheme, `https://` is assumed.
+  </Step>
+  <Step>
+    The client requests `GET <address>/healthz` and waits up to 5 seconds for a JSON reply with `"status": "ok"`. If it gets one, it shows **Server connected** and opens the sign-in page.
+  </Step>
+  <Step>
+    Sign in with your account on that server.
+  </Step>
+</Steps>
+
+The browser remembers the address. To pick another server, choose **Change server** on the sign-in page: it forgets the address, your session and the selected team, and returns to `/connect`.
+
+Some clients are tied to one server and never ask:
+
+- The client a self-hosted stack serves (port `5273` by default) always talks to its own server, so you sign in there directly.
+- A client built with `VITE_SERVER_ENDPOINT` uses that server (see [Configuration](/docs/run/configuration#web-client-build-variables)).
+- The desktop app always runs its own workspace and can't connect to a server.
+
+### Which address to enter
+
+Enter an address that answers `/healthz` with the server's JSON: the server's own port (`http://<host>:8100` on a default self-hosted stack), or a reverse proxy that routes `/healthz` to the server (see [Self-hosting](/docs/run/self-hosting#put-it-behind-https)). The client's port `5273` answers `/healthz` with the web app's page, so it isn't recognized as a server.
+
+A client loaded over HTTPS can't reach a server over plain HTTP, since browsers block mixed content. Connect to an `https://` address from such a client.
+
+If the check fails, the client says why:
+
+| Message | What it means |
+| --- | --- |
+| Enter a valid server address. | The text isn't a URL. |
+| That address does not look like a Volt server. | Something answered, but not with a successful JSON `{"status": "ok"}` from `/healthz`. |
+| The server took too long to respond. Check the address and try again. | No answer within 5 seconds. |
+| Could not reach that server. Check the address and try again. | The request failed: wrong host or port, the server is down, a certificate error, or blocked mixed content. |
+
+The same screen offers **Run in this browser**, which starts a workspace in the tab instead. See [Run in the browser](/docs/run/browser).

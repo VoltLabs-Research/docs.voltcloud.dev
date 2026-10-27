@@ -1,0 +1,9 @@
+{
+  "title": "Run VOLT",
+  "pages": [
+    "browser",
+    "desktop",
+    "self-hosting",
+    "configuration"
+  ]
+}
