@@ -1,0 +1,83 @@
+---
+title: OpenDXA (Dislocation Analysis)
+description: Extract dislocation lines with their Burgers vectors, the defect surface mesh and network statistics from crystal clusters shared by a structure identification stage.
+---
+
+OpenDXA is VOLT's implementation of the Dislocation Extraction Algorithm (DXA). It turns an atomistic crystal into a network of dislocation lines, each segment with its Burgers vector, plus a surface mesh around the regions that aren't good crystal. Use it to measure dislocation density and character during plastic deformation, nanoindentation, irradiation or annealing. In the app it is called **Dislocation Analysis (Experimental)**.
+
+| Key | Version | Builds |
+|---|---|---|
+| `opendxa` | 2.5.1 | Linux, macOS, Windows, browser |
+
+OpenDXA doesn't classify atoms itself: it reads the crystal clusters of an earlier structure identification stage.
+
+## How it works
+
+1. **Crystal clusters.** The earlier stage (PTM or a-CNA) has classified the atoms, grouped crystalline atoms into clusters with a common lattice orientation, and recorded how neighboring clusters' lattices relate. That gives every bond between two crystalline atoms an ideal lattice vector.
+2. **Tessellation.** OpenDXA builds a Delaunay tessellation of the atoms and marks each tetrahedron as good crystal when all its edges map consistently onto lattice vectors.
+3. **Interface mesh.** The surface that separates good from bad tetrahedra encloses every defect.
+4. **Burgers circuits.** OpenDXA places small closed circuits on that surface and sums the lattice vectors of their edges. A non-zero sum is a Burgers vector: the circuit encloses a dislocation. It then sweeps the circuit along the defect to trace the dislocation line, and leaves the rest of the surface as the defect mesh of non-dislocation defects (surfaces, voids, grain boundaries).
+5. **Lines.** The traced lines are smoothed and coarsened, joined at junctions and clipped at periodic boundaries.
+
+Burgers vectors are expressed in the lattice of **Reference Topology** and grouped into families such as `1/2<110>` and `1/6<112>`.
+
+## Inputs
+
+- An earlier stage of [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) or [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) in the same pipeline, with the same crystal. Its shared `clusters_table`, `clusters_transitions` and `neighbor_lattice`, and the annotated frame it writes, are OpenDXA's input.
+
+## Arguments
+
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Reference Topology** `reference_topology` | select | `fcc` | `fcc` (FCC), `bcc` (BCC), `hcp` (HCP), `sc` (SC), `cubic_diamond` (Cubic Diamond), `hex_diamond` (Hexagonal Diamond) | The lattice the Burgers vectors are expressed in. Match the crystal of the structure identification stage. |
+| **Max Trial Circuit Size** `max_trial_circuit_size` | number | `14` | ≥ 1, step 1 | Longest Burgers circuit, in edges, that OpenDXA tries when looking for dislocations. Larger values find dislocations in more distorted regions, at a higher cost. |
+| **Circuit Stretchability** `circuit_stretchability` | number | `9` | ≥ 1, step 1 | How many edges a circuit may grow by while it is swept along a line. Larger values follow lines through disordered regions. |
+| **Line Smoothing Level** `line_smoothing_level` | number | `1` | ≥ 0, step 0.1 | How strongly the traced lines are smoothed. `0` keeps them as traced. |
+| **Line Point Interval** `line_point_interval` | number | `2.5` | ≥ 0, step 0.1 | Spacing of the points kept along each line, in the frame's length units. |
+| **Export Dislocations** `export_dislocations` | boolean | `true` | | Write the dislocation lines. |
+| **Export Defect Mesh** `export_defect_mesh` | boolean | `true` | | Write the defect mesh. |
+| **Export Defect Mesh (Interior Only)** `export_defect_mesh_interior` | boolean | `false` | | Also write a copy of the defect mesh without its enclosing component, such as the outer free surface of a sample. Needs **Export Defect Mesh**. |
+| **Export Network Statistics** `export_dislocation_network_stats` | boolean | `true` | | Write the statistics behind the charts and the **Network Statistics** tables. |
+| **Export Interface Mesh** `export_interface_mesh` | boolean | `false` | | Write the interface mesh. In this version it is identical to the defect mesh. |
+| **Export Structure Identification** `export_structure_identification` | boolean | `false` | | Write the per-atom structure types OpenDXA worked with. |
+| **Mark Core Atoms** `mark_core_atoms` | boolean | `false` | | Mark the atoms in dislocation cores with the id of their dislocation. |
+| **Export Crystalline Coherent Regions** `export_coherent_crystalline_regions` | boolean | `false` | | Write the atoms grouped into coherent crystalline regions. |
+
+These arguments are filled in from the earlier stage and don't appear in the form:
+
+| Argument | Type | Shared by |
+|---|---|---|
+| **Clusters Table** `clusters_table` | string | Polyhedral Template Matching, Adaptive Common Neighbor Analysis |
+| **Clusters Transitions** `clusters_transitions` | string | Same |
+| **Neighbor Lattice** `neighbor_lattice` | string | Same |
+
+The workflow also lists Pattern Structure Matching, Reference Crystal Matching and Generalized Template Matching as sources. The last two aren't in the registry yet, and Pattern Structure Matching 2.1.0 shares only `neighbor_lattice`.
+
+## Outputs
+
+Each output is written only when its argument is on.
+
+| Exposure | Written when | What you get |
+|---|---|---|
+| **Dislocations** | **Export Dislocations** | A listing (number of dislocations and points, mean, longest, shortest and total segment length), and 3D lines colored by Burgers family. |
+| **Defect Mesh** | **Export Defect Mesh** | A listing, and the defect surface as a 3D mesh. |
+| **Defect Mesh (Interior)** | **Export Defect Mesh (Interior Only)** | A listing, and the defect mesh without its enclosing component. |
+| **Interface Mesh** | **Export Interface Mesh** | A listing, and the interface mesh. |
+| **Structure Identification** | **Export Structure Identification** | A listing, and a 3D model of the atoms colored by structure. |
+| **Crystalline Coherent Regions** | **Export Crystalline Coherent Regions** | A listing, and a 3D model of the atoms in coherent crystalline regions. |
+| **Core Atoms** | **Mark Core Atoms** | A listing, and a 3D model of the atoms colored by structure, with a `dislocation_id` column. |
+| **Burgers Segment Counts** | **Export Network Statistics** | A bar chart, "Dislocation segments by Burgers vector". |
+| **Burgers Length Distribution** | **Export Network Statistics** | A bar chart, "Dislocation length by Burgers vector". |
+| **Network Statistics** | **Export Network Statistics** | A listing, and two tables under **Results** in the canvas: **Structure analysis results** (count and fraction per structure) and **Dislocation analysis results** (segments and total length per Burgers family). |
+
+Each dislocation segment carries `burgers_family`, `burgers_family_label`, `crystal_structure`, `length` (Segment length), `magnitude` (Burgers magnitude) and `cluster_id`, the properties the workflow declares for **Dislocations**.
+
+## Notes
+
+- If no earlier stage shared the cluster tables, the stage fails with `Pipeline stage requires shared exposure "clusters_table" but no upstream stage produced it`. Put PTM or a-CNA before OpenDXA.
+- Dislocation density is the total line length (from the **Dislocations** listing) divided by the volume of the cell.
+- The defaults suit FCC metals. For BCC, set both the structure identification stage and **Reference Topology** to BCC.
+
+## Reference
+
+A. Stukowski, K. Albe, "Extracting dislocations and non-dislocation crystal defects from atomistic simulation data", *Modelling Simul. Mater. Sci. Eng.* **18**, 085001 (2010). A. Stukowski, V. V. Bulatov, A. Arsenlis, "Automated identification and indexing of dislocations in crystal interfaces", *Modelling Simul. Mater. Sci. Eng.* **20**, 085007 (2012).
