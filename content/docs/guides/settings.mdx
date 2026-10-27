@@ -1,0 +1,82 @@
+---
+title: Account settings
+description: Your profile, theme, password, sign-in methods, signed-in devices, and the team settings under Settings.
+---
+
+**Settings** at the bottom of the sidebar, or **Account Settings** in the user menu, opens the settings pages. **Back to app** returns to the dashboard.
+
+| Page | Route | What it holds | Shown |
+|---|---|---|---|
+| **General** | `/dashboard/settings/general` | Profile, theme, account deletion | Always; profile and deletion on multi-user servers only |
+| **Authentication** | `/dashboard/settings/authentication` | Password, link to login activity | Multi-user servers only |
+| **Integrations** | `/dashboard/settings/integrations` | The team's AI providers | Always |
+| **Sessions** | `/dashboard/settings/sessions` | Signed-in devices, login history | Multi-user servers only |
+| **Secret Keys** | `/dashboard/settings/secret-keys` | The team's API keys | Always (needs `team-secret-key:read`) |
+
+**General**, **Authentication** and **Sessions** are about your account. **Integrations** and **Secret Keys** belong to the selected team: see [VOLT AI](/docs/guides/volt-ai#connect-a-provider) and [Secret keys](/docs/guides/secret-keys).
+
+<Callout type="info">
+A single-user deployment (the [browser runtime](/docs/run/browser), the [desktop app](/docs/run/desktop), or a server in `local` mode) has one local account and signs you in to it automatically. There is no sign-in page, password or session to manage, so its settings show only the theme, **Integrations** and **Secret Keys**.
+</Callout>
+
+## Sign in
+
+The sign-in page (`/auth/sign-in`, **Sign In or Join Now!**) starts with your email.
+
+1. Enter your **Email address** and click **Continue with Email**, or use a **Continue with GitHub**, **Continue with Google** or **Continue with Microsoft** button.
+2. With an email that has an account, VOLT asks for your **Password** (**Welcome back**) and **Sign In** signs you in.
+3. With a new email, VOLT creates the account (**Create Account**): enter your **Full name**, a **Password** of at least 8 characters and **Confirm password**.
+
+The sign-in page shows only the OAuth providers the server is configured for. A server enables GitHub, Google or Microsoft when its administrator sets the provider's client credentials; see [Configuration](/docs/run/configuration).
+
+Signing in with a provider goes through the provider's page and back to VOLT (`/auth/oauth/callback`, **Authenticating...**). VOLT needs the email address from the provider:
+
+- If an account with that email exists, VOLT links the provider to it and signs you in.
+- Otherwise, VOLT creates a new account with no password.
+
+After you sign up, VOLT takes you through onboarding: creating a team (unless the server adds new users to a team automatically) and connecting a [cluster](/docs/guides/clusters).
+
+## General
+
+**General Settings** has three parts.
+
+- **Profile**: **Profile Picture**, **Full Name** and **Email**. Click the picture to upload a new one (an image of up to 5 MB). Name and email changes save on their own a second after you stop typing (**Saving changes...**, then **Changes saved**).
+- **Appearance**: **Theme**, one of **System** (follows your operating system), **Light** or **Dark**.
+- **Delete Account**: deletes your account after you confirm **Delete your account?**. VOLT also removes your sign-in sessions, your AI conversations, your team memberships and your activity records. This cannot be undone.
+
+## Authentication
+
+**Authentication Settings** manages your password.
+
+- **Password** shows when you last changed it, or **No password set (OAuth only)** for an account created with a provider. **Change** opens the form: **Current Password**, **New Password** (at least 8 characters) and **Confirm New Password**, then **Change Password**. Without a password, the button is **Set Password** and the form doesn't ask for a current one.
+- **Recent Sessions** › **View Activity** opens the Sessions page.
+
+Changing your password signs out every other device: the server refuses tokens issued before the change. The device you changed it on stays signed in.
+
+Some actions, such as deleting a [cluster](/docs/guides/clusters#delete-a-cluster), ask for your password. An account without one must set one here first.
+
+## Sessions
+
+**Session Management** lists where your account is signed in and what happened recently.
+
+### Active Sessions
+
+**Active Sessions** lists each signed-in device with its IP address and last activity. This device is marked **Current** (**Active now**).
+
+- **Revoke** signs a device out, after you confirm **Revoke this session?**.
+- **Revoke all others** (**Revoke All Other Sessions**) signs out every device but this one.
+
+**Sign Out** in the user menu forgets the session in this browser only. On the server it stays active, and listed here, until you revoke it or its token expires (after 7 days unless the server is configured otherwise).
+
+### Login Activity
+
+**Login Activity** lists your 20 most recent events, each with the browser, operating system, IP address and time.
+
+| Event | Meaning |
+|---|---|
+| **Signed in** | Signed in with email and password. |
+| **Signed in with OAuth** | Signed in with GitHub, Google or Microsoft. |
+| **Password changed** | The password was changed or set. |
+| **Failed sign-in** | A sign-in attempt with a wrong password. |
+
+VOLT AI can also list and revoke your sessions with its `manage_sessions` tool. It asks you before revoking anything; see [VOLT AI](/docs/guides/volt-ai#approvals).
