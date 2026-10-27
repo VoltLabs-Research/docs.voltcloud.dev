@@ -1,0 +1,67 @@
+---
+title: Desktop app
+description: Install VOLT as an app that runs the whole stack in its own window, with no Docker, database or server to set up.
+---
+
+The desktop app is VOLT's web client in a window of its own, running the same in-browser stack a [browser tab](/docs/run/browser) runs: the server and a cluster daemon compiled to WebAssembly, in workers of the window. There's no Docker, no database to install and no server to reach. The window is its own backend, and its storage belongs to the app, so the browser can't clear your workspace.
+
+Use it to work alone on your own computer. For a group, several machines or native plugin builds, [self-host a server](/docs/run/self-hosting).
+
+## Download
+
+Installers for each release are on the [VOLT releases page](https://github.com/VoltLabs-Research/VOLT/releases/latest):
+
+| Platform | File | Install |
+| --- | --- | --- |
+| Windows (x64) | `VOLT.Desktop.<version>.exe` | Run it. It installs for your user without asking for a folder, adds **Volt** to the Start menu and the desktop, and opens the app. |
+| macOS (Apple silicon) | `Volt-<version>-arm64.dmg` | Open the disk image and drag **Volt** to Applications. |
+| Linux (x86-64) | `Volt-<version>.AppImage` | Make it executable (`chmod +x Volt-<version>.AppImage`) and run it. |
+| Debian, Ubuntu (x86-64) | `volt-desktop_<version>_amd64.deb` | `sudo apt install ./volt-desktop_<version>_amd64.deb` |
+
+<Callout type="info">
+The installers aren't code-signed, so Windows SmartScreen or macOS Gatekeeper may warn you the first time you open the app.
+</Callout>
+
+## First launch
+
+The window shows **Starting VOLT** with the same phases as a browser tab: **Start API server**, **Provision workspace** and **Start compute daemon**. The first launch creates the local account, a team and a cluster, and opens the dashboard signed in. A default set of analysis plugins then installs from the plugin registry in the background; any that fail are tried again at the next launch.
+
+If startup fails, **Show log** has the stack's output and **Try again** restarts it.
+
+## How it differs from a browser tab
+
+- **Storage is the app's.** The workspace persists in the app's data folder, where no browser can evict it.
+- **One window.** Only one instance runs. Opening the app again brings the existing window to the front.
+- **It keeps running in the background.** A minimized or hidden window isn't throttled, so analyses keep going. Closing the window stops VOLT, along with anything running.
+- **Links open outside.** Links to other sites open in your default browser; the window only shows VOLT.
+- **No server to choose.** The app always runs its own workspace and can't connect to a server. To work on a server, open its address in a browser.
+
+Everything else works as in a browser tab, with the same limits: one local user, no other machines to enroll, plugins only with a `wasm-wasm32` build, and Python under Pyodide. See [Run in the browser](/docs/run/browser#limits).
+
+## Where data lives
+
+The app keeps its data in its folder under your user's application data:
+
+| Platform | Folder |
+| --- | --- |
+| Windows | `%APPDATA%\Volt` |
+| macOS | `~/Library/Application Support/Volt` |
+| Linux | `~/.config/Volt` |
+
+In it:
+
+- `Partitions/volt/` is the window's storage, which holds the whole workspace: the local account, trajectories, analysis results, installed plugins and notebook environments.
+- `app-config.json` remembers the window's size and position.
+
+To start over with an empty workspace, quit the app and delete `Partitions/volt/`. Uninstalling the app on Windows leaves this folder in place.
+
+## Updates
+
+The app bundles the stack it runs, so updating the app updates VOLT.
+
+| Install | How it updates |
+| --- | --- |
+| Windows | Automatically. Shortly after launch the app checks the latest release, downloads it in the background and installs it when you quit. |
+| Linux AppImage | Automatically, as on Windows. |
+| macOS | Download the new `.dmg` from the releases page and replace the app. |
+| Linux `.deb` | Download the new package and install it over the old one. |
