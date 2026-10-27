@@ -1,0 +1,229 @@
+---
+title: Trajectories
+description: Upload simulation output, follow its processing, organize it in folders, inspect atoms, download it and share it.
+---
+
+A trajectory is one simulation's output as VOLT stores it: an ordered set of frames, one per timestep, each
+with its atoms, their properties and the simulation cell. Every analysis, 3D scene and result in VOLT hangs off
+a trajectory, so uploading one is the first step of any work.
+
+Trajectories belong to a team. Every member of the team sees the same trajectories, folders and results.
+
+## Uploading
+
+There are three ways to start an upload:
+
+- **Upload** on the [dashboard](/docs/guides/dashboard) or on the trajectory listing opens your file picker.
+  You can select several files at once.
+- Drag files or folders from your file manager and drop them anywhere on a dashboard page.
+- Press Ctrl I in the [canvas](/docs/guides/canvas) to pick files. The upload goes to the root folder and the
+  dashboard opens.
+
+The upload lands in the folder you have open. A toast follows its progress (`Uploading dump.lammpstrj (42%)`)
+and reads **Upload received, processing started** once every byte has reached the cluster.
+
+### What becomes one trajectory
+
+| You upload | You get |
+| --- | --- |
+| One file | One trajectory named after the file, without its extension |
+| Several files picked together | One trajectory named `upload_<timestamp>`. Rename it afterwards. |
+| Several loose files dropped together | One trajectory named after the first file |
+| A dropped folder | One trajectory named after the folder, with every file inside it, recursively |
+| Several dropped folders | One trajectory per folder |
+
+The files of one trajectory can be frames in separate files, one file with many frames, ZIP archives of frames,
+or any mix of these.
+
+Before uploading, VOLT drops empty files and system files: anything whose name or folder starts with a dot,
+`__MACOSX`, `Thumbs.db` and `desktop.ini`. A warning toast says how many were skipped. If nothing is left,
+the upload stops with **Nothing to upload**.
+
+<Callout type="info">
+Dropping a `.glb` file doesn't upload anything. It opens the file in the [local GLB viewer](/docs/guides/canvas#local-glb-viewer)
+at `/canvas/glb`, in your browser only. If a drop contains a `.glb`, the other files in that drop are ignored.
+</Callout>
+
+### Supported formats
+
+VOLT recognizes a file by its content, not its extension. Each file is tested against these readers in order,
+and the first one that recognizes it reads it:
+
+| Format | Notes |
+| --- | --- |
+| LAMMPS text dump | `ITEM:` headers, any column layout with positions and atom types |
+| LAMMPS binary dump | |
+| LAMMPS YAML dump | |
+| LAMMPS data file | Atom styles such as `atomic`, `charge`, `full`, `molecular` and the other standard ones |
+| Extended XYZ and plain XYZ | Lattice and properties from the comment line when present, otherwise `type x y z` columns |
+| ZIP archive | Every file inside is read as above. Hidden entries and `__MACOSX` are skipped. |
+
+A file that holds several frames is split into one frame per timestep. If two files contain the same
+timestep, the first one read is kept and the other is dropped. Frames are ordered by timestep.
+
+Files no reader recognizes are skipped. If none of the uploaded files contains a readable frame, the upload
+fails with **None of the uploaded files contain readable trajectory frames** and the trajectory is removed.
+
+### Large files
+
+Files up to 64 MiB go up in one request. Larger files are split into 64 MiB parts that upload in parallel and
+are joined on the cluster. A single file can be up to 512 GiB unless your administrator changed the limit,
+and an upload has six hours to finish before its session expires. Both values are server settings, see
+[Configuration](/docs/run/configuration).
+
+The files are stored on the cluster that holds the team's trajectories. If the team has several, the server
+picks one.
+
+## Processing
+
+Once the upload is committed, the cluster reads the header of every frame (timestep, atom count, simulation
+cell) and creates a [simulation cell](/docs/guides/simulation-cells) record per frame. Then each frame becomes a
+**Preprocess trajectory frame** job:
+
+1. The frame is compressed and stored as that timestep's dump.
+2. A 3D model of the frame is built for the canvas.
+3. The first frame to finish is rendered into the preview image shown on the card (a
+   **Rasterize trajectory preview** job).
+
+When every frame is done, the atoms of all frames are stored in a columnar format. That is what the per-atom
+viewer, color coding and expression selection read.
+
+Each frame job gets up to three attempts. You can follow all of these jobs in [Jobs](/docs/guides/jobs).
+
+### Statuses
+
+| Status | Card caption | Meaning |
+| --- | --- | --- |
+| `waiting-for-process` | **Waiting...** | Waiting to be processed |
+| `queued` | **Queued...** | Waiting for the cluster |
+| `processing` | **Processing frames...** | Frames are being processed. A new upload starts here. |
+| `completed` | `Edited … · N atoms · N frames` | Every frame was processed. The trajectory opens in the canvas. |
+| `failed` | **Failed** | At least one frame failed for good, or the upload was canceled |
+
+Only completed trajectories open in the canvas. For a failed one, open **Compute jobs** from its card to see
+which frames failed and why, and use **Retry Failed Jobs** there.
+
+## Folders
+
+Folders organize a team's trajectories and can be nested. They exist only to group: moving a trajectory never
+touches its data.
+
+- Create one with **New folder** on the dashboard or **New Folder** on the listing. It is created inside the
+  folder you have open.
+- Rename or delete a folder from its card's menu, from its row's right-click menu, or, while you are inside it,
+  from the listing's **…** menu (**Rename Folder**, **Delete Folder**).
+- Move a trajectory with **Move to folder** (pick a folder and press **Move Here**, or **Move to Root**), or by
+  dragging it onto a folder or a breadcrumb.
+
+Deleting a folder deletes its subfolders and every trajectory in them, after a confirmation.
+
+On the dashboard, a folder card shows the previews of the three most recently edited trajectories in the
+folder's tree.
+
+## The trajectory listing
+
+`/dashboard/trajectories/list` shows the same folders and trajectories as a table. Open it from **Trajectories**
+in the sidebar.
+
+| Column | Content |
+| --- | --- |
+| **Name** | Folder or trajectory name |
+| **Atoms** | Atoms in the first frame |
+| **Frames** | Number of frames |
+| **Size** | Total size of the frames |
+| **Status** | Processing status |
+| **Cluster** | The cluster that stores the trajectory's frames |
+| **Updated At** | Last change |
+
+Click a folder row to open it and a trajectory row to open the canvas. Hide columns with **Toggle columns**
+next to the title. Ctrl-click (⌘-click on macOS) selects several rows.
+
+Right-click a trajectory row for its actions:
+
+| Action | What it does |
+| --- | --- |
+| **View Scene** | Opens the canvas |
+| **Inspect Atoms** | Opens the per-atom viewer at the first frame |
+| **Export** | Downloads every frame as a ZIP |
+| **Move to Folder** | Opens the move dialog |
+| **Delete trajectory** / **Delete trajectories** | Deletes the row, or every selected row, after a confirmation |
+| **Copy Document ID** | Copies the trajectory's ID, for the SDKs and the API |
+
+### Renaming and deleting
+
+Double-click a trajectory's name, on its card or in the canvas toolbar, to rename it.
+
+Deleting a trajectory is permanent. It removes the frames, the simulation cells, every analysis and result
+computed from it, and its jobs.
+
+## Artifacts
+
+**Artifacts** in the trajectories section (`/dashboard/trajectories/artifacts`) lists the team's saved scene
+artifacts: the 3D models VOLT stores per timestep for a trajectory beyond its plain frames.
+
+| Column | Content |
+| --- | --- |
+| **Display Name** | The artifact's name |
+| **Source** | `plugin-exposure` (a 3D result of an analysis), `color-coding` (a model baked by a color coding modification), or `particle-filter` (a filtered model created through the API) |
+| **Trajectory** | The trajectory it belongs to |
+| **Timestep** | The frame it was made for |
+| **Status** | `ready` or `failed` |
+| **Updated At** | Last change |
+
+You load artifacts into the scene from the canvas, not from this page. See [Analysis results](/docs/guides/results).
+
+## Per-atom viewer
+
+The per-atom viewer at `/dashboard/trajectory/:trajectoryId/atoms` is a table of every atom in one frame. Open
+it with **Inspect Atoms** from a trajectory, or from a row of an analysis listing to include that analysis's
+properties.
+
+- The title reads **Per-Atom Properties - Frame** followed by the timestep.
+- **Timestep** in the header switches frames. The URL keeps the timestep (`?timestep=`), so the link is shareable.
+- The columns are **ID**, **Type**, **X**, **Y**, **Z**, then every other property the frame has. When the page is
+  opened for an analysis (`?analysisId=`), the per-atom properties that analysis computed are added as columns.
+- Rows load 100 at a time.
+
+While the viewer is open, the trajectories section of the sidebar shows **Per-atom properties**.
+
+## Downloads
+
+**Export**, from a card or a listing row, downloads the trajectory as `<name>-dumps.zip`. The archive holds
+one file per frame, `timestep-<N>.dump.zst`: the frame's original content as it was split from your upload,
+compressed with zstd. Unpack them with `zstd -d`.
+
+To download analysis results instead, see [Downloads](/docs/guides/results#downloads).
+
+## Public sharing
+
+Each trajectory is either public or private:
+
+- **Public**: anyone with the canvas link can open it read-only, without an account, and it is listed on the
+  team's public page.
+- **Private**: only members of the team can open it.
+
+<Callout type="warn">
+New trajectories are public. Make a trajectory private if it shouldn't be visible outside your team.
+</Callout>
+
+To change it, open the trajectory in the canvas, choose **More actions** (**…**) in the toolbar, then
+**Share trajectory**. The panel has the **Public visibility** switch, shown to members who can edit
+trajectories, and the canvas link with a copy button. Other members see whether the trajectory is public or
+private.
+
+What a visitor can do on a shared canvas is described in [Public canvases](/docs/guides/canvas#public-canvases).
+
+### The team's public page
+
+`/discover/teams/:teamId` lists a team's public trajectories as cards, newest first, with a search field. It
+works without signing in. Copy its link from **Invite members** in the dashboard header, tab
+**Public Trajectories**, **Copy link**.
+
+Opening a trajectory from this page starts a short guided tour of the canvas the first time, when the
+trajectory has analyses.
+
+## Sample simulations
+
+The server ships sample simulations. When a team has no trajectories yet, the dashboard offers
+**Download sample simulations**, which saves them to your computer: `Shear Deformation.zip`, a LAMMPS
+shear-deformation run with three frames. Upload the ZIP as it is to get a first trajectory.

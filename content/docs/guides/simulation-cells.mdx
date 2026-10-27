@@ -1,0 +1,55 @@
+---
+title: Simulation cells
+description: The simulation box VOLT records for every frame, and the listing that shows them across a team.
+---
+
+A simulation cell is the box a frame was simulated in: its three edge vectors, its origin and which axes are
+periodic. VOLT records one per frame when a trajectory is uploaded, read from the frame's header. The canvas
+uses it to draw the box and its periodic images.
+
+## What a record holds
+
+| Field | Content |
+| --- | --- |
+| Trajectory | The trajectory the frame belongs to |
+| Timestep | The frame's timestep |
+| Cell vectors | The edge vectors **a**, **b** and **c**, in ångströms |
+| Cell origin | The corner the vectors start from |
+| Periodic boundary conditions | Whether X, Y and Z are periodic |
+| Bounding box | **Width** (the x component of **a**), **Length** (the y component of **b**) and **Height** (the z component of **c**) |
+
+For an orthogonal box the bounding box is the box's size. For a triclinic cell it holds only the diagonal
+components; the full shape is in the cell vectors.
+
+Records are created when the upload is committed, before the frames are processed, and they are deleted with
+their trajectory. You can't edit them.
+
+## The listing
+
+**Simulation cells** in the trajectories section of the sidebar opens `/dashboard/simulation-cells/list`, the
+cells of every frame of every trajectory in the team.
+
+| Column | Content |
+| --- | --- |
+| **Trajectory** | The trajectory's name. Click it for the trajectory's details. |
+| **Timestep** | The frame |
+| **Width (Å)**, **Height (Å)**, **Length (Å)** | The bounding box, to three decimals |
+| **Boundary Conditions** | **Periodic · X Y Z** for a fully periodic box, otherwise one chip per axis, such as **Z: Open** |
+| **Created At** | When the record was made |
+
+Sort by any column except **Boundary Conditions** and **Created At** by clicking its header. Right-click a row
+for **Copy Document ID**.
+
+## In the canvas
+
+The canvas shows the cell of the frame on screen in two places:
+
+- **Simulation cell** under **Visual elements** in the pipeline panel draws the box. Its checkbox shows or hides
+  it, and selecting it lets you set its opacity. See [Canvas](/docs/guides/canvas#visual-elements).
+- The **Simulation Cell** tab of the timeline lists the **Bounding Box**, **Boundary Conditions**,
+  **Cell Vectors** and **Cell Origin** of the current frame.
+
+The **Simulation Cell** tab also has **Show PBC images**, which outlines the neighboring copies of the box
+along each periodic axis, and **Edit Cell**, which lets you change the a/b/c vectors and the periodic axes and **Apply** them. The edit only
+changes how the canvas draws the cell in your browser; the stored record stays as it is. **Reset Cell** returns to
+the stored cell.
