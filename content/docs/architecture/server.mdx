@@ -1,0 +1,233 @@
+---
+title: Server
+description: How volt-server is built, from its modules, HTTP API and Socket.IO gateway to authentication, RBAC, the database, the event bus and its link to cluster daemons.
+---
+
+`volt-server` (`packages/infra/server`) is VOLT's API: an Express 5 app and a Socket.IO server on one Node HTTP server. It owns accounts, teams, roles, the metadata of trajectories, analyses and plugins, and the real-time events clients follow. It never stores simulation data; every dump, model, raster and Parquet table lives on a cluster, and the server reaches it through that cluster's daemon.
+
+The same build runs as a container (`volt-server`), as a plain Node process, and in a browser worker under the [web runtime](/docs/architecture/web-runtime).
+
+## Source layout
+
+<Files>
+  <Folder name="packages/infra/server/src" defaultOpen>
+    <File name="server.ts" />
+    <Folder name="core" defaultOpen>
+      <Folder name="bootstrap" />
+      <Folder name="config" />
+      <Folder name="constants" />
+    </Folder>
+    <Folder name="modules" defaultOpen>
+      <Folder name="<module>">
+        <Folder name="controllers" />
+        <Folder name="services" />
+        <Folder name="models" />
+        <Folder name="events" />
+        <Folder name="socket" />
+        <Folder name="ai-tools" />
+        <Folder name="contracts" />
+      </Folder>
+    </Folder>
+    <Folder name="shared">
+      <Folder name="http" />
+      <Folder name="events" />
+      <Folder name="keyvalue" />
+      <Folder name="persistence" />
+      <Folder name="services" />
+    </Folder>
+  </Folder>
+</Files>
+
+- **`src/server.ts`** is the entry point: startup and shutdown order.
+- **`src/core/bootstrap/`** holds the explicit registration lists: `mount-http-routes.ts` (every controller, grouped by module), `mount-event-groups.ts` (every domain event group), `ai-tools.ts` (the VOLT AI tool controllers), `entities.ts` (every TypeORM entity), plus `connect-database.ts`, `runtime-state-maintenance.ts` and `start-temp-storage-lifecycle.ts`. A controller, event group or entity that is not in its list is not loaded.
+- **`src/core/config/`**: `env.ts` (loads `./.env` with dotenv), `express.ts` (the middleware stack), `database.ts` (the TypeORM data source), `registry.ts` (`REGISTRY_URL`), `paths.ts` (`STATIC_ROOT`).
+- **`src/core/constants/`**: error codes, RBAC resources and actions, and the system roles.
+- **`src/shared/`**: the HTTP base classes (`Controller`, `@Route`, `@Middleware`, parameter resolvers), the event bus, the key-value store, persistence helpers, and file storage for the server's own files.
+
+### Modules
+
+Each folder under `src/modules/` is one domain. Its `controllers/` build Express routers, `services/` hold the logic, `models/` the TypeORM entities, `events/` the domain events it emits and handles, `socket/` its Socket.IO modules, and `ai-tools/` the tools VOLT AI can call.
+
+| Module | What it covers |
+|---|---|
+| `auth` | Users, sign-in and sign-up, JWTs, OAuth (GitHub, Google, Microsoft), avatars |
+| `session` | The sessions a user has open, their activity, revocation |
+| `team` | Teams, members, roles, invitations, secret keys and their usage, AI provider integrations |
+| `cluster` | Team clusters, daemon connections and the reverse channel, the object gateway client, install manifests, storage placement and transfers between clusters |
+| `trajectory` | Trajectories, folders, upload sessions, frames, scene artifacts, the canvas, Discover, color coding, particle filters, clones |
+| `simulation-cell` | Simulation cells |
+| `plugin` | Installed plugins, the registry gateway, workflow validation, pipeline planning and runs, analysis listings and exports, the plugin debugger |
+| `analysis` | Analyses, provenance, per-frame logs |
+| `jobs` | The team's job list, projected from daemon status events, and retries |
+| `scripting` | Notebooks, the Jupyter proxy, notebook credentials, in-page kernel environments |
+| `whiteboards` | Whiteboards and their real-time state |
+| `ai` | VOLT AI conversations; turns run on the server with the team's configured provider |
+| `notification`, `daily-activity`, `dashboard` | Notifications, the activity heatmap, dashboard search |
+| `system` | `GET /api/system/config` (deployment mode), `GET /api/system/rbac`, cluster metrics, deployment settings |
+| `socket` | The Socket.IO gateway, rooms, and the team event broadcast |
+
+## Startup and shutdown
+
+`startServer()` in `src/server.ts` runs in this order:
+
+<Steps>
+<Step>
+Load the environment (`src/core/config/env.ts`), register the VOLT AI tools, configure the OAuth strategies whose client ids are set, and start the temp storage lifecycle.
+</Step>
+<Step>
+Mount every controller from `mount-http-routes.ts`, then the error middleware, and start listening on `SERVER_HOST`:`SERVER_PORT` (default `0.0.0.0:8000`).
+</Step>
+<Step>
+Connect the database. If it fails, the server logs the failure and exits with code 1.
+</Step>
+<Step>
+Mount the event groups and subscribe their handlers to the event bus, then start runtime-state maintenance.
+</Step>
+<Step>
+Register the Socket.IO modules and attach the gateway to the HTTP server, then start the cluster transfer runner and the trajectory clone runner.
+</Step>
+</Steps>
+
+On `SIGTERM` or `SIGINT` it terminates open HTTP connections (`http-terminator`, grace period `SERVER_SHUTDOWN_GRACE_PERIOD`, 1 s), closes the Socket.IO gateway, stops both runners and the maintenance timer, and disconnects the database. If that takes longer than `SERVER_SHUTDOWN_FORCE_EXIT_TIMEOUT` (5 s), it exits with code 1.
+
+## HTTP API
+
+Every route is declared once in `@volt/contracts` (`packages/shared/contracts/src/modules/<module>/routes.ts`) with its method, path and types, and the server and the client both import that table. A controller method binds to a route with `@Route(trajectoryRoutes.list)`; `@Middleware(...)` on the class or the method adds Express middleware, and parameter decorators (`@Req`, `@Param`, `@Query`, `@Body`, `@CurrentUser`) resolve arguments. Request bodies are validated with `typia`. A handler's return value becomes the JSON response; a paginated result is sent with its pagination metadata.
+
+Paths are under `/api`, and team-scoped resources under `/api/teams/:teamId/...`. See [REST & realtime API](/docs/develop/rest-api) for the API from a client's point of view.
+
+The middleware stack (`src/core/config/express.ts`), in order:
+
+| Layer | Behavior |
+|---|---|
+| `helmet` | Security headers, with `upgrade-insecure-requests` turned off |
+| Request context | A trace id per request: the `x-trace-id` request header, or a new UUID, echoed in the response |
+| `cors` | Reflects the request origin, with credentials |
+| `compression` | Compresses responses except binary ones (images, models, archives, attachments) and streams (`text/event-stream`, `X-Accel-Buffering: no`) |
+| Body parsers | JSON and URL-encoded, 1 MB limit |
+| `/healthz` | `HEAD` answers 204; `GET` answers `{ "status": "ok", "clientHost": ... }` |
+| Static files | `static/` |
+
+Request timeouts come from `SERVER_TIMEOUT` (0, none), `SERVER_KEEP_ALIVE_TIMEOUT` (30 minutes) and `SERVER_HEADERS_TIMEOUT` (the keep-alive value), sized for long uploads and downloads. Public auth routes, password updates and password-confirmed cluster actions are rate limited per 15-minute window.
+
+WebSocket upgrades on the HTTP server go to Socket.IO for `/socket.io/`, to the Jupyter proxy for `/api/jupyter`, and are refused otherwise.
+
+## Socket.IO
+
+`SocketGateway` (`src/modules/socket/socket/SocketGateway.ts`) creates one Socket.IO server on the same HTTP server, path `/socket.io`, with the `websocket` and `polling` transports, a 10 s ping interval and 20 s ping timeout, per-message deflate above 1 KB, and a 512 MB maximum message size.
+
+The handshake's token is verified as a user JWT. A connection without a token is a guest; that is how cluster daemons connect, and they authenticate afterwards by registering with their cluster id and daemon password.
+
+The modules registered in `src/server.ts`:
+
+| Module | Role |
+|---|---|
+| `TeamClusterSocketModule` | Daemon registration and messages on every channel, and cluster metrics for clients |
+| `CanvasWorkspaceSocketModule`, `TrajectoryPresenceSocketModule` | The shared canvas workspace and who is viewing a trajectory |
+| `TeamJobsSocketModule`, `TeamPresenceSocketModule` | The team's job feed and member presence |
+| `WhiteboardSocketModule` | Real-time whiteboard state |
+| `AIChatSocketModule` | Following VOLT AI turns as they run |
+| `PluginDebugSocketModule` | The plugin debugger (`debug:start` and its session events) |
+| `AnalysisLogSocketModule` | Live analysis logs |
+| `EventBroadcastSocketModule` | Re-emits team domain events (`trajectory.updated`, `analysis.status.changed`, `scene-artifact.upserted`, ...) to the room `team:<teamId>` |
+| `TeamSubscriptionSocketModule` | `subscribe_to_team`, which joins a client to its team's room |
+
+## Authentication and sessions
+
+Every protected route runs the `protect` middleware (`src/modules/auth/controllers/middleware/authentication.ts`). It reads `Authorization: Bearer <token>` and accepts two kinds of token:
+
+| Token | How it is checked |
+|---|---|
+| Secret key (`vsk_...`) | Its SHA-256 hash must match an active row in `secret_keys`. The request takes the key's team and the permissions of the key's role, and every request is logged to `secret_key_usage_logs`. |
+| User JWT | Verified with `SECRET_KEY` (lifetime `JWT_EXPIRE`, 7 days by default). The user must exist, must not have changed their password since the token was issued, and the exact token must belong to an active row in `sessions`. |
+
+Signing in creates the session row, so revoking a session invalidates its token immediately. OAuth sign-in uses Passport, and each provider is enabled by its client id (`GITHUB_CLIENT_ID`, `GOOGLE_CLIENT_ID`, `MICROSOFT_CLIENT_ID`) with its secret and callback URL. In `local` mode, `POST /api/auth/sessions/local` signs in as the provisioned local account.
+
+Stored secrets (AI provider keys, notebook credentials, cluster credentials) are encrypted with AES-256-GCM under a key derived from `VOLT_SECRET_ENCRYPTION_KEY`, or `SSH_ENCRYPTION_KEY` when that is unset.
+
+## RBAC enforcement
+
+A team-scoped controller adds `teamScoped(Resource.X)` after `protect`:
+
+```ts
+@Middleware(protect, teamScoped(Resource.TRAJECTORY))
+export default class TrajectoryController extends TrajectoryControllerBase { ... }
+```
+
+`teamScoped` resolves the team from the `:teamId` path parameter (or `teamId` in the body), checks that the user is a member (a secret key is bound to its team), and loads the member role's permissions. It maps the HTTP method to an action and requires the permission `<resource>:<action>`, or `*`:
+
+| Method | Action |
+|---|---|
+| `GET`, `HEAD` | `read` |
+| `POST` | `create` |
+| `PUT`, `PATCH` | `update` |
+| `DELETE` | `delete` |
+
+A missing permission answers 403 with `RBAC_INSUFFICIENT_PERMISSIONS`. Resources are listed in `src/core/constants/resources.ts` (`trajectory`, `analysis`, `plugin`, `scripting`, `team`, `team-member`, `team-role`, `team-invitation`, `team-secret-key`, `simulation-cell`, `ai-conversation`, `whiteboard`, `daily-activity`, `raster`) and served to the client at `GET /api/system/rbac`. The system roles (`Owner`, `Admin`, `Member`, `Viewer`) are defined in `src/core/constants/system-roles.ts`; for a system role, the permissions in that file apply, not the ones stored on the role row. See [Teams](/docs/guides/teams) for what each role can do.
+
+## Database
+
+The server uses TypeORM, and `DATABASE_URL` picks the engine (`src/core/config/database.ts`):
+
+| `DATABASE_URL` | Engine | Where |
+|---|---|---|
+| `postgres://user:pass@host:5432/volt` | Postgres, pool of 100, `application_name` `volt` | Self-hosted |
+| `sqlite:<path>` | SQLite through `better-sqlite3` | The browser and desktop runtimes (on sqlite-wasm), and tests (`sqlite::memory:`) |
+
+There are no migrations. The schema comes from the entities in `src/core/bootstrap/entities.ts` through TypeORM's `synchronize`, which is always on for SQLite and on for Postgres unless `NODE_ENV=production`. After connecting, `dropRetiredTables` drops the tables listed in `src/core/bootstrap/drop-retired-tables.ts`, since `synchronize` never drops a table. The tables themselves are listed in [Data & storage](/docs/architecture/storage#server-database).
+
+## Event bus
+
+Modules communicate through domain events (`eventBus.emit('trajectory.updated', payload)`), and handlers subscribe through the event groups in `mount-event-groups.ts`. `PostgresEventBus` (`src/shared/events/PostgresEventBus.ts`) delivers them two ways:
+
+- **On Postgres**, `emit` sends `pg_notify('volt_domain_events', envelope)`, and every server process holds a dedicated connection that `LISTEN`s on that channel and dispatches what arrives to its handlers. A payload larger than 6,000 bytes is written to `domain_event_spool` and the notification carries only its id. The listener reconnects with backoff from 1 s up to 30 s.
+- **On SQLite**, `emit` dispatches to the handlers in the same process.
+
+## Key-value store
+
+`KeyValueStore` (`src/shared/keyvalue/KeyValueStore.ts`) is short-lived runtime state in the same database: strings with optional TTLs, counters, sets, and named locks (a transaction-scoped advisory lock on Postgres). Job projections and retries, for example, live there. Tables: `key_value_entries` and `key_value_set_members`.
+
+Runtime-state maintenance runs every 5 minutes. It deletes expired key-value rows, event spool rows older than 10 minutes, and cluster metric samples older than 24 hours.
+
+## Talking to cluster daemons
+
+Daemons connect to the server, never the other way around for control. Each daemon opens four Socket.IO connections and registers each one with `team-cluster-daemon:register` (cluster id, daemon password, channel). The server checks the password, marks the cluster connected when its `control` or `heartbeat` channel registers, and schedules a disconnect `TEAM_CLUSTER_DAEMON_DISCONNECT_GRACE_MS` (60 s) after both close. All traffic is the `team-cluster-daemon:message` event.
+
+### Commands
+
+`TeamClusterDaemonClient.command(clusterId, command, payload)` sends `{ type: 'command', requestId, command, payload }` on the cluster's `control` socket and awaits the response with the same `requestId`. The command names are in `packages/shared/contracts/src/modules/cluster/daemon-commands.ts`: `pipeline.start`, `trajectory.ingest`, `plugin.registry.install`, `plugin.sync`, `plugin.listings.list`, `notebook.session.create`, `runtime.role.apply`, and so on. Two travel the other way, from the daemon to the server: `runtime.config.get` (queue concurrency, scope limits and role, read from the `team_clusters` row) and `runtime.lifecycle`.
+
+Daemon events (job and stage status, heartbeats, provenance, log chunks, scene artifact batches, exposure snapshots) arrive on the `events` and `heartbeat` channels and are routed by `TeamClusterDaemonFrameRouter`.
+
+### Object bytes: direct or tunneled
+
+`TeamClusterObjectGatewayClient` reads and writes objects in a cluster's store. Every request carries a direct-access JWT (`x-team-cluster-direct-access-token`) that the server signs with the daemon password, valid for 5 minutes. Then:
+
+1. `BytePlaneResolver` looks up the daemon's `daemon:object-gateway` exposure. If it has a `volt.exposure.base-url` label with an `http` or `https` URL (the daemon's `OBJECT_GATEWAY_PUBLIC_BASE_URL`), the request goes **direct** to that URL.
+2. If the direct dial fails and the body can be replayed, the cluster is marked unreachable for `TEAM_CLUSTER_BYTE_PLANE_UNREACHABLE_TTL_MS` (60 s) and the request goes **over the tunnel**: an HTTP session framed onto the daemon's `object-gateway` Socket.IO channel.
+
+The single-host compose stack sets `OBJECT_GATEWAY_PUBLIC_BASE_URL=http://cluster-daemon:18080`, so its reads go direct. The install files the server generates for other machines set none, so those clusters tunnel. Both paths give the same results; the direct one is faster.
+
+The other direction exists too: a daemon that needs an object owned by another cluster calls the server's `/internal/team-cluster/object-store/v1/owners/:ownerClusterId/buckets/:bucket/objects`, authenticated with `x-team-cluster-id` and `x-team-cluster-daemon-password`, and the server forwards it to the owner.
+
+Clients never talk to a daemon. Uploads and downloads go to `/api/teams/:teamId/cluster-objects/:token`, where the token is a signed grant for one object (signed with `CLUSTER_OBJECT_SIGNING_SECRET`, or `SECRET_KEY` when unset), and the server streams the bytes to or from the owner cluster.
+
+### Exposures and the Jupyter proxy
+
+Daemons publish exposure snapshots (services reachable on their machine, such as their object gateway and notebook containers) and `TeamClusterExposureRegistryService` keeps the latest per cluster. The Jupyter proxy (`/api/jupyter`) finds a notebook's exposure there and relays HTTP and WebSocket traffic to it through a tunnel on the daemon's `control` channel.
+
+### Installing daemons on other machines
+
+For a new cluster the server generates install files: a `docker-compose.yml` with a Postgres service and the daemon, plus `.env`, `postgres.env` and `daemon.env` holding the cluster id, daemon password, `VOLT_CLOUD_URL` and `DATABASE_URL`. `TEAM_CLUSTER_DAEMON_DISTRIBUTION_MODE` chooses between the published image (`image`, `ghcr.io/voltlabs-research/volt-cluster-daemon:main`) and a build from the VOLT sources next to the server (`build`); when unset, the server builds if it finds those sources. See [Clusters](/docs/guides/clusters) for the enrollment flow.
+
+## The plugin registry gateway
+
+`RegistryGateway` (`src/modules/plugin/services/plugin/RegistryGateway.ts`) talks to the plugin registry at `REGISTRY_URL`, `https://registry.voltcloud.dev` by default:
+
+| Call | Registry request |
+|---|---|
+| Search (`GET /api/teams/:teamId/plugins/registry/search`) | `GET /-/search?q=&kind=workflow&page=&pageSize=` |
+| Latest version | `GET /packages/<user>/<name>` |
+| Tarball | `GET /packages/<user>/<name>/<version>/-/<platform>.tgz` with `Accept: application/json`, which returns the tarball's `sha256` |
+
+To install (`POST /api/teams/:teamId/plugins/registry/installations`), the server picks a compute cluster, waits up to 30 s for its heartbeat to report a platform tag, resolves the tarball for that platform, and sends `plugin.registry.install` with the download URL and checksum. The daemon downloads and verifies the tarball itself and stores the plugin binary in its object store; the server then creates the `plugins` row from the workflow the daemon read. See [Plugins in the app](/docs/guides/plugins) and [VPM](/docs/develop/vpm).
