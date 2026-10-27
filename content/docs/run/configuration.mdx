@@ -58,7 +58,7 @@ Read by `compose.yml`. The CLI writes `SECRET_KEY`, `SSH_KEY`, `WEB_PORT`, `SERV
 | `POSTGRES_USER` | `volt` | PostgreSQL user, also used in the server's and the daemon's `DATABASE_URL` |
 | `POSTGRES_PASS` | Built-in fallback | PostgreSQL password. PostgreSQL isn't published on the host. |
 | `POSTGRES_DB` | `volt` | The server's database. The daemon always uses `volt-cluster`. |
-| `NODE_ENV` | `development` | The server's `NODE_ENV`. Keep the default (see [Server](#server)). |
+| `NODE_ENV` | `development` | The server's `NODE_ENV` (see [Server](#server)). |
 | `DEPLOYMENT_MODE` | `local` | The server's [deployment mode](#deployment-modes). The CLI writes `cloud`. |
 | `CLIENT_HOST` | `http://localhost:5273` | The web client's public address. The CLI writes `http://<host>:<WEB_PORT>`. |
 | `SERVER_ENDPOINT` | `http://localhost:8100` | The server's public address. The CLI writes `http://<host>:<SERVER_PORT>`. |
@@ -95,7 +95,7 @@ The compose file fixes the rest of what the containers need: the server listens 
 | `SERVER_DATA_DIR` | `./storage` | Where the server keeps its own files |
 | `USER_FILES_ROOT` | `<SERVER_DATA_DIR>/user-files` | Where files served under `/api/files/` are stored |
 | `REGISTRY_URL` | `https://registry.voltcloud.dev` | The plugin registry the marketplace and plugin installs use |
-| `NODE_ENV` | None | With PostgreSQL, the server creates and updates its tables only when this isn't `production`. |
+| `NODE_ENV` | None | `production` writes the log as JSON lines; anything else pretty-prints it. The server creates and updates its tables on every start either way. |
 | `LOG_LEVEL` | `debug` | `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent` |
 | `JWT_EXPIRE` | `7d` | Lifetime of session tokens, in seconds or as a duration such as `12h` |
 | `TEAM_CLUSTER_DAEMON_DISTRIBUTION_MODE` | Automatic | How enrolled machines get the daemon: `build` sends them the daemon's sources to build, `image` has them pull `ghcr.io/voltlabs-research/volt-cluster-daemon:main`. By default it's `build` when the server finds those sources, as the stack's server image ships them, and `image` otherwise. |

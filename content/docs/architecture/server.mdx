@@ -174,7 +174,7 @@ The server uses TypeORM, and `DATABASE_URL` picks the engine (`src/core/config/d
 | `postgres://user:pass@host:5432/volt` | Postgres, pool of 100, `application_name` `volt` | Self-hosted |
 | `sqlite:<path>` | SQLite through `better-sqlite3` | The browser and desktop runtimes (on sqlite-wasm), and tests (`sqlite::memory:`) |
 
-There are no migrations. The schema comes from the entities in `src/core/bootstrap/entities.ts` through TypeORM's `synchronize`, which is always on for SQLite and on for Postgres unless `NODE_ENV=production`. After connecting, `dropRetiredTables` drops the tables listed in `src/core/bootstrap/drop-retired-tables.ts`, since `synchronize` never drops a table. The tables themselves are listed in [Data & storage](/docs/architecture/storage#server-database).
+There are no migrations. The schema comes from the entities in `src/core/bootstrap/entities.ts` through TypeORM's `synchronize`, which is always on, for SQLite and for Postgres, as on the daemon. After connecting, `dropRetiredTables` drops the tables listed in `src/core/bootstrap/drop-retired-tables.ts`, since `synchronize` never drops a table. The tables themselves are listed in [Data & storage](/docs/architecture/storage#server-database).
 
 ## Event bus
 
