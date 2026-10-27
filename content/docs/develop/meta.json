@@ -1,0 +1,12 @@
+{
+  "title": "Develop",
+  "pages": [
+    "plugins",
+    "vpm",
+    "---SDKs & APIs---",
+    "rest-api",
+    "voltclient",
+    "python-sdk",
+    "daemon-cluster-client"
+  ]
+}

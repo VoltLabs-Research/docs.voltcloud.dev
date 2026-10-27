@@ -1,0 +1,197 @@
+---
+title: Develop
+description: The VOLT monorepo, how to build it from source, run its pieces in development, and the checks CI runs.
+---
+
+VOLT's application code lives in one pnpm monorepo, [VoltLabs-Research/VOLT](https://github.com/VoltLabs-Research/VOLT). The native libraries, every plugin and the plugin CLI live in their own repositories. This page covers the monorepo: what each package is, how to build it, how to run the server, the cluster daemon and the client while you work on them, and what CI checks on every push.
+
+To deploy VOLT rather than develop it, see [Self-hosting](/docs/run/self-hosting).
+
+<Cards>
+  <Card title="Writing plugins" href="/docs/develop/plugins" description="The plugin.json workflow, how the daemon runs a plugin, output files, platforms and publishing." />
+  <Card title="VPM" href="/docs/develop/vpm" description="The CLI that packs, publishes and installs plugin bundles." />
+  <Card title="REST & realtime API" href="/docs/develop/rest-api" description="Authentication, route groups, response envelopes and the Socket.IO channel." />
+  <Card title="SDKs" href="/docs/develop/voltclient" description="@voltstack/voltclient, voltsdk and @voltstack/daemon-cluster-client." />
+</Cards>
+
+## Repository layout
+
+The workspace (`pnpm-workspace.yaml`) is every directory under `packages/apps`, `packages/infra`, `packages/shared` and `packages/sdk`.
+
+| Directory | Package name | What it is |
+| --- | --- | --- |
+| `packages/apps/client` | `volt-webapp` | The React web app, built with Vite. It ships the web runtime, so it can run a whole VOLT stack in the browser tab. |
+| `packages/apps/landing` | `volt-landing` | The public landing page, a separate Vite app deployed apart from VOLT. Its links point at the web app (`VITE_VOLT_APP_URL`), and its **Run in this browser** opens the app's `/connect?run=browser`. |
+| `packages/apps/desktop` | `volt-desktop` | The Electron desktop app: a window onto the client's build that runs the stack in that window. It also holds the self-hosting deploy CLI (`src/cli.ts`, `scripts/deploy.sh`) and the Docker stack (`stack/compose.yml`, `stack/compose.images.yml`). |
+| `packages/infra/server` | `volt-server` | The API server: Express routes under `/api` and a Socket.IO gateway. It stores its data in PostgreSQL, or in SQLite in the browser and desktop runtimes. |
+| `packages/infra/cluster` | `cluster-daemon` | The cluster daemon: runs analyses and plugins, stores trajectories and results, and connects out to the server. |
+| `packages/infra/web-runtime` | `@volt/web-runtime` | The server and the daemon compiled to run unchanged in browser workers, on a Node platform implemented over browser APIs, with CPython from Pyodide as `python3`. |
+| `packages/sdk/voltclient` | `@voltstack/voltclient` | The TypeScript HTTP client, published to npm. The web client uses it too. |
+| `packages/sdk/python` | `voltsdk` | The Python SDK, published to PyPI and bundled as a wheel in the web runtime. |
+| `packages/sdk/daemon-cluster-client` | `@voltstack/daemon-cluster-client` | The protocol between a cluster daemon and the server, and a client for it, published to npm. |
+| `packages/shared/contracts` | `@volt/contracts` | The wire contracts the server, the client and the daemon share: routes, request and response types, enums, and the plugin workflow model with its rules. Raw TypeScript with no build step; each consumer compiles it from source. |
+| `packages/shared/local-stack` | `@volt/local-stack` | Provisioning of the single-user local stack the browser and desktop runtimes run: each backend's environment, the bootstrap that creates the local account, team and cluster, and the default plugin seed. The deploy CLI reuses the bootstrap. |
+| `packages/shared/tooling` | `@volt/tooling` | ESLint and dependency-cruiser configuration for the server and the daemon, and the `volt-layering` command. |
+
+## Prerequisites
+
+| Tool | Version | Needed for |
+| --- | --- | --- |
+| Node.js | 22 (from `.nvmrc`) | Everything. |
+| pnpm | 10 | Installing and running the workspace. CI uses pnpm 10. |
+| Emscripten | 3.1.74 | Building `@volt/web-runtime`, which compiles the backends' native addons to WebAssembly. The client build needs it, because the client ships the runtime. |
+| A C/C++ toolchain and the libraries of `canvas` | | Installing `cluster-daemon`, whose native modules (DuckDB, `canvas`) build on install. On Debian or Ubuntu, CI installs `build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev zstd`. |
+| PostgreSQL | | Running the server outside Docker. The stack's compose file uses `postgres:17-alpine`. |
+| Docker | | Running the stack with Docker Compose. |
+| Google Chrome or Chromium | | The web runtime's smoke tests (`CHROME_PATH`, `/usr/bin/google-chrome` by default). |
+| Python | 3.10 or later | The Python SDK. |
+
+## Install and build
+
+```bash
+git clone https://github.com/VoltLabs-Research/VOLT.git
+cd VOLT
+pnpm install
+pnpm build          # pnpm -r build: every package that has a build script
+```
+
+To build one package, build its workspace dependencies first and then the package. The SDKs' `package.json` types point at their `dist/`, so a consumer's typecheck needs them built:
+
+```bash
+pnpm --filter "volt-server^..." build   # the dependencies of volt-server
+pnpm --filter volt-server build
+```
+
+The web runtime bundles the backends' built `dist/`, so build them before it, with Emscripten on your `PATH`:
+
+```bash
+source ~/emsdk/emsdk_env.sh
+pnpm --filter "@volt/web-runtime^..." build
+pnpm --filter @volt/web-runtime build
+```
+
+The client's Vite plugin copies the built runtime into the client's build and fails with `@volt/web-runtime: … is not built (run its build first)` when it is missing. `pnpm --filter "volt-webapp^..." build` builds the runtime along with the client's other dependencies.
+
+### Package scripts
+
+| Package | Scripts |
+| --- | --- |
+| `volt-webapp` | `dev`, `build` (`tsc -b`, then `vite build`), `lint`, `preview` |
+| `volt-desktop` | `dev`, `build`, `typecheck`, `lint`, `package` (builds the client, then the installers with electron-builder), `package:only`, `cli:build` (bundles the deploy CLI to `dist/cli.cjs`), `deploy` (runs the CLI from source), `smoke` |
+| `volt-server` | `start` (ts-node from `src/`), `start:dist`, `build`, `typecheck`, `lint`, `layering`, `layering:update`, `test` |
+| `cluster-daemon` | `dev` (tsx from `src/`), `start` (from `dist/`), `build`, `fetch:tools`, `typecheck`, `lint`, `layering`, `layering:update` |
+| `@volt/web-runtime` | `build`, `typecheck`, `smoke <page>` |
+| `@voltstack/voltclient`, `@voltstack/daemon-cluster-client` | `build`, `dev` (tsup in watch mode), `typecheck`, `test` |
+
+The root `package.json` runs `build`, `typecheck` and `lint` across the workspace (`pnpm -r`).
+
+## Running in development
+
+### Server
+
+The server reads `packages/infra/server/.env`. Copy `.env.example` and point `DATABASE_URL` at a PostgreSQL database; the example value is `postgres://volt:volt@localhost:5432/volt`. One way to get that database:
+
+```bash
+docker run -d --name volt-dev-postgres -p 5432:5432 \
+  -e POSTGRES_USER=volt -e POSTGRES_PASSWORD=volt -e POSTGRES_DB=volt \
+  postgres:17-alpine
+```
+
+Then start the server from source. It listens on `SERVER_PORT` (8000 unless set):
+
+```bash
+cd packages/infra/server
+cp .env.example .env
+pnpm --filter volt-server start
+```
+
+`GET /healthz` answers `{"status":"ok", ...}` once it is up. [Configuration](/docs/run/configuration) lists the variables.
+
+### Cluster daemon
+
+The daemon reads its configuration from the environment; it does not load a `.env` file. `packages/infra/cluster/.env.example` lists the variables. It needs at least `TEAM_CLUSTER_ID`, `TEAM_CLUSTER_DAEMON_PASSWORD` and `VOLT_CLOUD_URL` (the server's origin), which you get by creating a cluster in the app (see [Clusters](/docs/guides/clusters)).
+
+```bash
+cd packages/infra/cluster
+set -a; source .env; set +a
+pnpm dev
+```
+
+`dev` first fetches the daemon's vendor tools (`volt-dump-transform` and `zstd`, from the CoreToolkit release pinned in `package.json` under `coreToolkitTools`), then runs `src/daemon.ts` with tsx. `scripts/start.js` sets the V8 heap to 80% of the machine's memory, or of its cgroup limit; set `DAEMON_HEAP_MB` to override it.
+
+### Client
+
+```bash
+VITE_PROXY_API_URL=http://localhost:8000 pnpm --filter volt-webapp dev
+```
+
+The dev server listens on port 5170 over HTTPS and proxies `/api` and `/socket.io` (WebSockets included) to `VITE_PROXY_API_URL`, else `VITE_SERVER_ENDPOINT`, else `http://127.0.0.1:8000`. Without certificates it serves a self-signed one. Service workers reject self-signed certificates, so to run the in-browser stack from the dev server, generate a trusted local CA and certificate first:
+
+```bash
+packages/apps/client/scripts/dev-certs.sh            # localhost, 127.0.0.1 and this host's LAN IPs
+packages/apps/client/scripts/dev-certs.sh my-host    # extra names or IPs
+```
+
+The script writes `packages/apps/client/.certs/` and trusts the CA in the user's NSS database (Chrome and Brave on Linux). It needs `openssl` and `certutil`. Import `.certs/volt-dev-ca.pem` by hand in Firefox and on other devices.
+
+### Desktop app
+
+The desktop window loads the client's build from `packages/apps/client/dist`, so build the client first:
+
+```bash
+pnpm --filter "volt-webapp..." build
+pnpm --filter volt-desktop dev
+```
+
+### The Docker stack
+
+`packages/apps/desktop/stack/compose.yml` describes the stack: `volt-postgres`, `volt-server`, `volt-client` and, under the `enrolled` profile, `cluster-daemon`. It builds each image from the checkout that `VOLT_SOURCE_DIR` points at. `compose.images.yml` is an overlay that swaps every build for a published image. The deploy CLI drives both; see [Self-hosting](/docs/run/self-hosting).
+
+## Checks and tests
+
+| Check | Command |
+| --- | --- |
+| Typecheck | `pnpm --filter <package> typecheck`. The client has no `typecheck` script; its `build` runs `tsc -b`. |
+| Lint | `pnpm --filter <package> lint` |
+| Layering | `pnpm --filter volt-server layering` and `pnpm --filter cluster-daemon layering` run dependency-cruiser. They fail on any rule error and on growth of the debt pinned in each package's `depcruise-baseline.json`; `layering:update` lowers the baseline. |
+| Server tests | `pnpm --filter volt-server test` runs `src/**/*.test.ts` with `node --test` on an in-memory SQLite database. |
+| SDK tests | `pnpm --filter @voltstack/voltclient test`, `pnpm --filter @voltstack/daemon-cluster-client test`, and `pytest` in `packages/sdk/python`. |
+| Web runtime smoke tests | `pnpm --filter @volt/web-runtime smoke <page>`, with `page`, `programs`, `stack`, `python` or `notebook`. Each runs a page of `smoke/` in headless Chrome. The Python pages download packages from Pyodide's CDN. |
+
+### CI
+
+`.github/workflows/verify.yml` runs on every push to `main`, on pull requests and on demand. A newer push cancels the run in progress on the same ref. Each job installs only its package and the workspace packages it depends on (`pnpm install --frozen-lockfile --filter <name>...`), then builds those dependencies.
+
+| Job | Steps |
+| --- | --- |
+| Server | Typecheck, lint, layering, build (`tspc` applies typia's transform, so the build proves it still runs). |
+| Cluster daemon | Native toolchain, then typecheck, lint, layering, build. |
+| Client | Native toolchain and Emscripten 3.1.74, then lint, typecheck of the web runtime, the five web runtime smoke pages, and the client build. |
+| Desktop | Typecheck, lint, build, and the deploy CLI bundle (`cli:build`). |
+| Landing | Lint and build of `volt-landing`, which has no workspace dependencies. |
+| Stack compose | `docker compose config` on `compose.yml` and on `compose.yml` with `compose.images.yml`, both with the `enrolled` profile, and an assertion that the overlay leaves no `build:` block. |
+
+The other workflows publish:
+
+| Workflow | Publishes |
+| --- | --- |
+| `publish-stack-images.yml`, `publish-cluster-daemon.yml`, `publish-cluster-stack-image.yml`, `publish-jupyter-scripting.yml` | Container images to `ghcr.io/voltlabs-research`, on pushes to `main` that touch their paths. |
+| `desktop-build.yml` | Desktop installers, on `v*` tags. |
+| `desktop-cli-release.yml` | The deploy CLI bundle and `stack/compose.yml` as assets of a `v*` release. |
+| `publish-sdk-npm.yml` | `@voltstack/voltclient` and `@voltstack/daemon-cluster-client` to npm, on `voltsdk-node-*` releases or on demand. |
+| `pypi-voltsdk.yml` | `voltsdk` platform wheels to PyPI, on `voltsdk-py-*` releases or on demand. |
+
+## Other repositories
+
+Everything outside the monorepo is under [github.com/VoltLabs-Research](https://github.com/VoltLabs-Research), one repository each:
+
+| Repository | What it is |
+| --- | --- |
+| [CoreToolkit](https://github.com/VoltLabs-Research/CoreToolkit) | The C++ library plugins build on: the LAMMPS frame, neighbor search, the plugin entry point and the Parquet writers. It also holds the reusable workflow that builds and publishes plugin binaries, and the daemon's `volt-dump-transform` tool. |
+| [LammpsIO](https://github.com/VoltLabs-Research/LammpsIO) | Trajectory reading, used by CoreToolkit. |
+| [SpatialAssembler](https://github.com/VoltLabs-Research/SpatialAssembler) | Assembles GLB models from exporter payloads. |
+| [HeadlessRasterizer](https://github.com/VoltLabs-Research/HeadlessRasterizer) | Renders trajectory previews without a display. |
+| [vpm](https://github.com/VoltLabs-Research/vpm) | The plugin registry CLI. See [VPM](/docs/develop/vpm). |
+| One repository per plugin | For example [coordination-analysis](https://github.com/VoltLabs-Research/coordination-analysis) and [OpenDXA](https://github.com/VoltLabs-Research/OpenDXA). See the [plugin catalog](/docs/plugins) and [Writing plugins](/docs/develop/plugins). |
+
+[Native libraries](/docs/architecture/libraries) describes the libraries in more depth.
