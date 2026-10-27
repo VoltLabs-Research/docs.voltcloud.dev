@@ -1,70 +1,110 @@
 ---
-title: Plugins
-description: Browse the analysis plugins published to the VOLT Registry, and learn how the plugin system works.
+title: Plugin catalog
+description: Every analysis plugin published in the VOLT registry, what it computes, which platforms it has builds for, and how plugins feed each other.
 ---
 
-Plugins are node-based analysis workflows that run scientific binaries on your cluster and feed results back into VOLT as listings, charts, and 3D artifacts. A plugin becomes available to a trajectory as an **Analysis stage** in the [canvas pipeline](/docs/modules/canvas#the-pipeline-editor).
+These are the analysis plugins published in the public registry at `registry.voltcloud.dev` under `@voltlabs`. Install them from the **Marketplace** in the app (see [Plugins in the app](/docs/guides/plugins)), then add them as stages to a trajectory's pipeline in the [canvas](/docs/guides/pipelines).
 
-<Cards>
-  <Card title="Plugin System" href="/docs/plugins/plugin-system" description="How a plugin is built node by node — Modifier, Arguments, Context, Entrypoint, Exposure, and Export — with runnable examples and downloadable templates." />
-</Cards>
+Each plugin page lists what the plugin computes, what it needs from earlier stages, every argument with its default, and the results it produces.
 
-## Where plugins live in the app
+## Catalog
 
-The plugin module has three surfaces:
+The **Name in VOLT** column is the name the app shows in the Installed list and in the canvas's **Add modification…** menu.
 
-| Surface | Path | What it is for |
+### Structure identification
+
+| Plugin | Name in VOLT | Version | What it does | Builds |
+|---|---|---|---|---|
+| [`polyhedral-template-matching`](/docs/plugins/polyhedral-template-matching) | Polyhedral Template Matching | 2.4.2 | Classifies each atom's crystal structure by template matching and gives its lattice orientation; shares the crystal clusters OpenDXA needs. | Linux, macOS, Windows, browser |
+| [`adaptive-common-neighbor-analysis`](/docs/plugins/adaptive-common-neighbor-analysis) | Adaptive Common Neighbor Analysis | 2.1.1 | Classifies the structures of a chosen crystal family (FCC/HCP, BCC or diamond) with adaptive CNA; shares the crystal clusters OpenDXA needs. | Linux, macOS, Windows, browser |
+| [`pattern-structure-matching`](/docs/plugins/pattern-structure-matching) | Pattern Structure Matching | 2.1.0 | Matches atoms against lattice patterns defined in YAML files; ships patterns for FCC, BCC, HCP, diamond, L1₂, ω, 9R and more. | Linux, macOS, Windows, browser |
+| [`ackland-jones`](/docs/plugins/ackland-jones) | Ackland-Jones Analysis | 1.1.1 | Bond-angle classification of FCC, HCP, BCC and ICO with no cutoff. | Linux, macOS, Windows, browser |
+| [`identify-diamond`](/docs/plugins/identify-diamond) | Identify Diamond Structure | 1.1.1 | Finds cubic and hexagonal diamond and their first and second neighbor shells. | Linux, macOS, Windows, browser |
+| [`chill-plus`](/docs/plugins/chill-plus) | Chill+ Ice & Hydrate Classifier | 1.1.1 | Classifies water into hexagonal ice, cubic ice, interfacial ice, clathrate hydrate and interfacial hydrate. | Linux, macOS, Windows, browser |
+
+### Local environment
+
+| Plugin | Name in VOLT | Version | What it does | Builds |
+|---|---|---|---|---|
+| [`coordination-analysis`](/docs/plugins/coordination-analysis) | Coordination Analysis | 2.1.1 | Coordination number per atom, the radial distribution function and partial RDFs per type pair. | Linux, macOS, Windows, browser |
+| [`centrosymmetry-parameter`](/docs/plugins/centrosymmetry-parameter) | Centrosymmetry Parameter | 2.0.3 | Centrosymmetry parameter per atom, to find dislocation cores, stacking faults and surfaces. | Linux, macOS, Windows |
+| [`steinhardt-order-parameters`](/docs/plugins/steinhardt-order-parameters) | Steinhardt Order Parameters | 1.0.4 | Bond-orientational order parameters `q_l`, `w_l` and `w_l_hat` per atom. | Linux, macOS, Windows |
+| [`voronoi-analysis`](/docs/plugins/voronoi-analysis) | Voronoi Analysis | 1.1.1 | Voronoi cell of each atom: volume, coordination, cavity radius and Voronoi index. | Linux, macOS, Windows, browser |
+| [`cluster-analysis`](/docs/plugins/cluster-analysis) | Cluster Analysis | 2.1.1 | Groups atoms into connected clusters by distance, with optional centers of mass and radii of gyration. | Linux, macOS, Windows, browser |
+
+### Deformation and strain
+
+| Plugin | Name in VOLT | Version | What it does | Builds |
+|---|---|---|---|---|
+| [`atomic-strain`](/docs/plugins/atomic-strain) | Atomic Strain | 2.1.1 | Strain of each atom relative to a reference frame: deformation gradient, strain tensor, von Mises shear strain, D²min. | Linux, macOS, Windows, browser |
+| [`elastic-strain`](/docs/plugins/elastic-strain) | Elastic Strain | 2.1.0 | Elastic lattice strain of each crystalline atom relative to the ideal crystal, with no reference frame. | Linux, macOS, Windows, browser |
+| [`displacements-analysis`](/docs/plugins/displacements-analysis) | Displacements Analysis | 2.1.1 | Displacement of each atom from a reference frame, and the slip vector. | Linux, macOS, Windows, browser |
+
+### Defects and microstructure
+
+| Plugin | Name in VOLT | Version | What it does | Builds |
+|---|---|---|---|---|
+| [`opendxa`](/docs/plugins/opendxa) | Dislocation Analysis (Experimental) | 2.5.1 | Extracts dislocation lines with their Burgers vectors, the defect surface mesh and network statistics. | Linux, macOS, Windows, browser |
+| [`line-reconstruction-dxa`](/docs/plugins/line-reconstruction-dxa) | Line Reconstruction DXA | 2.2.0 | An experimental DXA that reconstructs dislocation lines from the crystal clusters. | Linux, macOS, Windows, browser |
+| [`grain-segmentation`](/docs/plugins/grain-segmentation) | Grain Segmentation | 2.1.0 | Splits a polycrystal into grains from local PTM orientations. | Linux, macOS, Windows, browser |
+| [`ilda`](/docs/plugins/ilda) | Interfacial Line Defect Analysis | 1.1.1 | Finds interface dislocations and disconnections (Burgers vector and step height) between two grains. | Linux, macOS, Windows, browser |
+| [`wigner-seitz-defect-analysis`](/docs/plugins/wigner-seitz-defect-analysis) | Wigner-Seitz Defect Analysis | 1.1.1 | Counts vacancies, interstitials and antisites against a reference lattice. | Linux, macOS, Windows, browser |
+
+### Clustering and machine learning
+
+| Plugin | Name in VOLT | Version | What it does | Builds |
+|---|---|---|---|---|
+| [`multisom`](/docs/plugins/multisom) | MultiSOM | 1.1.0 | Unsupervised structure identification with a multilayer self-organizing map over features from other plugins. Version 1.1.0 can't complete a run in VOLT; see its page. | Linux, macOS, Windows |
+| [`kmeans-clustering`](/docs/plugins/kmeans-clustering) | K-means Clustering | 1.1.0 | Separates crystal atoms from grain-boundary atoms by K-means clustering of stress, energy and volume. | Linux, macOS, Windows |
+
+### Builds
+
+A plugin is published once per platform. A machine that runs plugins asks the registry for the build that matches the platform it reports:
+
+| Column above | Registry platform | Machines that use it |
 |---|---|---|
-| **Installed** | `/dashboard/plugins/list` | The team's plugins, their draft/published state, and per-plugin actions (edit, clone, export, publish, delete) |
-| **Marketplace** | `/dashboard/plugins/marketplace` | Browse and install published plugins from the VOLT Registry |
-| **Builder** | `/plugins/builder` | The node editor for authoring or editing a workflow, with debug panels for arguments and context |
+| Linux | `linux-x86_64` | A cluster daemon on 64-bit x86 Linux |
+| macOS | `darwin-arm64` | A cluster daemon on an Apple silicon Mac |
+| Windows | `windows-x86_64` | A cluster daemon on 64-bit x86 Windows |
+| browser | `wasm-wasm32` | The stack that runs in a browser tab or in the desktop app (see [Run in the browser](/docs/run/browser) and [Desktop app](/docs/run/desktop)) |
 
-Installing is also scriptable: [vpm](/docs/open-source/vpm) installs from the command line (`vpm install @voltlabs/opendxa`), and Volt AI can do it through its `install_plugin` and `search_registry_plugins` tools.
+A plugin without a `wasm-wasm32` build can't be installed when your team's machine runs in the browser or the desktop app. [How a plugin gets onto a machine](/docs/guides/plugins#how-a-plugin-gets-onto-a-machine) explains the install in detail.
 
-A plugin must be **published** to appear as a pipeline stage; drafts stay hidden.
+## How plugins feed each other
 
-## Structural Analysis
+A pipeline runs its stages in order, one frame at a time, on a single working copy of the frame. Two things carry results from one stage to the next:
 
-<Cards>
-  <Card title="Adaptive Common Neighbor Analysis" href="/docs/plugins/adaptive-common-neighbor-analysis" description="Run ACNA/CNA, label each atom by local structure, and emit the cluster-graph artifacts consumed by OpenDXA." />
-  <Card title="Polyhedral Template Matching" href="/docs/plugins/polyhedral-template-matching" description="Classify atoms by polyhedral template (FCC, BCC, HCP, SC, diamond) and export structure type plus cluster-graph tables." />
-  <Card title="Pattern Structure Matching" href="/docs/plugins/pattern-structure-matcher" description="Match local environments against user-defined reference patterns and export a reconstructed-state contract for OpenDXA." />
-  <Card title="Ackland-Jones Analysis" href="/docs/plugins/ackland-jones" description="Identify FCC, HCP, BCC, and ICO via adaptive bond-angle analysis — no cutoff parameter required." />
-  <Card title="Identify Diamond Structure" href="/docs/plugins/identify-diamond" description="Detect cubic and hexagonal diamond using second-neighbor-shell CNA, labelling core and neighbour-shell atoms." />
-  <Card title="Chill+ Ice & Hydrate Classifier" href="/docs/plugins/chill-plus" description="Classify hexagonal, cubic, and interfacial ice plus hydrate phases via Chill+ bond-order correlation." />
-  <Card title="Steinhardt Order Parameters" href="/docs/plugins/steinhardt-order-parameters" description="Compute bond-orientational order parameters q_l and Wigner invariants per atom for crystallinity and nucleation studies." />
-</Cards>
+- **The per-atom table.** After a stage finishes, its per-atom table is merged into the working frame. Polyhedral Template Matching, Adaptive Common Neighbor Analysis and Pattern Structure Matching write an annotated copy of the frame with a `structure_type` column, and that copy becomes the working frame instead. Later stages read those columns. For example, after Polyhedral Template Matching, **Displacements Analysis** finds the structure column and groups its 3D model by structure.
+- **Shared outputs.** Some plugins publish named files for later stages, and some plugins have arguments marked to be filled in from them. Those arguments never appear in the stage's form. When the stage runs, VOLT passes each one the file an earlier stage shared under the same name.
 
-## Local Environment
+```mermaid
+flowchart LR
+    PTM[Polyhedral Template Matching] -- "clusters_table, clusters_transitions, neighbor_lattice" --> DXA[OpenDXA]
+    ACNA[Adaptive Common Neighbor Analysis] -- "clusters_table, clusters_transitions, neighbor_lattice" --> DXA
+    PTM --> ES[Elastic Strain]
+    ACNA --> ES
+    PTM --> LR[Line Reconstruction DXA]
+    ACNA --> LR
+    GS[Grain Segmentation] -- "grains, grain_atoms" --> ILDA[ILDA]
+```
 
-<Cards>
-  <Card title="Coordination Analysis" href="/docs/plugins/coordination-analysis" description="Count neighbors within a cutoff and compute the radial distribution function and per-type-pair partial RDF." />
-  <Card title="Centrosymmetry Parameter" href="/docs/plugins/centrosymmetry-parameter" description="Measure local centrosymmetry as a fast way to highlight disorder and defect-rich regions." />
-  <Card title="Voronoi Analysis" href="/docs/plugins/voronoi-analysis" description="Compute per-atom Voronoi tessellation — topological coordination, atomic volume, and cavity radius." />
-  <Card title="Cluster Analysis" href="/docs/plugins/cluster-analysis" description="Group atoms into clusters by distance cutoff and optionally compute centers of mass and radius of gyration." />
-</Cards>
+| Plugin | Arguments filled in from earlier stages | Plugins that share them |
+|---|---|---|
+| OpenDXA | `clusters_table`, `clusters_transitions`, `neighbor_lattice` | Polyhedral Template Matching, Adaptive Common Neighbor Analysis |
+| Elastic Strain | `clusters_table`, `clusters_transitions`, `neighbor_lattice` | Polyhedral Template Matching, Adaptive Common Neighbor Analysis |
+| Line Reconstruction DXA | `clusters-table`, `clusters-transitions`, `neighbor_lattice` | Polyhedral Template Matching, Adaptive Common Neighbor Analysis |
+| ILDA | `grains`, `grain-atoms` | Grain Segmentation |
 
-## Deformation & Strain
+Names match with dashes and underscores treated alike, so `clusters-table` takes the file shared as `clusters_table`.
 
-<Cards>
-  <Card title="Atomic Strain" href="/docs/plugins/atomic-strain" description="Compute per-atom strain tensors, deformation gradient, and D2min relative to a reference configuration." />
-  <Card title="Elastic Strain" href="/docs/plugins/elastic-strain" description="Compute the per-atom elastic strain tensor from a chosen crystal structure and lattice constant." />
-  <Card title="Displacements Analysis" href="/docs/plugins/displacements-analysis" description="Compute per-atom displacement vectors and optional Zimmerman slip vectors relative to a reference frame." />
-</Cards>
+If no earlier stage shared a file, the stage fails with `Pipeline stage requires shared exposure "<name>" but no upstream stage produced it`. Put the structure identification stage first.
 
-## Defects & Microstructure
+<Callout type="warn">
+OpenDXA, Elastic Strain and Line Reconstruction DXA also list Pattern Structure Matching as a source, and OpenDXA lists Reference Crystal Matching and Generalized Template Matching. Those two aren't in the registry yet. Pattern Structure Matching 2.1.0 shares only `neighbor_lattice`, so on its own it doesn't give these plugins the cluster tables they need.
+</Callout>
 
-<Cards>
-  <Card title="OpenDXA" href="/docs/plugins/open-dxa" description="Reconstruct the dislocation network from a structure-identification package — Burgers vectors, lines, and defect mesh." />
-  <Card title="Grain Segmentation" href="/docs/plugins/grain-segmentation" description="Segment crystalline grains from local PTM, merging similar orientations into grain regions." />
-  <Card title="Wigner-Seitz Defect Analysis" href="/docs/plugins/wigner-seitz-defect-analysis" description="Identify vacancies, interstitials, and antisites by comparing against a reference lattice with Wigner-Seitz cells." />
-  <Card title="Interfacial Line Defect Analysis" href="/docs/plugins/ilda" description="Detect interfacial line defects and disconnections, exporting bond and disconnection-summary data." />
-  <Card title="Line Reconstruction DXA" href="/docs/plugins/line-reconstruction-dxa" description="Reconstruct dislocation lines via DXA from upstream structure-identification artifacts, or from PTM run inline." />
-</Cards>
+MultiSOM works differently: you pick its feature plugins (Coordination Analysis, Centrosymmetry Parameter, Steinhardt Order Parameters) in its own form, and its workflow runs them inside its own stage. See [MultiSOM](/docs/plugins/multisom).
 
-## Clustering & Machine Learning
+## Writing your own
 
-<Cards>
-  <Card title="MultiSOM" href="/docs/plugins/multisom" description="Unsupervised structure identification with a multi-layer Self-Organizing Map over feature-plugin per-atom properties." />
-  <Card title="K-means Clustering" href="/docs/plugins/kmeans-clustering" description="Cluster atoms by von Mises stress, potential energy, and atomic volume to separate crystal from grain boundary (Amigo 2020)." />
-</Cards>
+Plugins are workflows you can open and edit in the Plugin Builder. To write one, see [Writing plugins](/docs/develop/plugins) and [VPM, the plugin CLI](/docs/develop/vpm).
