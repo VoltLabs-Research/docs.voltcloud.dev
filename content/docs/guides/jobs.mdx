@@ -1,0 +1,101 @@
+---
+title: Jobs
+description: Follow the work clusters do for your team, frame by frame, and remove or retry it.
+---
+
+Everything a cluster does for your team runs as jobs: processing an uploaded trajectory, rendering its preview,
+computing an analysis, uploading results. Each job covers one piece of work, usually one frame. The jobs view
+lets you follow them as they run, see which frames failed and why, and stop or retry them.
+
+Jobs are team-wide: every member sees the jobs of every trajectory in the selected team, whoever started them.
+The list updates live.
+
+## Where to find them
+
+- **Compute jobs** in the [dashboard header](/docs/guides/dashboard#the-header): the ring fills as jobs complete,
+  and the label reads **Jobs**, `2 running` or `5 queued`. Click it to open the popover.
+- **Compute jobs** in a trajectory card's menu opens a panel at the right of the dashboard with that trajectory's
+  jobs only.
+
+The popover shows:
+
+- The counts: **Queued**, **Running**, **Done** and **Failed**.
+- The jobs of all trajectories, grouped as described below.
+- **Clusters**: the team's clusters' average **CPU**, **Memory**, **Disk** and **Network**, from those reporting
+  live metrics. CPU turns red at 85 %.
+- `3 / 5 online`, the team members online, linking to **My Team**.
+- **Open clusters**, to the [clusters](/docs/guides/clusters) page.
+
+When VOLT runs in your browser tab or in the desktop app, **Clusters** and **Open clusters** don't appear. On
+single-user deployments the online count doesn't appear.
+
+## How jobs are grouped
+
+Jobs are listed in three levels, most recent trajectory first:
+
+| Level | Shows |
+| --- | --- |
+| Trajectory | Its name, `12/20 jobs` completed and when the last job changed. Click to expand. |
+| Frame | **Frame** followed by the timestep, **General** for jobs not tied to a frame, or **Storage Transfer** / **Storage Transfers** |
+| Job | Its name, how long ago it changed, how long it took once completed, and its error if it failed |
+
+Groups that contain storage transfers open by themselves.
+
+The color of a name tells its state: amber while queued, blue while running, green once completed, red if it
+failed. A trajectory or frame whose jobs are partly done and partly failed keeps a neutral color. A trajectory
+that has just finished all its jobs briefly glows green.
+
+## Job types
+
+| Job | Started by | What it does |
+| --- | --- | --- |
+| **Preprocess trajectory frame** | An upload | Stores the frame and builds its 3D model. See [Processing](/docs/guides/trajectories#processing). |
+| **Rasterize trajectory preview** | An upload | Renders the preview image of the trajectory card |
+| The plugin's name, such as **Polyhedral Template Matching** | A pipeline run | Computes that analysis on that frame |
+| **Artifact Upload** | An analysis | Stores an analysis's 3D results |
+| **Trajectory Transfer**, **Analysis Transfer**, **Storage Transfer** | The clusters | Moves stored data from one cluster to another |
+
+A pipeline run with several analyses shows one job per analysis under each frame: the cluster runs all the
+stages of a frame in one go, in order.
+
+## Statuses
+
+| Status | Counted as | Meaning |
+| --- | --- | --- |
+| `queued` | **Queued** | Waiting in the cluster's queue for a free worker |
+| `retrying` | **Queued** | Queued again after a retry |
+| `running` | **Running** | A worker is on it |
+| `completed` | **Done** | Finished |
+| `failed` | **Failed** | Failed for good. The error is shown under the job's name. |
+
+Jobs run on the cluster that holds the work: trajectory processing on the cluster that stores the trajectory,
+analyses on the cluster the pipeline ran on. A job waits in **Queued** until a worker of that cluster picks it
+up, so a busy cluster shows long queues while an idle one starts jobs at once. A trajectory frame job gets up
+to three attempts before it is marked failed.
+
+A job stays in the list for 24 hours after its last change, then drops out.
+
+## Actions
+
+Right-click a trajectory's group for:
+
+| Action | What it does |
+| --- | --- |
+| **Remove Running Jobs** | Stops the trajectory's queued, running and retrying jobs on their clusters and removes them from the list |
+| **Retry Failed Jobs** | Queues every failed job of the trajectory again |
+
+Toasts report the outcome: `Removed 4 job(s)`, `Queued 2 failed job(s) for retry`, or
+**No queued or running jobs found** / **No failed jobs found to retry**. If a cluster doesn't confirm, the toast
+says so.
+
+A failed analysis job also has its own **Retry** button, which retries the failed frames of that analysis. The
+[analysis listing](/docs/guides/pipelines#the-analysis-listing) offers the same as **Retry Failed Frames**.
+
+Removing jobs doesn't delete what they already produced. To delete results, delete the analysis; see
+[Deleting results](/docs/guides/results#deleting-results).
+
+## Completion notices
+
+While a trajectory's jobs panel is open, a toast appears when its work finishes: **Analysis completed
+successfully!**, **Rasterization completed successfully**, or **Jobs completed successfully**, and the same with
+"with errors" when some jobs failed.
