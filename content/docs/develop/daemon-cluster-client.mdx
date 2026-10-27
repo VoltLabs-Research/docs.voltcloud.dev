@@ -1,0 +1,147 @@
+---
+title: Daemon cluster client
+description: "@voltstack/daemon-cluster-client, the Node.js package that holds the protocol between a cluster daemon and the VOLT server, and a client for the daemon's side of the control connection."
+---
+
+`@voltstack/daemon-cluster-client` owns the protocol between a [cluster daemon](/docs/architecture/cluster-daemon) and the VOLT server. It has two parts:
+
+- the protocol's constants, types and codecs: socket event and channel names, reverse-channel messages, the object gateway's paths, headers and buckets, direct-access tokens, binary stream chunks, service exposures, and the daemon's runtime configuration with its defaults. The VOLT server and the daemon both import these, so they are the reference for the wire format;
+- `ClusterDaemonClient`, a client for the daemon's side of the control connection: enrollment, the Socket.IO registration, a heartbeat loop, commands to the server, and handlers for the commands the server sends. VOLT's own daemon does not use this class; it opens one socket per channel itself.
+
+You need it to write your own daemon, or tooling that speaks the daemon protocol. To add a machine to a team, install VOLT's daemon instead; see [Clusters](/docs/guides/clusters).
+
+<Callout type="warn">
+On npm, the `latest` release, 1.0.1, contains no build, so importing it fails. 1.0.0 has `ClusterDaemonClient` and the reverse-channel types, but none of the object-gateway, token, stream-chunk, exposure or runtime exports. This page describes 1.3.0, the version in the VOLT monorepo at `packages/sdk/daemon-cluster-client`; build it there.
+</Callout>
+
+## Install
+
+```bash
+# in a checkout of the VOLT monorepo
+pnpm --filter @voltstack/daemon-cluster-client build
+```
+
+The build writes ESM, CommonJS and type declarations to `dist/`. Inside the workspace, depend on it as `"@voltstack/daemon-cluster-client": "workspace:*"`, as the server and the daemon do. It runs on Node.js, needs `socket.io-client` 4 or later as a peer dependency, and depends on `jose`. Its scripts are `build`, `dev`, `typecheck` and `test` (a `node:test` suite under `tests/`).
+
+## ClusterDaemonClient
+
+```ts
+import { ClusterDaemonClient, DaemonClientErrorCode } from '@voltstack/daemon-cluster-client';
+
+const server = 'https://volt.example.com';
+const teamClusterId = process.env.TEAM_CLUSTER_ID!;
+
+const client = new ClusterDaemonClient({
+    serverUrl: server,
+    controlSocketUrl: server,
+    credentials: {
+        teamClusterId,
+        daemonPassword: process.env.TEAM_CLUSTER_DAEMON_PASSWORD ?? '',
+        enrollmentToken: process.env.TEAM_CLUSTER_ENROLLMENT_TOKEN,
+        installedVersion: '1.0.0'
+    },
+    enrollment: { url: `${server}/api/team-clusters/${teamClusterId}/healthcheck` }
+});
+
+// Handlers survive reconnections; register them once.
+client.registerHandler('runtime.queues.snapshot', {
+    async handle(payload, { requestId }) {
+        return { data: await snapshotQueues(payload) };   // your code
+    }
+});
+
+client.onError((error) => console.error(error.code, error.message));
+client.onDisconnected((reason) => console.warn('disconnected:', reason));
+
+await client.connect();
+const config = await client.sendCommand('runtime.config.get');
+```
+
+`connect()` does three things:
+
+1. **Enrollment**, when the credentials have an `enrollmentToken` and the options have `enrollment`. It sends `POST <enrollment.url>` with `{ enrollmentToken, installedVersion }`. The server's endpoint is `POST /api/team-clusters/:teamClusterId/healthcheck`, and it answers `{ data: { daemonPassword, teamCluster } }`. The client keeps the new password; `getDaemonPassword()` returns it, so store it for the next start.
+2. **Registration.** It connects a Socket.IO client to `controlSocketUrl` and, on each connection, emits `team-cluster-daemon:register` with `{ teamClusterId, daemonPassword }`. The server checks the password, registers the socket on the `control` channel (the default when the payload names no `channel`), marks the cluster connected and answers `team-cluster-daemon:registered`. `connect()` resolves then, or rejects with `SOCKET_CONNECTION_FAILED` on a connection error.
+3. **Heartbeat.** It starts sending `runtime.heartbeat` commands, the first right away, with the payload from `heartbeat.payloadFactory`.
+
+<Callout type="warn">
+The server accepts only two commands from a daemon, `runtime.config.get` and `runtime.lifecycle`, and answers any other with 404. VOLT's daemon reports heartbeats as `runtime-heartbeat` event messages instead, so the client's built-in heartbeat is rejected on every beat, and each rejection reaches `onError` as `COMMAND_REJECTED`.
+</Callout>
+
+### Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `serverUrl` | | The server's URL. Required, but the client does not use it. |
+| `controlSocketUrl` | | The URL the Socket.IO client connects to: the server's origin, whose Socket.IO endpoint is at `/socket.io`. |
+| `credentials` | | `{ teamClusterId, daemonPassword, enrollmentToken?, installedVersion? }`. |
+| `enrollment` | | `{ url, enabled? }`. `enabled: false` skips enrollment even with a token. |
+| `heartbeat` | | `{ interval?, jitter?, payloadFactory? }`: `interval` is 30000 ms, plus a random delay of up to `jitter` ms; `payloadFactory` returns the payload, or a promise of it. |
+| `socket` | | `{ reconnect?, maxReconnectAttempts?, reconnectBaseDelayMs?, reconnectMaxDelayMs?, randomizationFactor? }`, passed to Socket.IO: reconnection on, unlimited attempts, 500 ms base delay, 30000 ms maximum, 0.3 randomization. |
+| `commandTimeout` | 30000 ms | The default timeout of `sendCommand`. |
+
+### Methods
+
+| Method | Description |
+| --- | --- |
+| `connect()` | Enrolls, registers and starts the heartbeat. Reconnections register again on their own. |
+| `disconnect()` | Stops the heartbeat, closes the socket and rejects pending commands with `SOCKET_NOT_READY`. |
+| `sendCommand<T>(command, payload?, timeout?)` | Sends `{ type: 'command', requestId, command, responseType: 'json', payload }` on `team-cluster-daemon:message` and resolves with the `data` of the server's success envelope. It rejects with `SOCKET_NOT_READY` before registration, `COMMAND_TIMEOUT` after the timeout, and `COMMAND_REJECTED` with the server's message when the server answers `ok: false`. A disconnect rejects every pending command. |
+| `emit(message)` | Sends any `TeamClusterDaemonMessage` as is; throws `EMIT_FAILED` without a socket. |
+| `registerHandler(command, handler)`, `unregisterHandler(command)` | Handlers for the commands the server sends. |
+| `onMessage(callback)` | Every message from the server that is not a command or a response. |
+| `onConnected(callback)`, `onDisconnected(callback)`, `onError(callback)` | Registration, disconnection (with Socket.IO's reason), and every `DaemonClientError` the client reports. |
+| `getTeamClusterId()`, `getDaemonPassword()`, `isReady()` | The cluster's ID, the current password, and whether the socket is registered. |
+
+The methods that add listeners or handlers return the client, so they chain. `EnrollmentClient`, `ControlSocketManager`, `HeartbeatManager` and `ReverseChannelBridge`, the parts it is built from, are exported too.
+
+### Handling the server's commands
+
+The server sends commands to the daemon over the same socket: running analyses and pipelines, plugin installs and warm-ups, notebook sessions, trajectory queries, runtime configuration and more. The names are listed in `DaemonCommand`, in `packages/shared/contracts/src/modules/cluster/daemon-commands.ts`. A handler is `{ handle(payload, { command, requestId }) }`, and returns, or resolves to, a `CommandResult`:
+
+| Field | Description |
+| --- | --- |
+| `status` | The HTTP-style status of the response, 200 by default. |
+| `data` | The result, sent as `{ status: 'success', data }`. |
+| `body` | A `Buffer`, sent instead of `data` when the command asked for a `buffer` response. |
+| `stream` | A `ReadableStream<Uint8Array>`, sent as `stream` messages followed by `stream-end` when the command asked for a `stream` response. |
+| `headers` | Response headers. |
+
+A command with no handler is answered with 404 `Unknown daemon command: <name>`. A handler that throws is answered with 500 and reported as `HANDLER_ERROR`.
+
+### Errors
+
+Every failure is a `DaemonClientError` with a `code` from `DaemonClientErrorCode`:
+
+| Code | When |
+| --- | --- |
+| `ENROLLMENT_FAILED` | The enrollment request failed, did not answer JSON, answered an error status, or lacked `daemonPassword` or `teamCluster`. |
+| `SOCKET_CONNECTION_FAILED` | The Socket.IO connection failed. |
+| `SOCKET_NOT_READY` | A command before registration, or pending when the socket disconnected. |
+| `COMMAND_TIMEOUT` | No response within the timeout. |
+| `COMMAND_REJECTED` | The server answered `ok: false`. |
+| `HANDLER_ERROR` | A registered handler threw. |
+| `EMIT_FAILED` | `emit` without a socket. |
+| `HEARTBEAT_FAILED` | The heartbeat's payload factory failed, or sending it failed with an error that is not a `DaemonClientError`. |
+
+## Protocol exports
+
+| Export | Contents |
+| --- | --- |
+| `DaemonSocketEvent` | The Socket.IO events: `team-cluster-daemon:register`, `team-cluster-daemon:registered`, `team-cluster-daemon:message`, and `lifecycle` and `progress`. |
+| `TEAM_CLUSTER_DAEMON_SOCKET_CHANNEL` | The channels a daemon registers its sockets on: `heartbeat`, `control`, `object-gateway` and `events`. The server counts the cluster connected while a `control` or `heartbeat` socket is registered. |
+| `REVERSE_CHANNEL` | Response types (`json`, `buffer`, `stream`), session kinds (`terminal`, `tunnel`, `websocket`), terminal targets (`container`, `host`) and tunnel states (`opening`, `open`, `closed`). |
+| `TeamClusterDaemonMessage` and its members | Every message on `team-cluster-daemon:message`: commands, responses, streams, terminal sessions, service exposures, tunnels and runtime progress. |
+| `ProgressStageType` | `accepted`, `queued`, `running`, `completed`, `failed`. |
+| `TEAM_CLUSTER_OBJECT_STORE_PROXY_BASE_PATH` | `/internal/team-cluster/object-store/v1`, the server's proxy through which a daemon lists, reads, writes and deletes the objects another cluster owns, at `…/owners/:ownerClusterId/buckets/:bucket/objects`. The daemon authenticates with the ID and password headers below. |
+| Object gateway headers | `x-team-cluster-id`, `x-team-cluster-daemon-password`, `x-object-meta-` (metadata prefix), `x-volt-object-store-skip-metadata` and `x-team-cluster-direct-access-token`. |
+| `TEAM_CLUSTER_OBJECT_STORE_BUCKET` | The buckets: `volt-dumps`, `volt-models`, `volt-plugins`, `volt-rasterizer`, `volt-analysis-logs`, `volt-whiteboards`, `volt-trajectories`. |
+| `signTeamClusterDirectAccessToken(claims, daemonPassword)`, `verifyTeamClusterDirectAccessToken(token, daemonPassword)` | The HS256 JWT, keyed with the daemon's password, that the server signs (for five minutes) to reach a daemon's object gateway directly rather than over the socket; the daemon verifies it. Its claims are `requesterKind`, `requesterId`, `ownerClusterId`, `teamId`, `exposureId`, `exposureName` and `accessMode`. `verify…` returns the claims, or `null`. |
+| `encodeStreamChunk(bytes)`, `decodeStreamChunk(chunk)`, `toBytes(value)` | Binary stream frames: a 10-byte little-endian header (u32 operation ID, u16 kind, which is 3 for stream chunks, u32 length) and the payload. `toBytes` accepts the byte shapes Socket.IO and JSON produce. |
+| `TEAM_CLUSTER_SERVICE_EXPOSURE` | Service exposures: access modes (`http`, `tcp`, `websocket`), statuses (`active`, `unavailable`) and source kinds (`container`, `daemon`). |
+| `DEFAULT_TEAM_CLUSTER_QUEUE_CONCURRENCY` | `analysis` 8, `rasterizer` 8, `glbPreprocessing` 16, `artifactUpload` 16, `pluginWarmup` 4. |
+| `DEFAULT_TEAM_CLUSTER_QUEUE_SCOPE_LIMITS` | `maxRunningPerTrajectory: 0` (no limit) for analysis processing, artifact upload, rasterization and GLB conversion. |
+| `createDefaultTeamClusterRuntimeRoleConfig(role = 'cluster')` | A role configuration: the roles are `cluster`, `storage-server` and `compute-node`. |
+| Runtime types | The runtime configuration, role and queue-concurrency apply payloads, heartbeat metrics and host capabilities, and the lifecycle command. |
+| Enrollment types | `EnrollmentRequestBody`, `EnrollmentResponseData`, `EnrollmentApiResponse`. |
+
+For how the daemon uses these, see [Cluster daemon](/docs/architecture/cluster-daemon).

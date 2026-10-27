@@ -1,0 +1,224 @@
+---
+title: Python SDK
+description: voltsdk, the Python SDK - installing it, connecting to a VOLT server with a secret key, running published plugins locally, and turning exporter payloads into GLB models.
+---
+
+`voltsdk` is VOLT's Python SDK. It has two halves:
+
+- a client for a VOLT server, `VoltClient`, authenticated with a team secret key;
+- local tools that need no server: `PluginHub`, which downloads published plugins from the registry and runs them on files on your machine, `SpatialAssembler`, which builds GLB models from exporter payloads, `open_in_volt`, which opens GLB files in VOLT's canvas, and `msgpack_as_df`.
+
+Its source is `packages/sdk/python` in the VOLT monorepo; this page describes version 3.1.1.
+
+<Callout type="warn">
+Against the server in this release, only `VoltClient.team` reaches a route that exists. The trajectory, frame, analysis, listing and simulation-cell helpers request paths such as `/api/trajectories/<team>/` and `/api/analyses/<team>/`, while the server serves `/api/teams/<team>/trajectories` and `/api/teams/<team>/analyses`, so they fail with `VoltNotFoundError`; the OVITO helpers, which download dumps the same way, fail too. Until they match, call the [REST API](/docs/develop/rest-api) with `requests` and the same bearer token. The plugin hub has two limits of its own, described [below](#plugin-hub).
+</Callout>
+
+## Install
+
+```bash
+pip install voltsdk
+pip install "voltsdk[ovito]"   # with the OVITO integration
+```
+
+It needs Python 3.10 or later. PyPI has platform wheels for `linux_x86_64` (built on Ubuntu 24.04, so older glibc releases are not supported), `macosx_14_0_arm64` and `win_amd64`. Each wheel bundles VOLT's native runtime libraries under `voltsdk/native/{bin,lib,share}`, which `voltsdk.native_root()` returns. Its dependencies are `msgpack`, `pandas`, `pyarrow`, `requests`, `zstandard`, `semver` and, except under Emscripten, `volt-spatial-assembler`.
+
+VOLT's notebooks run on the app's own Python runtime, built on Pyodide. It carries the SDK of the VOLT build it belongs to as a pure-Python wheel in `/usr/local/share/python-wheels`, and `pip install voltsdk` (or `%pip install voltsdk`) without a version installs that wheel rather than PyPI's. Its version ends in a digest of its files, such as `3.1.1+afe0a4816516`. Each notebook kernel installs it when it starts, and gets `VOLT_BASE_URL` and `VOLT_SECRET_KEY` from the server, so `VoltClient.from_env()` works there with no setup. `SpatialAssembler` is unavailable in that runtime, because `volt-spatial-assembler` has no Pyodide build.
+
+## Connecting to a server
+
+```python
+from voltsdk import VoltClient
+
+client = VoltClient(secret_key='vsk_...', base_url='https://volt.example.com')
+print(client.team)   # the secret key: its team, role, name, keyPrefix, ...
+```
+
+`base_url` may be the server's origin or end in `/api`; the client adds `/api` when it is missing. `VoltClient.from_env()`, the same as `VoltClient()`, reads the configuration from the environment, which VOLT's notebooks set for you:
+
+| Variable | Used for |
+| --- | --- |
+| `VOLT_SECRET_KEY` | `secret_key` when you pass none. Required one way or the other. |
+| `VOLT_BASE_URL` | `base_url` when you pass none. |
+| `VOLT_SERVER_URL`, then `JUPYTERHUB_API_URL` | Fallbacks for the base URL, with `/api` appended. |
+
+`VoltClient(secret_key=None, base_url=None, *, plugin_registry_url=None, plugin_registry_token=None, plugin_cache_dir=None)` raises `ValueError` when it ends up without a key or a URL. The `plugin_*` arguments configure `client.plugins`.
+
+Requests send `Authorization: Bearer <key>`, time out after 30 seconds, and retry `GET`s up to three times on 502, 503 and 504. A response whose envelope is not `status: "success"` raises:
+
+| Exception | When |
+| --- | --- |
+| `VoltAuthenticationError` | 401 |
+| `VoltPermissionError` | 403 |
+| `VoltNotFoundError` | 404 |
+| `VoltAPIError` | Any other error status. The base of the three above; it has `status_code`, `server_message` and `url`. |
+| `VoltConnectionError`, `VoltTimeoutError` | The server could not be reached, or did not answer in time. |
+
+All of them derive from `VoltError`.
+
+### Resources
+
+| Member | Returns |
+| --- | --- |
+| `client.team` | The secret key's record, cached. Its `team` field is the team ID the other helpers use. |
+| `client.trajectories` | A `TrajectoryCollection`: iterate it (pages of 100, fetched lazily), or call `.list(search=None)`, `.first()`, `.get(trajectory_id)` or `.to_dataframe()`. |
+| `client.analyses` | The team's analyses, as an `AnalysisCollection` with the same iteration helpers. |
+| `client.plugins` | A `PluginHub`. |
+| `Trajectory` | `.id`, `.raw`, `.frames`, `.analyses`, `.simulation_cell`, `.listings.to_dataframe()` (every completed analysis's listing, concatenated), `.download(dest='.')`, `.open_in_volt(analysis_id=None, timestep=None)`, `.to_ovito_pipeline(timesteps=None)`. |
+| `Frame` | `.timestep`, `.natoms`, `.atoms(analysis_id='default')` (every atom as a DataFrame, all pages fetched), `.download_dump(dest='.')`, `.download_glb(analysis_id='default', dest='.')`, `.open_in_volt()`, `.to_ovito_data()`. |
+| `Analysis` | `.listings` (`.columns`, `.to_dataframe(sort_asc=True, columns=None)`, `.to_csv()`), `.df(columns=None)`, `.download_artifacts(dest='.', unzip=True)` (nested ZIPs extracted), `.open_in_volt(timestep=None)`. |
+
+## Plugin hub
+
+`PluginHub` downloads plugin bundles from the [registry](/docs/develop/vpm#registry-api) into a local cache and runs them as subprocesses on your files, with no VOLT server involved.
+
+```python
+from voltsdk import PluginHub
+
+hub = PluginHub(default_publisher='voltlabs')
+hub.versions('coordination-analysis')       # ['1.0.1', ..., '2.1.1']
+hub.install('coordination-analysis')        # Path to the extracted bundle
+```
+
+`PluginHub(registry=None, *, url=None, cache_dir=None, default_publisher=None, token=None)`:
+
+| Method | Description |
+| --- | --- |
+| `versions(key)` | The published versions, sorted. |
+| `install(key, version=None, *, force=False)` | Downloads the bundle for this machine's platform, checks its SHA-256 and extracts it to `<cache>/plugins/<scope>/<name>/<version>/<platform>/`, unless it is there already. Returns that path. |
+| `uninstall(key, version=None)` | Removes one version, or all of them. |
+| `get(key, version=None)` | A `Plugin`, from the newest installed version (or `version`), installing it first if needed. `hub[key]` is `get(key)`. |
+| `list()` | Package names from the registry's search. |
+| `key in hub` | Whether the registry knows the package. |
+
+Keys are `@scope/name`, or a bare name when the hub has a `default_publisher`. A version is exact, a dist-tag such as `latest` (the default), or a caret range such as `^2.0.0`. The platform is `<system>-<machine>`, such as `linux-x86_64` or `darwin-arm64`.
+
+Failures raise subclasses of `PluginError`: `PluginNotFoundError` (no such package or version, or no bundle for the platform), `PluginYankedError`, `PluginVerificationError` (the download does not match its SHA-256) and `NetworkError`.
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `VOLT_PLUGIN_REGISTRY` | `https://registry.voltcloud.dev` | Registry URL. |
+| `VOLT_CACHE_DIR` | `$XDG_CACHE_HOME/volt` (`~/.cache/volt`) | Cache. [VPM](/docs/develop/vpm) uses the same directory and layout. |
+| `VOLT_REGISTRY_TOKEN` | | A bearer token for registry reads. |
+
+<Callout type="warn">
+`list()` searches for packages of kind `engine`, and every plugin in the registry is a `workflow`, so it returns an empty list; `hub.registry.list(kind='workflow')` returns them. `get()` builds the plugin's signature from `interface.params` in its `plugin.json`, which the published bundles do not carry yet, so it raises `PluginError: … interface.params is missing`. `versions`, `install` and `uninstall` work.
+</Callout>
+
+### Running a plugin
+
+A `Plugin` is called like a function: the input, then its parameters as keyword arguments. `help(plugin)` lists them, with what the plugin requires and provides.
+
+```python
+ptm = hub.get('polyhedral-template-matching')
+dxa = hub.get('opendxa')
+
+ptm_run = ptm('dump', output_dir='output/ptm-dxa', crystal_structure='FCC', rmsd=0.10)
+dxa_run = dxa(ptm_run, output_dir='output/ptm-dxa', reference_topology='fcc')
+
+print(dxa_run['dislocation_summary'].df('main_listing'))
+print(dxa_run['dislocation_summary'].df('sub_listings.burgers_families'))
+print(dxa_run['dislocations'].df().head())   # one row per dislocation line
+dxa_run['dislocations'].open_in_volt()
+```
+
+`plugin(source, *, output_dir=None, output_name=None, timeout=None, **kwargs)`:
+
+- runs the bundle's program with the input path, an output prefix, the flags wired from upstream runs, and `<flag> <value>` for each parameter you pass. The program is the single file in the bundle's `bin/`, or the one named after the plugin when there are several, else the single file in `scripts/` (a `.py` script runs with the current interpreter). It runs in the bundle's directory, with the bundle's `bin/` and `lib/` and the SDK's native runtime prepended to `PATH`, `LD_LIBRARY_PATH` and `DYLD_LIBRARY_PATH`;
+- uses `<output_dir>/<output_name>` as the output prefix, where `output_name` defaults to the plugin's name, or, without `output_dir`, the input path without its extension. The plugin writes `<prefix>_<suffix>` files, such as `output/ptm-dxa/opendxa_dislocations.parquet`;
+- waits up to `timeout` seconds, or indefinitely;
+- returns a `PluginRun`, or raises `PluginError` (with the run as `error.run`) when the program exits with a non-zero status. Unknown keyword arguments raise `PluginError` listing the accepted ones.
+
+| `PluginRun` | Description |
+| --- | --- |
+| `command`, `returncode`, `stdout`, `stderr` | The process. |
+| `output_prefix`, `output_dir` | Where it wrote. |
+| `artifacts` | `{ suffix: Path }` of every file the run wrote, such as `atoms.parquet`. |
+| `provides`, `unmet` | The capabilities of the plugin's `interface` that the run produced, and those it did not. |
+| `run['atoms.parquet']`, `run['atoms']` | A `PluginArtifact`, by suffix or by stem. |
+
+| `PluginArtifact` | Description |
+| --- | --- |
+| `path` | The file. The artifact is also path-like. |
+| `df(key=None)` | A DataFrame. For a payload Parquet file (one `payload` column), `key` is a dotted path into the document, such as `'main_listing'` or `'sub_listings.<name>'`; for any other Parquet table, the whole table or the column `key`. `.msgpack` and `.json` files work too. |
+| `json(key=None)` | A `.json` artifact's content, or the value at `key`. |
+| `glb(*, output_path=None, exporter=None, **options)` | Builds a GLB from the artifact with `SpatialAssembler`, next to it by default, and returns its path. A `.glb` artifact is returned as is. |
+| `open_in_volt(*, volt_url=None, open_browser=True)` | Builds the GLB if needed and opens it with [`open_in_volt`](#open_in_volt). |
+
+### The interface block
+
+Passing `ptm_run` to OpenDXA works through the optional `interface` block of `plugin.json`, which only the SDK and VPM read:
+
+```json
+"interface": {
+  "version": 2,
+  "requires": [
+    { "id": "structure", "capability": "volt/structure-identification@1",
+      "bind": { "clusters_table": "--clusters_table", "cluster_transitions": "--clusters_transitions", "neighbor_lattice": "--neighbor_lattice" } }
+  ],
+  "input": { "from": "structure", "port": "annotated_dump" },
+  "provides": {
+    "volt/dislocation-network@1": { "dislocations": "dislocations.parquet" },
+    "volt/per-atom-properties@1": { "atoms": "atoms.parquet" }
+  }
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `version` | `2`. |
+| `provides` | `{ capability: { port: artifact } }`: what a run of this plugin offers, by artifact suffix. |
+| `requires` | What the plugin takes from upstream runs: `id`, `capability`, `bind` (`{ port: flag }`), `required` (true by default) and `multiple` (false by default; a list of runs when true). |
+| `input` | `{ from, port }`: the requirement and port whose file is the positional input. Without it, the input is a file path. |
+| `params` | `{ descriptor: 1, generated: true, checksum, options }`: the option table the program prints for `--describe` (each option has `flag`, `type`, `help`, `default`, and `values` for an enum), written by `vpm seal` (see [VPM](/docs/develop/vpm#commands-on-the-main-branch)). The SDK refuses a table whose checksum does not match. Parameters are named after their flags without the leading dashes, with dashes turned into underscores; bound flags are not parameters. |
+
+The SDK reads `plugin.json` from the bundle and refuses one without an `interface` block of version 2. You pass an upstream `PluginRun` as the input or as `<requirement id>=run`, and the SDK passes each bound port's file to its flag (comma-separated when `multiple`). It refuses a plain path where a capability is required, and a run where the input is a file.
+
+## SpatialAssembler
+
+`SpatialAssembler` builds GLB models from the payloads that VOLT's exporters read (see [export](/docs/develop/plugins#export)), so you can render a plugin's output without a server:
+
+```python
+from voltsdk import SpatialAssembler, open_in_volt
+
+glb_path = SpatialAssembler().lines_glb(
+    'output/ptm-dxa/opendxa_dislocations.parquet',
+    output_path='output/ptm-dxa/opendxa_dislocations.glb',
+    color_by='burgers_family',
+)
+open_in_volt(glb_path)
+```
+
+| Method | Description |
+| --- | --- |
+| `glb(source, *, output_path=None, exporter=None, **options)` | Finds an `AtomisticExporter`, `MeshExporter` or `LineExporter` payload in `source`, or the one `exporter` names, and calls the method below. |
+| `atomistic_glb(source, *, output_path=None)` | A point cloud from an `AtomisticExporter` payload. |
+| `mesh_glb(source, *, output_path=None, material=None, enable_double_sided=True)` | A mesh from a `MeshExporter` payload (`vertices` and `facets`). |
+| `lines_glb(source, *, output_path=None, line_width=0.8, tubular_segments=12, min_line_points=2, material=None, color_by=None, property_colors=None)` | Tubes from a `LineExporter` payload (`lines`) or a lines Parquet table. |
+| `generate_point_cloud_glb(positions, colors, *, bounds=None)`, `generate_mesh_glb(positions, normals, indices, *, colors=None, bounds=None, material=None)` | GLB bytes from raw arrays. |
+
+`source` is a dict, or a `.json` or `.msgpack` file holding the payload itself or an `export` object with it under the exporter's name, or a Parquet lines table (`id` and `points` columns). Each method returns the GLB as `bytes`, or the written `Path` when you pass `output_path`; an empty payload gives an empty GLB.
+
+## open_in_volt
+
+`open_in_volt(source, *, title=None, volt_url=None, open_browser=True)` opens GLB files in VOLT's canvas, at `/canvas/glb`, and returns the URL it opened. `source` is a path or URL, a list of them (one per timestep, in order), or a `{ timestep: path }` mapping; several frames are written into a manifest with `title`.
+
+Local files are served by a file server it starts on `127.0.0.1`, so the browser must run on the same machine. In a notebook with `VOLT_PUBLIC_BASE_PATH` and `VOLT_NOTEBOOK_PATH` set, it copies them under `.voltsdk-viewer/` in the notebook's directory and serves them through Jupyter instead. The app's URL is `volt_url`, else `VOLT_APP_URL`, else `VOLT_BASE_URL` without its `/api`, else `https://app.voltcloud.dev`.
+
+## Other helpers
+
+| Name | Description |
+| --- | --- |
+| `msgpack_as_df(file_path, iterable_key=None)` | Reads a MessagePack file, possibly written as several messages that it merges, into a DataFrame; `iterable_key` is a dotted path into each message. |
+| `native_root()` | The directory of the bundled native runtime. |
+| `voltsdk.integrations.ovito` | `create_pipeline(trajectory, timesteps=None, dest=None)`, behind `Trajectory.to_ovito_pipeline`, and `frame_to_data(frame)`, behind `Frame.to_ovito_data`: download the dumps (into `./volt_dumps/<trajectory id>/` by default), decompress them and load them with OVITO. Needs the `ovito` extra. |
+
+## Developing the SDK
+
+```bash
+cd packages/sdk/python
+pip install -e .
+pytest
+```
+
+`pypi-voltsdk.yml` builds the platform wheels on `voltsdk-py-*` releases. It downloads the published native bundles from the registry with `scripts/download_native_bundles.py`, stages them into `voltsdk/native`, builds a wheel tagged for the platform (`VOLTSDK_PLATFORM_TAG`), and smoke-tests it with `scripts/smoke_native_plugins.py` before publishing.

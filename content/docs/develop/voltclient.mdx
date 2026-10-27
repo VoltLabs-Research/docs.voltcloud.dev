@@ -1,0 +1,183 @@
+---
+title: TypeScript SDK
+description: "@voltstack/voltclient, the HTTP client for the VOLT API: installing it, authenticating with a secret key, scoping requests to a team, and its full API."
+---
+
+`@voltstack/voltclient` is a small HTTP client for the [VOLT API](/docs/develop/rest-api). It adds the bearer token to each request, unwraps the server's `{ status, data }` envelope, normalizes paginated lists, and turns error responses into a typed `ApiError`. It runs on Node.js 18 or later and in browsers, on the native `fetch`, with no required dependencies. The VOLT web app makes its requests with it.
+
+It is a transport, not a typed model of every route: you give it paths, and the [route contracts](/docs/develop/rest-api) tell you which exist and what they return.
+
+## Install
+
+```bash
+npm install @voltstack/voltclient
+npm install axios   # optional: only for upload-progress events
+```
+
+The package ships ESM and CommonJS builds with type declarations. Its source is `packages/sdk/voltclient` in the VOLT monorepo.
+
+## Quick start
+
+Create a [secret key](/docs/guides/secret-keys) for your team, then:
+
+```ts
+import { createVoltClient, secretKey } from '@voltstack/voltclient';
+
+const root = createVoltClient('https://volt.example.com/api', {
+    credential: secretKey(process.env.VOLT_SECRET_KEY!)
+});
+
+// The key tells you which team it belongs to.
+const teams = root.withBasePath('/teams');
+const key = await teams.getUnwrapped<{ team: string; name: string }>('/secret-keys/me');
+
+// Requests scoped to that team: /api/teams/<team>/...
+const team = teams.withTeam(key.team);
+const page = await team.getPaginated<{ _id: string; name: string }>('/trajectories', { page: 1, limit: 20 });
+
+console.log(page.pagination.total, page.data.map((trajectory) => trajectory.name));
+```
+
+The base URL is the server's origin followed by `/api`. Every request goes to the base URL, then the client's base path, then the path you pass.
+
+<Callout type="warn">
+In 1.0.2, a client whose base path is empty, such as the one `createVoltClient` returns, joins it to your path with an extra slash (`/api//teams/…`), and the server answers 404. Call `withBasePath` first, as above, and use `withTeam` rather than the factory's `teamId` option, which has the same problem.
+</Callout>
+
+## Creating a client
+
+### createVoltClient(baseUrl, options?)
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `credential` | `CredentialProvider` | none | Supplies the bearer token. Without it, requests carry no `Authorization` header. |
+| `adapter` | `'fetch' \| 'axios'` | `'fetch'` | The HTTP adapter. `axios` needs the `axios` package and is the one that reports upload progress. |
+| `timeout` | number (ms) | `30000` | Per-request timeout. |
+| `teamId` | string | none | Scopes the root client to a team. |
+
+### Credentials
+
+A `CredentialProvider` is `{ getToken(): string | null | Promise<string | null> }`, called before every request. The token is sent as `Authorization: Bearer <token>`; a `null` token sends no header.
+
+| Preset | Use |
+| --- | --- |
+| `secretKey('vsk_…')` | A team secret key. |
+| `staticToken(token)` | Any fixed token. |
+| `dynamicToken(() => store.get())` | A token read on every request, so it can change or refresh. The web app uses this with the user's session token. |
+
+### Adapters
+
+`FetchHttpClient` and `AxiosHttpClient` both implement `HttpClient`, `{ request<T>(req: HttpRequest): Promise<T> }`, and take `{ baseUrl, credential?, timeout? }`. Build a `VoltClient` on either, or on your own `HttpClient`:
+
+```ts
+import { VoltClient, FetchHttpClient, secretKey } from '@voltstack/voltclient';
+
+const http = new FetchHttpClient({ baseUrl: 'https://volt.example.com/api', credential: secretKey(key) });
+const teams = new VoltClient(http, '/teams');
+```
+
+`HttpRequest` has `method`, `url`, and optional `query`, `body`, `headers`, `signal`, `responseType` (`json`, `blob`, `text` or `arraybuffer`) and `onUploadProgress`. A `FormData` body is sent as is; any other body is sent as JSON. Query values that are arrays repeat the key; `null` and `undefined` values are dropped.
+
+## VoltClient
+
+`new VoltClient(http, basePath, options?)`. The options are `useRBAC`, `getTeamId` and `dedupeGetRequests`.
+
+### Scoping
+
+| Method | Returns |
+| --- | --- |
+| `withBasePath(basePath, options?)` | A client on the same HTTP client with another base path. It keeps the current options unless you pass new ones. |
+| `withTeam(teamId)` | A client that puts `/<teamId>` between the base path and every path: `withBasePath('/teams').withTeam(id).get('/analyses')` requests `/teams/<id>/analyses`. |
+
+`useRBAC: true` with `getTeamId: () => string | null` does the same with a team ID read per request; the request fails with `VoltClient: missing teamId for RBAC` when it returns nothing.
+
+### Requests
+
+| Method | Returns |
+| --- | --- |
+| `request<T>(method, path, args?)` | The response, untouched. `args` is an `HttpRequest` without `method` and `url`. |
+| `get<T>(path, query?)` | The response body. |
+| `post<T>(path, body?)`, `patch<T>(path, body?)` | The response body. |
+| `delete<T>(path, query?)` | The response body. |
+| `getUnwrapped<T>`, `postUnwrapped<T>`, `patchUnwrapped<T>`, `deleteUnwrapped<T>` | The envelope's `data`. |
+| `getPaginated<T>(path, params?)` | A `PaginatedResponse<T>`: `{ status, data: T[], pagination, _meta? }`. |
+| `exportFile(path, params?)` | A `Blob`, for downloads. |
+
+Concurrent identical `get` calls (same URL and query) share one request. Pass `dedupeGetRequests: false` to send each one. With the fetch adapter, a 204 response, or one with `Content-Length: 0`, resolves to `undefined`.
+
+`getPaginated` accepts both shapes the server uses for lists: `data` as the array with a separate `pagination` (it throws `VoltClient: paginated response missing pagination metadata` when that is missing), or `data` as `{ data, total, page, totalPages, limit }`. `pagination` is `{ page, limit, total, totalPages, hasMore }`.
+
+## Declarative services
+
+For many endpoints, describe them once with `createService(config, methods, factory)` and call them as functions. `factory(basePath, options)` builds the client each method uses; derive it from a client you already have:
+
+```ts
+import { VoltClient, FetchHttpClient, createService, paginated, get, post, download, secretKey, type ClientFactory } from '@voltstack/voltclient';
+
+const root = new VoltClient(new FetchHttpClient({ baseUrl: 'https://volt.example.com/api', credential: secretKey(key) }), '');
+const factory: ClientFactory = (basePath, options) => root.withBasePath(basePath, options);
+
+const trajectories = createService('/teams', {
+    list: paginated<{ teamId: string; page?: number; limit?: number }, Trajectory>('/:teamId/trajectories'),
+    get: get<{ teamId: string; trajectoryId: string }, Trajectory>('/:teamId/trajectories/:trajectoryId'),
+    download: download<{ teamId: string; trajectoryId: string }>('GET', '/:teamId/trajectories/:trajectoryId/download')
+}, factory);
+
+const page = await trajectories.list({ teamId, page: 2 });          // GET /teams/<teamId>/trajectories?page=2
+const one = await trajectories.get({ teamId, trajectoryId });      // the envelope's data
+const file = await trajectories.download({ teamId, trajectoryId }); // a Blob
+```
+
+Path parameters (`:name`) are filled from the argument object. The remaining fields become the query string of a `GET` or `DELETE`, and the JSON body of a `POST` or `PATCH`. A missing path parameter throws `Missing path param: <name>`.
+
+| Builder | Request | Result by default |
+| --- | --- | --- |
+| `get(path, options?)` | GET | `data` |
+| `post(path, options?)`, `patch(path, options?)` | POST, PATCH | `data` |
+| `del(path, options?)` | DELETE | nothing |
+| `paginated(path, options?)` | GET | a `PaginatedResponse` |
+| `request(method, path, options?)` | any method | `data` |
+| `download(method, path, options?)` | any method | a `Blob` |
+| `custom((ctx, params) => …, { validate? })` | your code | your result. `ctx.getClient(name?)` and `ctx.clients` give you the service's clients. |
+
+`path` may also be a function of the parameters. The method options:
+
+| Option | Description |
+| --- | --- |
+| `unwrap` | `'data'`, `'raw'`, `'void'`, `'paginated'`, or `{ field }` to return one field of `data`. |
+| `omit` | Parameter keys to leave out of the query or body. |
+| `body`, `query` | Build the body or query from the parameters yourself. |
+| `headers` | Headers, or a function of the parameters. |
+| `responseType` | `json`, `blob`, `text` or `arraybuffer`. |
+| `onUploadProgress` | A function of the parameters that returns a progress callback (Axios adapter). |
+| `map` | Transforms the unwrapped result. |
+| `validate` | Runs before the request; throw to stop it. |
+| `client` | The name of the client to use, in a multi-client service. |
+
+`config` is a base path, `{ basePath, useRBAC? }`, or `{ clients: { <name>: { basePath, useRBAC?, getTeamId?(params) } } }` for a service that spans several base paths; methods use the `default` client, or the first, unless they name another.
+
+## Errors
+
+Every failure is an `ApiError` with a `code`, the HTTP `status` when there was a response, and the `originalError`. The code is the server's error `code` (for example `SecretKey::Invalid` or `Team::AccessDenied`, see [Responses](/docs/develop/rest-api#responses)); when the response carries none, it is `Http::<status>` for 400, 401, 403, 404, 409, 429, 500, 502, 503 and 504, else `Internal::Server::Error`. Network failures are `Network::Timeout` and `Network::ConnectionError`. Aborted requests reject with the abort error itself.
+
+```ts
+import { ApiError } from '@voltstack/voltclient';
+
+try {
+    await team.getUnwrapped(`/trajectories/${trajectoryId}`);
+} catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+        // not found
+    }
+    throw error;
+}
+```
+
+| Member | Description |
+| --- | --- |
+| `message` | A friendly message for the codes the SDK knows, else the code. |
+| `getFriendlyMessage()` | The friendly message, or `Unknown error`. |
+| `isPermissionDenied()`, `ApiError.isRBACError(error)`, `ApiError.isCodePermissionDenied(code)` | Whether the code means a permission was denied, including `Team::AccessDenied`, `Team::InsufficientPermissions`, `RBAC::InsufficientPermissions` and `Http::403`. |
+| `markHandled()`, `isHandled()` | A flag for your own error handling. |
+
+The package also exports `ERROR_CODE_MESSAGES`, `getErrorMessage(code, fallback?)` and `extractServerCode(body)`.
