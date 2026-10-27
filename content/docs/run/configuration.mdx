@@ -1,0 +1,227 @@
+---
+title: Configuration
+description: Reference of the environment variables, deployment modes, ports and volumes of a self-hosted VOLT stack.
+---
+
+A self-hosted stack is configured with environment variables. Some are read by `compose.yml` and passed to the containers, the rest are read by the server, the cluster daemon or the deploy CLI directly. This page lists them with their defaults.
+
+## How to set variables
+
+The deploy CLI keeps the stack's variables in the `env` object of `~/.volt-deploy/app-config.json` and hands them to `docker compose` on every start. To change one, edit that object and apply it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/voltlabs-research/volt/main/packages/apps/desktop/scripts/deploy.sh | bash -s -- --update --force
+```
+
+This works for the [stack variables](#stack-variables) below, the ones `compose.yml` reads. The compose file passes a fixed list of variables to each container, so any other server or daemon variable needs a compose override file.
+
+### Variables the compose file doesn't pass
+
+Write the extra variables in an override file, for example `~/.volt-deploy/compose.override.yml`:
+
+```yaml
+services:
+  volt-server:
+    environment:
+      GITHUB_CLIENT_ID: "<client id>"
+      GITHUB_CLIENT_SECRET: "<client secret>"
+      GITHUB_CALLBACK_URL: "https://volt.example.org/api/auth/github/callback"
+  cluster-daemon:
+    environment:
+      VOLT_DUCKDB_MEMORY_LIMIT_MB: "8192"
+```
+
+Then run compose yourself with the values the CLI uses, read from `app-config.json` (this needs `jq`):
+
+```bash
+cd ~/.volt-deploy
+eval "$(jq -r '.env | to_entries[] | "export \(.key)=\(.value | @sh)"' app-config.json)"
+export TEAM_CLUSTER_ID="$(jq -r '.bootstrap.teamClusterId' app-config.json)"
+export DAEMON_PASS="$(jq -r '.bootstrap.daemonPassword' app-config.json)"
+export VOLT_SOURCE_DIR="$(find "$PWD/downloads/voltlabs-research/volt" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+
+docker compose -f compose.yml -f compose.override.yml --profile enrolled up -d
+```
+
+Add `-f compose.images.yml` before the override if you use prebuilt images, and leave out `--profile enrolled` on a server-only deployment.
+
+<Callout type="warn">
+Always export the CLI's values first. Without them, compose falls back to the built-in development secrets and an empty cluster ID, and the server can't read what it encrypted. `deploy.sh --update` starts the stack without your override, so run the compose command again after each update.
+</Callout>
+
+## Stack variables
+
+Read by `compose.yml`. The CLI writes `SECRET_KEY`, `SSH_KEY`, `WEB_PORT`, `SERVER_PORT`, `DEPLOYMENT_MODE`, `CLIENT_HOST` and `SERVER_ENDPOINT` into `app-config.json`, and sets `TEAM_CLUSTER_ID`, `DAEMON_PASS` and `VOLT_SOURCE_DIR` itself on every start.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `POSTGRES_USER` | `volt` | PostgreSQL user, also used in the server's and the daemon's `DATABASE_URL` |
+| `POSTGRES_PASS` | Built-in fallback | PostgreSQL password. PostgreSQL isn't published on the host. |
+| `POSTGRES_DB` | `volt` | The server's database. The daemon always uses `volt-cluster`. |
+| `NODE_ENV` | `development` | The server's `NODE_ENV`. Keep the default (see [Server](#server)). |
+| `DEPLOYMENT_MODE` | `local` | The server's [deployment mode](#deployment-modes). The CLI writes `cloud`. |
+| `CLIENT_HOST` | `http://localhost:5273` | The web client's public address. The CLI writes `http://<host>:<WEB_PORT>`. |
+| `SERVER_ENDPOINT` | `http://localhost:8100` | The server's public address. The CLI writes `http://<host>:<SERVER_PORT>`. |
+| `SECRET_KEY` | Built-in fallback | The server's `SECRET_KEY`. The CLI generates a random one. |
+| `SSH_KEY` | Built-in fallback | Passed to the server as `SSH_ENCRYPTION_KEY`, the key stored credentials are encrypted with. The CLI generates a random one. |
+| `SERVER_PORT` | `8100` | Host port of `volt-server` (it listens on `8000` inside its container) |
+| `WEB_PORT` | `5273` | Host port of `volt-client` (nginx listens on `5173` inside its container) |
+| `DAEMON_PORT` | `18080` | Port of `cluster-daemon`, on the host and in its container |
+| `DAEMON_HEAP_MB` | Empty | The daemon's Node.js heap size in MB (see `DAEMON_HEAP_MB` under [Cluster daemon](#cluster-daemon)) |
+| `TEAM_CLUSTER_ID` | None | The cluster the daemon enrolls as |
+| `DAEMON_PASS` | Built-in fallback | Passed to the daemon as `TEAM_CLUSTER_DAEMON_PASSWORD` |
+| `COMPOSE_PROJECT_NAME` | `volt` | Passed to the daemon |
+| `VOLT_SOURCE_DIR` | None | The VOLT source tree the images build from |
+| `VOLT_IMAGE_TAG` | `main` | Tag of the prebuilt server and client images (`compose.images.yml`) |
+| `CLUSTER_DAEMON_IMAGE_TAG` | `main` | Tag of the prebuilt daemon image (`compose.images.yml`) |
+
+`CLIENT_HOST` and `SERVER_ENDPOINT` contain the ports, so update them when you change `WEB_PORT` or `SERVER_PORT`.
+
+The compose file fixes the rest of what the containers need: the server listens on `0.0.0.0:8000` with `SERVER_DATA_DIR=/var/lib/volt-server`; the daemon runs with `NODE_ENV=production`, `VOLT_CLOUD_URL=http://volt-server:8000`, `DAEMON_DATA_DIR=/var/lib/volt-daemon` and `BUCKET_PREFIX=cluster-`.
+
+## Server
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `DATABASE_URL` | Required | `postgres://user:password@host:5432/database`, or `sqlite:<path>` for a SQLite file |
+| `SERVER_HOST` | `0.0.0.0` | Address the server listens on |
+| `SERVER_PORT` | `8000` | Port the server listens on |
+| `SERVER_ENDPOINT` | None | The server's public address. File URLs (`/api/files/...`), Jupyter proxy URLs, the `VOLT_BASE_URL` notebook kernels get, and the address enrolled machines connect to are all built from it. Without it, file URLs point at `http://localhost:8100` and enrolling machines fails. |
+| `CLIENT_HOST` | None | The web client's public address. Accepts several origins separated by commas or spaces; `GET /healthz` reports the first as `clientHost`. |
+| `DEPLOYMENT_MODE` | `cloud` | `local` or `cloud`; any value other than `local` means `cloud`. See [Deployment modes](#deployment-modes). |
+| `SECRET_KEY` | Required | Signs session tokens, signed object URLs and Jupyter proxy tokens |
+| `VOLT_SECRET_ENCRYPTION_KEY` | `SSH_ENCRYPTION_KEY` | Encrypts the credentials the server stores: each cluster's daemon credentials, notebook credentials and the API keys of team AI integrations. One of the two is required; the compose file sets `SSH_ENCRYPTION_KEY`. |
+| `CLUSTER_OBJECT_SIGNING_SECRET` | `SECRET_KEY` | Signs the URLs browsers use to upload and download cluster objects |
+| `SERVER_DATA_DIR` | `./storage` | Where the server keeps its own files |
+| `USER_FILES_ROOT` | `<SERVER_DATA_DIR>/user-files` | Where files served under `/api/files/` are stored |
+| `REGISTRY_URL` | `https://registry.voltcloud.dev` | The plugin registry the marketplace and plugin installs use |
+| `NODE_ENV` | None | With PostgreSQL, the server creates and updates its tables only when this isn't `production`. |
+| `LOG_LEVEL` | `debug` | `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent` |
+| `JWT_EXPIRE` | `7d` | Lifetime of session tokens, in seconds or as a duration such as `12h` |
+| `TEAM_CLUSTER_DAEMON_DISTRIBUTION_MODE` | Automatic | How enrolled machines get the daemon: `build` sends them the daemon's sources to build, `image` has them pull `ghcr.io/voltlabs-research/volt-cluster-daemon:main`. By default it's `build` when the server finds those sources, as the stack's server image ships them, and `image` otherwise. |
+| `TRAJECTORY_UPLOAD_CHUNK_SIZE` | `67108864` (64 MiB) | Size of each part of a trajectory upload. Keep it below your proxies' body limits, including the client's nginx at 100 MB. |
+| `TRAJECTORY_UPLOAD_MAX_FILE_SIZE` | `549755813888` (512 GiB) | Largest file a trajectory upload accepts |
+| `TRAJECTORY_UPLOAD_SESSION_TTL_SECONDS` | `21600` (6 h) | How long an upload session stays valid |
+| `SERVER_KEEP_ALIVE_TIMEOUT` | `1800000` (30 min) | HTTP keep-alive timeout, in milliseconds |
+| `SERVER_HEADERS_TIMEOUT` | `SERVER_KEEP_ALIVE_TIMEOUT` | Time allowed to receive request headers, in milliseconds |
+| `SERVER_TIMEOUT` | `0` (none) | Socket inactivity timeout, in milliseconds |
+
+### Sign-in providers
+
+A provider appears on the sign-in page once its client ID is set. Register `<SERVER_ENDPOINT>/api/auth/<provider>/callback` as the callback URL with the provider.
+
+| Variable | What it does |
+| --- | --- |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL` | GitHub sign-in. The callback is `<SERVER_ENDPOINT>/api/auth/github/callback`. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` | Google sign-in. The callback is `<SERVER_ENDPOINT>/api/auth/google/callback`. |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_CALLBACK_URL` | Microsoft sign-in. The callback is `<SERVER_ENDPOINT>/api/auth/microsoft/callback`. |
+| `OAUTH_SUCCESS_REDIRECT` | Where the server sends the browser after a successful sign-in, with the session token. Set it to `<CLIENT_HOST>/auth/oauth/callback`. The default, `http://localhost:3000/auth/oauth/success`, doesn't match a self-hosted client. |
+| `OAUTH_FAILURE_REDIRECT` | Where the server sends the browser when sign-in fails. Set it to `<CLIENT_HOST>/auth/sign-in`; the default is `http://localhost:3000/auth/sign-in`. |
+
+The compose file doesn't pass these, so set them in an [override file](#variables-the-compose-file-doesnt-pass).
+
+## Cluster daemon
+
+These apply to the daemon in the stack and to daemons on enrolled machines.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `TEAM_CLUSTER_ID` | Required | The cluster this daemon enrolls as |
+| `TEAM_CLUSTER_DAEMON_PASSWORD` | Required | The cluster's daemon password |
+| `VOLT_CLOUD_URL` | Required | The server's address |
+| `HOST` | `0.0.0.0` | Address the daemon listens on |
+| `PORT` | `8080` | Port the daemon listens on |
+| `DAEMON_DATA_DIR` | `~/.volt-daemon/data` | The daemon's data: object store, caches, analysis output |
+| `DATABASE_URL` | `sqlite:<DAEMON_DATA_DIR>/daemon.sqlite` | The daemon's database, PostgreSQL or SQLite |
+| `OBJECT_STORE_ROOT` | `<DAEMON_DATA_DIR>/object-store` | Where trajectories, models and results are stored |
+| `DAEMON_HEAP_MB` | 80% of the memory limit | Node.js heap size in MB, at least 512. By default it's 80% of the container's memory limit, or of the host's RAM when there's none. |
+| `VOLT_DUCKDB_MEMORY_LIMIT_MB` | 25% of RAM | Memory limit handed to the DuckDB of each plugin process. By default 25% of the host's RAM, kept between 1024 and 16384 MB. |
+| `PLUGIN_PROCESS_POOL_MAX` | CPUs − 1 | Most plugin processes running at once. The memory budget can lower it further. |
+| `PLUGIN_PROCESS_POOL_MAX_MEMORY_MB` | 70% of RAM | Memory budget for plugin processes |
+| `PLUGIN_PROCESS_EST_MEMORY_MB` | `1024` | Memory one plugin process is assumed to use when the budget is divided |
+| `PLUGIN_PROCESS_NATIVE_THREAD_BUDGET` | Derived | Threads each plugin process may use. By default the CPUs, minus one for the daemon, divided among the concurrent processes, at least 2. |
+| `PLUGIN_PROCESS_EXECUTION_TIMEOUT_MS` | None | Time limit for one plugin run |
+| `PLUGIN_PROCESS_MAX_ATTEMPTS` | `3` | Attempts per plugin run |
+| `TRAJECTORY_INGEST_CONCURRENCY` | `8` | Frames processed at once while a trajectory is ingested |
+| `ANALYSIS_QUEUE_ADMISSION_WINDOW` | `64` | Jobs of one analysis put in the queue at once; the rest wait and enter as earlier ones finish |
+| `DAEMON_PLUGIN_PARQUET_CACHE_MAX_BYTES` | `4294967296` (4 GiB) | Size of the cache of plugin results kept as Parquet |
+| `TEAM_CLUSTER_HEARTBEAT_INTERVAL_MS` | `10000` | How often the daemon sends a heartbeat |
+| `TEAM_CLUSTER_METRICS_INTERVAL_MS` | `3000` | How often it reports CPU, memory, disk and network |
+| `JUPYTER_IMAGE` | `ghcr.io/voltlabs-research/volt-jupyter-scripting:main` | Image of the Jupyter containers notebooks run in |
+| `LOG_LEVEL` | `info` | Log level, as for the server |
+
+In the stack, the compose file passes only `DAEMON_HEAP_MB` among the tuning variables; set the others in an [override file](#variables-the-compose-file-doesnt-pass).
+
+## Web client build variables
+
+The web client reads these when it's built, not at run time. The stack's client image sets neither: it uses the server of the origin it's served from.
+
+| Variable | What it does |
+| --- | --- |
+| `VITE_SERVER_ENDPOINT` | Ties the client to one server. It never shows **Connect to a server**, and the sign-in page has no **Change server**. |
+| `VITE_REGISTRY_URL` | The plugin registry a workspace [run in the browser](/docs/run/browser) installs from, when not the public one |
+
+## Deploy script and CLI
+
+Read by `deploy.sh` and the deploy CLI on the host. Set them on the `bash` side of the pipe, for example `curl ... | VOLT_DEPLOY_DIR=/srv/volt bash`.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `VOLT_DEPLOY_DIR` | `~/.volt-deploy` | Where the script puts the CLI and the compose file, and keeps the deployment |
+| `VOLT_DEPLOY_DATA` | `VOLT_DEPLOY_DIR` | The CLI's deployment directory (`app-config.json`, `downloads/`). `--data-dir` overrides it. |
+| `VOLT_REPO_URL` | `https://github.com/voltlabs-research/volt` | Repository whose latest release the script downloads `cli.cjs` and `compose.yml` from |
+| `VOLT_CLI_URL` | `<VOLT_REPO_URL>/releases/latest/download/cli.cjs` | Where the script downloads the CLI |
+| `VOLT_COMPOSE_URL` | `<VOLT_REPO_URL>/releases/latest/download/compose.yml` | Where the script downloads the compose file |
+| `VOLT_COMPOSE_FILE` | `<VOLT_DEPLOY_DIR>/compose.yml` | The compose file the CLI runs. It looks for `compose.images.yml` next to it. |
+| `GITHUB_TOKEN` | None | Token for GitHub's API, to avoid its rate limit when looking up releases |
+| `VOLT_CONSOLE_URL` | `https://server.console.voltcloud.dev` | Where the CLI creates the VOLT Cloud ID on a fresh deploy |
+
+The CLI always installs the source of the latest release of `voltlabs-research/volt`; `VOLT_REPO_URL` only changes where the script downloads the CLI and the compose file from.
+
+## Deployment modes
+
+`DEPLOYMENT_MODE` tells the server whether it serves one person or many, and the client adapts its interface to it.
+
+| | `local` | `cloud` |
+| --- | --- | --- |
+| Used by | [The browser](/docs/run/browser) and [the desktop app](/docs/run/desktop) | Self-hosted servers deployed with the CLI |
+| Signing in | Automatic, as the local account `local@volt.local`, through `POST /api/sessions/local` | People sign up and sign in; `POST /api/sessions/local` answers 404 |
+| Teams | The one provisioned team | Teams, members, roles and invitations ([Teams](/docs/guides/teams)) |
+
+In `local` mode the client hides what only makes sense with other people:
+
+- **My Team** and **Manage Roles** in the navigation, and **Authentication** and **Sessions** in the settings.
+- The team switcher, the **Team actions** menu (**Create team**, **Join existing team**) and **Invite members** in the header.
+- The user menu with **Account Settings** and **Sign Out**.
+- **Profile** and **Delete Account** in the general settings.
+- **Have an invite code?** during onboarding.
+- Who else is online, in the jobs status, on whiteboards and in the canvas.
+
+`local` is meant for the single-user stacks the browser and the desktop app provision, where the local account exists. Run a self-hosted server in `cloud` mode, as the CLI does, even though `compose.yml` alone defaults to `local`.
+
+To see a server's mode, ask it:
+
+```bash
+curl -s http://localhost:8100/api/system/config
+# {"status":"success","data":{"mode":"cloud"}}
+```
+
+## Ports
+
+| Host port | Variable | Container port | Service | Serves |
+| --- | --- | --- | --- | --- |
+| `5273` | `WEB_PORT` | `5173` | `volt-client` | The web app; proxies `/api/` and `/socket.io/` to the server |
+| `8100` | `SERVER_PORT` | `8000` | `volt-server` | `/api/`, `/socket.io/` and `/healthz` |
+| `18080` | `DAEMON_PORT` | `18080` | `cluster-daemon` | The daemon's HTTP port |
+| None | | `5432` | `volt-postgres` | PostgreSQL, reachable only inside the stack's network |
+
+## Volumes
+
+| Volume | Mounted at | Service | Holds |
+| --- | --- | --- | --- |
+| `volt_volt-postgres-data` | `/var/lib/postgresql/data` | `volt-postgres` | The `volt` (server) and `volt-cluster` (daemon) databases |
+| `volt_volt-server-data` | `/var/lib/volt-server` | `volt-server` | The server's files, such as avatars (`user-files/`) |
+| `volt_cluster-daemon-data` | `/var/lib/volt-daemon` | `cluster-daemon` | The object store with trajectories, models and results, and the daemon's caches |
+| `/var/run/docker.sock` (bind mount) | `/var/run/docker.sock` | `volt-server`, `cluster-daemon` | The host's Docker API, which the daemon uses to run containers such as notebook servers |
+
+Back up the three named volumes together with `~/.volt-deploy/app-config.json`. The volumes hold the data, and `app-config.json` holds the secrets needed to read the credentials stored in it.
