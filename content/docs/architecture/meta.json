@@ -1,0 +1,10 @@
+{
+  "title": "Architecture",
+  "pages": [
+    "server",
+    "cluster-daemon",
+    "web-runtime",
+    "storage",
+    "libraries"
+  ]
+}
