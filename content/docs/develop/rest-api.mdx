@@ -1,0 +1,141 @@
+---
+title: REST & realtime API
+description: How to call the VOLT server from your own code - base path, authentication, response envelopes, pagination and errors, the route groups, and the Socket.IO channel.
+---
+
+The VOLT server exposes a JSON API under `/api` and a Socket.IO endpoint at `/socket.io` on the same origin. The web app uses both. Your programs use the API with a team secret key, directly or through the [TypeScript](/docs/develop/voltclient) and [Python](/docs/develop/python-sdk) SDKs.
+
+The routes are declared in `packages/shared/contracts/src/modules/<module>/routes.ts`. The server mounts exactly those, and the client calls them, so that directory is the authoritative list, with each route's input and output types next to it.
+
+<Callout type="info">
+The server publishes no OpenAPI document, and it has no `/api-docs` endpoint.
+</Callout>
+
+## Authentication
+
+Protected routes take a bearer token in the `Authorization` header. The API reads credentials from that header only.
+
+```http
+Authorization: Bearer <token>
+```
+
+There are two kinds of token, and the server tells them apart by the `vsk_` prefix:
+
+| Token | Form | Used by | How you get one |
+| --- | --- | --- | --- |
+| Secret key | `vsk_…` | Programs, scripts, notebooks, the SDKs | Create it for a team; see [Secret keys](/docs/guides/secret-keys). It acts in that team with the permissions of the role it was given. |
+| Session token | A JWT | The web app | `POST /api/auth/sessions` with `{ "email", "password" }` returns `{ token, user }`. Each token is a session, listed by `GET /api/sessions` and revoked by `DELETE /api/sessions/:sessionId`. |
+
+A secret key works only on its own team's routes; any other `/api/teams/:teamId/…` answers 403 `Team::AccessDenied`. Every request made with a key is logged for its usage metrics (`GET /api/teams/:teamId/secret-keys/:secretKeyId/usage`). `GET /api/teams/secret-keys/me` returns the key you call it with, including its `team`, `role`, `name` and `keyPrefix`; it is how a program learns its team ID.
+
+```bash
+VOLT=https://volt.example.com
+KEY=vsk_...
+
+TEAM=$(curl -s -H "Authorization: Bearer $KEY" "$VOLT/api/teams/secret-keys/me" | jq -r .data.team)
+curl -s -H "Authorization: Bearer $KEY" "$VOLT/api/teams/$TEAM/trajectories?page=1&limit=20"
+```
+
+A few routes take no token: `GET /api/system/config` (the deployment mode), the sign-in and sign-up routes, and the `/api/public/…` routes, which serve public trajectories and accept a token when there is one. The server also answers `GET /healthz` outside `/api`.
+
+## Responses
+
+A successful response is an envelope with the data under `data`:
+
+```json
+{ "status": "success", "data": { "...": "..." } }
+```
+
+A route that returns nothing answers 204 with no body. A list answers with a page of results and its `pagination`:
+
+```json
+{
+  "status": "success",
+  "data": [{ "_id": "...", "...": "..." }],
+  "pagination": { "page": 1, "limit": 20, "total": 57, "totalPages": 3, "hasMore": true },
+  "_meta": {}
+}
+```
+
+Lists take `page` (1-based, default 1) and `limit` query parameters. Each route sets its default `limit` and caps it. `_meta` carries extra information some lists add, such as the columns of a listing.
+
+An error has the same envelope with `status: "error"`, a stable `code` of the form `Module::Reason` and the HTTP status:
+
+```json
+{ "status": "error", "code": "Authentication::Required", "message": "Authentication::Required", "statusCode": 401 }
+```
+
+| Code | Status | Meaning |
+| --- | --- | --- |
+| `Authentication::Required` | 401 | No bearer token. |
+| `Authentication::Unauthorized` | 401 | The session token is invalid, expired, revoked, or older than the user's last password change. |
+| `SecretKey::Invalid` | 401 | The secret key does not exist or is revoked. |
+| `Team::AccessDenied` | 403 | A secret key used on another team's route. |
+
+A path the server does not have answers Express's own 404 page, which is HTML.
+
+## Route groups
+
+Team-scoped resources live under `/api/teams/:teamId/`. The groups below follow the contract modules.
+
+| Group | Routes |
+| --- | --- |
+| System | `GET /api/system/config`, `GET /api/system/rbac` |
+| Account | `/api/auth/sessions` (sign in), `/api/auth/users` (sign up), `/api/auth/me` (read, update, delete the account), `/api/auth/me/password`, `/api/auth/oauth/providers`; OAuth sign-in at `/api/auth/github`, `/api/auth/google` and `/api/auth/microsoft` with their `/callback` routes |
+| Sessions | `/api/sessions`, `/api/sessions/activity`, `/api/sessions/:sessionId` |
+| Notifications | `/api/notifications`, `/api/notifications/read-status` |
+| Teams | `/api/teams`, `/api/teams/:teamId`, and under it `members`, `roles`, `invitations`, `invite-codes`, `self/permissions`, `self/membership`, `default-membership`; `/api/teams/invite-codes/:code`, `/api/teams/invitations/:invitationId` |
+| Secret keys | `/api/teams/:teamId/secret-keys` (list, create, `/:secretKeyId/revocations`, delete), `/secret-keys/metrics`, `/secret-keys/:secretKeyId/usage`, and `/api/teams/secret-keys/me` |
+| Trajectories | `/api/teams/:teamId/trajectories` and `/:trajectoryId` (read, update, delete); `upload-sessions` and their `commits`; `clones`; `/:trajectoryId/download`, `/preview`, `/frames/:timestep/atoms`, `/scene-artifacts`, `/folder`, `/color-codings`, `/particle-filters`, `/simulation-cell`, `/analyses/download`; `/api/teams/:teamId/trajectory-folders`, `/trajectory-metrics` |
+| Simulation cells | `/api/teams/:teamId/simulation-cells`, `/simulation-cells/:simulationCellId` |
+| Analyses | `/api/teams/:teamId/analyses`, `/analyses/:analysisId`, `/analyses/:analysisId/logs/:timestep`, `/analyses/:analysisId/failed-frames/retries`; `/api/teams/:teamId/provenance-records` and `/:provenanceId/reproduction` |
+| Plugins | `/api/teams/:teamId/plugins` and `/:pluginId` (CRUD), `/:pluginId/binary` (upload target, `commits`, download, delete), `/:pluginId/clones`, `/:pluginId/export`, `imports`, `registry/search`, `registry/installations`, `workflow-validations`, `node-types/schema` |
+| Pipelines | `/api/teams/:teamId/plugins/trajectories/:trajectoryId/pipeline-executions` (run), `/pipeline-runs` and `/pipeline-runs/:pipelineRunId` |
+| Results | `/api/teams/:teamId/plugins/listings/analyses/:analysisId` and its `export`, `sub-listings/:exposureId/:timestep/:subListingName`; `/plugins/:pluginId/listings` and its `export`; `/plugins/exposures/:trajectoryId/:analysisId/:exposureId/:timestep/glb`, `/plugins/exposures/artifacts/:artifactId/chart`, `/plugins/exposures/analyses/:analysisId/export`, `/plugins/exposures/analyses/:analysisId/panels/:timestep` |
+| Jobs | `/api/teams/:teamId/jobs`, `/jobs/retries` |
+| Clusters | `/api/teams/:teamId/clusters` and `/:teamClusterId`, with `runtime-snapshot`, `queue-concurrency`, `role`, `transfers`, `resource-limits`, `remote-access/…`, `enrollment-tokens`, `credentials`, `delete-requests`; `/api/teams/:teamId/cluster-objects/:token` |
+| Daemon | `/api/team-clusters/:teamClusterId/healthcheck` (enrollment), `/api/team-clusters/:teamClusterId/install-manifest` |
+| Notebooks | `/api/teams/:teamId/notebooks`, `/:notebookId/content`, `/:notebookId/kernel`; `/api/teams/:teamId/notebook-sessions` |
+| Whiteboards | `/api/teams/:teamId/whiteboards`, `/whiteboard-folders` |
+| VOLT AI | `/api/teams/:teamId/ai-conversations` and `/:conversationId/messages`, `/compact`; `/api/teams/:teamId/ai-integrations` and `/:provider`, `/ai-integrations/models` |
+| Dashboard | `/api/teams/:teamId/search`, `/daily-activities`, `/scene-artifacts`, `/sample-simulations` |
+| Public | `/api/public/teams/:teamId/trajectories`; `/api/public/trajectories/:trajectoryId` and its `bootstrap`, `preview`, `analyses`, `dumps/:timestep`, `frames/:timestep/glb`, `frames/:timestep/atoms`, plugin listings, exposures, logs and panels |
+
+Write routes follow the same shape: a resource's sub-collection names the action, as in `POST …/secret-keys/:secretKeyId/revocations` or `POST …/plugins/registry/installations` with `{ "name": "@voltlabs/opendxa", "version": "2.5.1" }`.
+
+## Realtime: Socket.IO
+
+The server runs a Socket.IO server on its HTTP port at the default path, `/socket.io`, with the `websocket` and `polling` transports. The web app uses it for live job lists, analysis logs, presence, collaboration on the canvas and whiteboards, VOLT AI chats and cluster metrics.
+
+Authenticate in the handshake with a session token. Secret keys are not accepted here. A connection without a token is a guest; one with an invalid token is refused.
+
+```ts
+import { io } from 'socket.io-client';
+
+const socket = io('https://volt.example.com', { auth: { token: sessionToken } });
+socket.emit('subscribe_to_team', { teamId });
+socket.on('analysis.status.changed', (event) => console.log(event));
+```
+
+### Team events
+
+Emit `subscribe_to_team` with `{ teamId, previousTeamId? }` to join the room `team:<teamId>`; the server checks that you are a member, and `leave_team` leaves it. In that room the server forwards these domain events, each with its payload plus `timestamp` and `eventName`:
+
+`trajectory.created`, `trajectory.updated`, `trajectory.deleted`, `analysis.created`, `analysis.deleted`, `analysis.status.changed`, `analysis.stage.changed`, `scene-artifact.upserted`, `plugin.created`, `plugin.deleted`, `team.created`, `team.deleted`, `team-member.deleted`, `team-role.created`, `team-role.updated`, `team-role.deleted`, `secret-key.created`, `secret-key.deleted`, `notebook.deleted`, `whiteboard.deleted`.
+
+Your socket receives `team.jobs.initial`, a snapshot of the team's jobs, when you subscribe; the room receives `team.job.updated` each time a job changes status, and a new `team.jobs.initial` after running jobs are removed. The room also carries the presence events `user:online`, `user:offline` and `user:list`, which `team:heartbeat` keeps current.
+
+### Other channels
+
+| Channel | Client emits | Server emits |
+| --- | --- | --- |
+| Analysis logs | `subscribe_to_analysis_log` and `unsubscribe_from_analysis_log`, with `{ analysisId, timestep, afterCursor? }` | `analysis-log:chunk`: `{ analysisId, timestep, cursor, segments, sealed, status, truncated }` |
+| Clusters | `subscribe_to_team_cluster` with `{ teamClusterIds }` | `metrics:all`, `metrics:history`, `team-cluster.updated` |
+| Canvas | `trajectory.presence.join`, `trajectory.presence.leave`, `canvas.lobby.join`, `canvas.lobby.leave`, `canvas.workspace.visit`, `canvas.workspace.leave`, `canvas.workspace.publish_snapshot`, `canvas.workspace.patch`, `canvas.workspace.cursor`, `canvas.workspace.model_drag` | `canvas.lobby.update`, `canvas.workspace.viewers`, `canvas.workspace.sync_state`, `canvas.workspace.apply_patch`, `canvas.workspace.cursor`, `canvas.workspace.model_drag`, `canvas.workspace.closed`, `trajectory.presence.update` |
+| Whiteboards | `subscribe_to_whiteboard`, `unsubscribe_from_whiteboard`, `whiteboard_patch` | `whiteboard_users_update`, `whiteboard_apply_delta` |
+| VOLT AI | `ai-chat:join`, `ai-chat:leave`, `ai-chat:send`, `ai-chat:stop` | `ai-chat:chunk`, `ai-chat:saved`, `ai-chat:tool-invoke` |
+| Plugin debugging | `debug:start`, `debug:step`, `debug:continue`, `debug:stop` | `debug:session:created`, `debug:session:completed`, `debug:session:error`, `debug:node:started`, `debug:node:completed`, `debug:node:skipped`, `debug:node:error`, `debug:node:log-chunk` |
+
+A handler that rejects a request emits `error` with `{ code, details }` to your socket.
+
+Cluster daemons connect to the same server with their own protocol; see [@voltstack/daemon-cluster-client](/docs/develop/daemon-cluster-client).
