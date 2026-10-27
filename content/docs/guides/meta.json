@@ -1,0 +1,26 @@
+{
+  "title": "Use VOLT",
+  "pages": [
+    "---Your data---",
+    "dashboard",
+    "trajectories",
+    "simulation-cells",
+    "---Analysis---",
+    "canvas",
+    "pipelines",
+    "results",
+    "jobs",
+    "plugins",
+    "notebooks",
+    "volt-ai",
+    "---Compute---",
+    "clusters",
+    "---Collaboration---",
+    "teams",
+    "whiteboards",
+    "notifications",
+    "---Account---",
+    "secret-keys",
+    "settings"
+  ]
+}
