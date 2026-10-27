@@ -1,97 +1,57 @@
 ---
 title: Steinhardt Order Parameters
-description: Compute per-atom bond-orientational order parameters for crystallinity, nucleation, and liquid/solid discrimination.
+description: Compute the bond-orientational order parameters q_l, w_l and w_l_hat of each atom, to tell crystal from liquid and follow nucleation.
 ---
 
-## Parameters
+Steinhardt bond-orientational order parameters describe the angular arrangement of an atom's neighbors with rotationally invariant combinations of spherical harmonics. `q_6` separates crystal-like from liquid-like environments, and `q_4` with `q_6` distinguishes FCC, HCP, BCC and icosahedral order. Use them to study melting, solidification and nucleation, or as features for [MultiSOM](/docs/plugins/multisom). The plugin is a port of LAMMPS `compute orientorder/atom`.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `qlist` | `string` | `4,6,8,10,12` | Comma-separated list of orders `l` to compute. |
-| `nnn` | `int` | `12` | Fixed number of nearest neighbors. Set to `0` to use `cutoff` instead. |
-| `cutoff` | `float` | `0` | Cutoff radius for neighbor search. Only used when `nnn` is `0`. |
-| `wl` | `bool` | `false` | Also compute the Wigner-3j invariants `w_l`. |
-| `wlHat` | `bool` | `false` | Also compute the normalized `w_l_hat = w_l / q_l^3` (dimensionless). |
-| `components` | `int` | `-1` | Emit the `2l+1` complex `Q_l^m / |Q_l|` components for a single order `l`. Disabled when `< 0`. |
-| `onlySelected` | `bool` | `false` | Only classify atoms flagged by a `Selection` column. |
+| Key | Version | Builds |
+|---|---|---|
+| `steinhardt-order-parameters` | 1.0.4 | Linux, macOS, Windows |
 
-## Output
+This plugin has no browser build, so it can't be installed on a machine that runs in the browser or the desktop app.
 
-The plugin writes two parquet files per frame.
+## How it works
 
-### `{outputBase}_steinhardt.parquet`
+For atom i with neighbors j, the plugin averages the spherical harmonics of the bond directions, q_lm(i) = (1/Nᵢ) Σⱼ Y_lm(r̂ᵢⱼ), for each order l in the list. From them it computes:
 
-Summary statistics for the frame, including the `q_6`-derived structure breakdown.
+- **q_l** = √(4π/(2l+1) Σₘ |q_lm|²), which is invariant under rotation.
+- **w_l**, the third-order invariant built from q_lm with Wigner 3j symbols, when **Compute w_l** is on.
+- **w_l_hat** = w_l / q_l³, a dimensionless version of w_l, when **Compute w_l_hat** is on.
 
-```ts
-interface SteinhardtOutput {
-    main_listing: {
-        total_atoms: int;
-        qlist: int[];
-        nnn: int;
-        cutoff: float;
-        wl: bool;
-        wl_hat: bool;
-        components: int;
-        liquid_like: int;
-        interface: int;
-        crystal_like: int;
-    };
-    sub_listings: {
-        structures: Array<{
-            structure_id: int;
-            structure_name: string;
-            atom_count: int;
-        }>;
-    };
-}
-```
+Neighbors are either a fixed number of nearest neighbors or all atoms within a cutoff.
 
-### `{outputBase}_atoms.parquet`
+## Inputs
 
-Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are bucketed by their `q_6`-derived structure label under group names `Liquid-like`, `Interface`, and `Crystal-like`. Each atom carries one scalar column per order in `qlist`, the classifying `q6` scalar, and the full `q_l` set as a single `list<double>` for downstream analysis.
+- Atom positions and the simulation cell.
+- A `Selection` column, only for **Only Selected Atoms**.
 
-```ts
-interface Atom {
-    id: int;
-    pos: [float, float, float];
-    bucket: string;
-    // one scalar column per order l in qlist (e.g. q_4, q_6, q_8, q_10, q_12)
-    [q_l: `q_${number}`]: float;
-    q6: float;
-    q: float[];
-    // emitted only when wl = true (one per order l)
-    [w_l: `w_${number}`]?: float;
-    // emitted only when wlHat = true (one per order l)
-    [w_hat_l: `w_hat_${number}`]?: float;
-    // emitted only when components >= 0: the 2*(2l+1) real/imag parts
-    components?: float[];
-}
+## Arguments
 
-interface AtomsOutput {
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-    };
-    sub_listings: {
-        structures: Array<{
-            structure_id: int;
-            structure_name: string;
-            atom_count: int;
-        }>;
-    };
-    export: {
-        AtomisticExporter: {
-            [bucketName: string]: Atom[];
-        };
-    };
-}
-```
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Orders (comma-separated list of l)** `qlist` | string | `4,6,8,10,12` | Comma-separated integers | The orders l to compute. |
+| **Nearest Neighbors (0 = use cutoff)** `nnn` | number | `12` | 0 to 64, step 1 | Use this many nearest neighbors. `0` switches to all neighbors within **Cutoff Radius**. Use 12 for close-packed crystals and 8 or 14 for BCC. |
+| **Cutoff Radius** `cutoff` | number | `0` | 0 to 20, step 0.1 | Neighbor cutoff. Shown and used only when **Nearest Neighbors** is `0`. |
+| **Compute w_l** `wl` | boolean | `false` | | Also compute w_l for each order. |
+| **Compute w_l_hat (normalized)** `wlHat` | boolean | `false` | | Also compute w_l_hat for each order. |
+| **Emit Q_l^m components for l (-1 disables)** `components` | number | `-1` | −1 to 20, step 1 | Write the 2l + 1 complex components q_lm / \|q_l\| for this single order l. `-1` writes none. |
+| **Only Selected Atoms** `onlySelected` | boolean | `false` | | Analyze only the atoms whose `Selection` column is non-zero. |
 
-Surfaced in VOLT as the **Steinhardt Model** exposure and exported as a `.glb` scene.
+## Outputs
 
-## See Also
+| Exposure | What you get |
+|---|---|
+| **Steinhardt Order** | A listing with the parameters and the counts of liquid-like, interface and crystal-like atoms, and a `structures` sub-listing. |
+| **Steinhardt Model** | A listing, and a 3D model of the atoms grouped by a heuristic label from q₆: `Liquid-like`, `Interface` or `Crystal-like`. |
 
-- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — local crystal structure classification
-- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — robust per-atom structure labels and orientation
-- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — fast disorder and defect highlighting
+The workflow declares the per-atom properties `q6` (q6 (bond order)), `q_4`, `q_6`, `q_8`, `q_10` and `q_12`. The per-atom table also has every q_l in one `q` list column, `w_<l>` and `w_hat_<l>` columns when those are on, and a `components` list column when **Emit Q_l^m components** is set.
+
+## Notes
+
+- If you change **Orders**, the `q_<l>` columns follow your list, but the workflow still declares `q_4` to `q_12`.
+- The `Liquid-like` / `Interface` / `Crystal-like` labels are a quick visual aid. For a quantitative phase assignment, color by `q_6` and choose thresholds for your system.
+
+## Reference
+
+P. J. Steinhardt, D. R. Nelson, M. Ronchetti, "Bond-orientational order in liquids and glasses", *Phys. Rev. B* **28**, 784 (1983). W. Lechner, C. Dellago, "Accurate determination of crystal structures based on averaged local bond order parameters", *J. Chem. Phys.* **129**, 114707 (2008).

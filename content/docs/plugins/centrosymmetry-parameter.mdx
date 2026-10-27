@@ -1,82 +1,48 @@
 ---
 title: Centrosymmetry Parameter
-description: Measure local centrosymmetry as a fast way to highlight disorder and defect-rich regions.
+description: Measure how far each atom's neighbor shell is from centrosymmetric, to find dislocation cores, stacking faults and surfaces in centrosymmetric crystals.
 ---
 
-## Parameters
+The centrosymmetry parameter (CSP) measures how much an atom's neighbor shell departs from inversion symmetry. In a perfect centrosymmetric lattice such as FCC or BCC each neighbor has an opposite partner and the CSP is close to zero; at dislocation cores, stacking faults, surfaces and vacancies it grows. Use it to highlight defects in FCC and BCC metals, or as a feature for [MultiSOM](/docs/plugins/multisom). It is not meaningful for lattices without inversion symmetry at the atom, such as HCP or diamond.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `num_neighbors` | `int` | `12` | Number of nearest neighbors to consider. Use a value consistent with the lattice you expect. |
-| `mode` | `string` | `conventional` | CSP calculation mode. Options: `conventional`, `matching`. |
+| Key | Version | Builds |
+|---|---|---|
+| `centrosymmetry-parameter` | 2.0.3 | Linux, macOS, Windows |
 
-## Output
+This plugin has no browser build, so it can't be installed on a machine that runs in the browser or the desktop app.
 
-The plugin writes two parquet files per frame.
+## How it works
 
-### `{outputBase}_centrosymmetry.parquet`
+For each atom, the plugin takes its N nearest neighbors and pairs them up into N/2 pairs of opposite neighbors. The CSP is the sum over those pairs of |rᵢ + rⱼ|², where rᵢ and rⱼ are the bond vectors to the two neighbors of a pair. The two modes differ in how they pick the pairs:
 
-Summary statistics for the frame.
+- **Conventional** follows the original definition: it takes the N/2 smallest values of |rᵢ + rⱼ|² over all neighbor pairs.
+- **Matching** finds the pairing (a minimum-weight perfect matching) that minimizes the sum, so each neighbor is used exactly once.
 
-```ts
-interface HistogramBin {
-    bin: int;
-    start: float;
-    end: float;
-    count: int;
-}
+## Inputs
 
-interface CentrosymmetryOutput {
-    main_listing: {
-        total_atoms: int;
-        histogram_bins: int;
-        histogram_bin_size: float;
-        max_csp: float;
-        histogram_start: float;
-        histogram_end: float;
-    };
-    sub_listings: {
-        histogram: HistogramBin[];
-    };
-}
-```
+- Atom positions and the simulation cell.
 
-### `{outputBase}_atoms.parquet`
+## Arguments
 
-Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are grouped into a single `"All"` bucket.
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Num Neighbors** `num_neighbors` | number | `12` | ≥ 2, step 1 | Number of nearest neighbors N. Use 12 for FCC and 8 for BCC. It must be even, and at most 32. |
+| **Mode** `mode` | select | `conventional` | `conventional` (Conventional), `matching` (Matching) | How neighbors are paired; see above. |
 
-```ts
-interface Atom {
-    id: int;
-    pos: [float, float, float];
-    structure_id: int;
-    structure_name: string;
-    cluster_id: int;
-    csp: float;
-}
+## Outputs
 
-interface AtomsOutput {
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-    };
-    sub_listings: {
-        structures: Array<{
-            structure_id: int;
-            structure_name: string;
-            atom_count: int;
-        }>;
-    };
-    export: {
-        AtomisticExporter: {
-            [bucketName: string]: Atom[];
-        };
-    };
-}
-```
+| Exposure | What you get |
+|---|---|
+| **Centrosymmetry** | A listing with the frame's summary. |
+| **Centrosymmetry Model** | A listing, and a 3D model of the atoms. |
 
-## See Also
+The workflow declares the per-atom properties `csp` (Centrosymmetry (CSP)) and `coordination` (Coordination number).
 
-- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — local structure labels
-- [Atomic Strain](/docs/plugins/atomic-strain) — deformation measures at the atom level
-- [OpenDXA](/docs/plugins/open-dxa) — dislocation-network reconstruction
+## Notes
+
+- The CSP has units of length squared and scales with the square of the lattice constant, so a threshold that separates defects from crystal in one material doesn't carry over to another.
+- Thermal vibrations raise the CSP of crystalline atoms; compare frames at the same temperature.
+
+## Reference
+
+C. L. Kelchner, S. J. Plimpton, J. C. Hamilton, "Dislocation nucleation and defect structure during surface indentation", *Phys. Rev. B* **58**, 11085 (1998). Matching mode: P. M. Larsen, "Revisiting the common neighbour analysis and the centrosymmetry parameter", arXiv:2003.08879 (2020).

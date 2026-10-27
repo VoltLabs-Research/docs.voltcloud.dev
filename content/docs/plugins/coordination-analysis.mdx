@@ -1,69 +1,41 @@
 ---
 title: Coordination Analysis
-description: Count neighbors within a cutoff and compute a radial distribution function for the frame.
+description: Count each atom's neighbors within a cutoff and compute the radial distribution function of the frame, with partial histograms per type pair.
 ---
 
-## Parameters
+Coordination Analysis counts the neighbors of each atom within a cutoff radius and computes the radial distribution function g(r) of the frame up to that radius. Use it to spot under-coordinated atoms at surfaces and voids, over-coordinated atoms at interstitials, to compare the short-range order of liquid, amorphous and crystalline states, or as a feature source for [MultiSOM](/docs/plugins/multisom).
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `cutoff` | `float` | `3.2` | Cutoff radius for neighbor search. |
-| `rdfBins` | `int` | `500` | Number of bins for RDF calculation. |
+| Key | Version | Builds |
+|---|---|---|
+| `coordination-analysis` | 2.1.1 | Linux, macOS, Windows, browser |
 
-## Output
+## How it works
 
-### `{outputBase}_coordination.parquet`
+The coordination number of an atom is the number of other atoms closer than the cutoff, using the minimum image across periodic boundaries. The RDF histograms all pair distances up to the cutoff into the requested number of bins and normalizes them by the ideal-gas density, so g(r) tends to 1 in a uniform liquid. When the frame has atom types, the plugin also writes a pair-distance histogram for each pair of types.
 
-```ts
-interface CoordinationOutput {
-    main_listing: {
-        cutoff: float;
-        rdf_bins: int;
-        total_atoms: int;
-        min_coordination: int;
-        max_coordination: int;
-        mean_coordination: float;
-    };
-    sub_listings: {
-        rdf: { r: float; g_r: float }[];
-    };
-}
-```
+## Inputs
 
-### `{outputBase}_atoms.parquet`
+- Atom positions and the simulation cell.
+- Atom types, for the partial histograms.
 
-Per-atom data written by the AtomisticExporter. Atoms are bucketed by coordination number under group names `Coordination_<n>`. Each atom entry includes the standard atomistic fields plus:
+## Arguments
 
-```ts
-interface CoordinationAtomFields {
-    coordination: int;
-    coordination_color: [float, float, float];
-    color: [float, float, float];
-}
-```
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Cutoff** `cutoff` | number | `3.2` | ≥ 0, step 0.1 | Neighbor cutoff radius, in the frame's length units. It is also the largest r of the RDF. For coordination, put it in the first minimum of g(r). |
+| **RDF Bins** `rdf_bins` | number | `500` | ≥ 1, step 1 | Number of RDF bins between 0 and the cutoff. |
 
-Surfaced in VOLT as the **Coordination Model** exposure and exported as a `.glb` scene.
+## Outputs
 
-### `{outputBase}_rdf_chart.parquet`
+| Exposure | What you get |
+|---|---|
+| **Coordination Analysis** | A listing with the cutoff, bin count, atoms, and minimum, maximum and mean coordination, and an `rdf` sub-listing of `r` and `g_r`. |
+| **Coordination Model** | A listing, and a 3D model of the atoms grouped by coordination number (`Coordination_12`, …) and colored on a scale from the lowest to the highest value. |
+| **RDF Chart** | A line chart of g(r) against r. |
+| **Partial RDF Histogram** | One row per type pair and bin: `pair_type`, `bin_center` (Å) and `bin_count`. Stored with the analysis. No listing. Written only when the frame has types. |
 
-Chart payload for the RDF line chart exposure.
+The workflow declares the per-atom property `coordination` (Coordination number).
 
-```ts
-interface RdfChartOutput {
-    export: {
-        ChartExporter: {
-            rdf: {
-                r: float[];
-                g_r: float[];
-            };
-        };
-    };
-}
-```
+## Reference
 
-Surfaced in VOLT as the **RDF Chart** exposure and exported as a `chart-png` image (x-axis: `r`, y-axis: `g(r)`).
-
-## See Also
-
-- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — local crystal structure classification alongside neighbor information
-- [Cluster Analysis](/docs/plugins/cluster-analysis) — connectivity-based grouping
+The coordination number and the radial distribution function are textbook quantities; see M. P. Allen, D. J. Tildesley, *Computer Simulation of Liquids*, 2nd ed., Oxford University Press (2017).

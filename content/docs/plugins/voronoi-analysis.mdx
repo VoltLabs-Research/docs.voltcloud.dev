@@ -1,60 +1,54 @@
 ---
 title: Voronoi Analysis
-description: Compute a per-atom Voronoi tessellation reporting topological coordination, atomic volume, and cavity radius.
+description: Build the Voronoi cell of each atom to get its volume, its topological coordination number, the shape of its cell's faces and its cavity radius.
 ---
 
-## Parameters
+Voronoi analysis divides space into one cell per atom: the region closer to that atom than to any other. The cell gives an atomic volume that needs no cutoff choice, a topological coordination number (the atoms sharing a face with it), and through the shapes of its faces a fingerprint of the local packing. Use it for metallic glasses and liquids (icosahedral order shows up as cells with twelve pentagonal faces) and to measure local free volume.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `cutoff` | `float` | `0` | Neighbor search cutoff radius. `0` requests an automatic estimate from the mean atomic volume. |
-| `edgeThreshold` | `float` | `0` | Minimum edge length for a face to contribute to the coordination count. |
-| `faceThreshold` | `float` | `0` | Minimum face area for a face to contribute to the coordination count. |
-| `useRadii` | `boolean` | `false` | Build a radical (power) Voronoi tessellation using the `Radius` column. |
-| `onlySelected` | `boolean` | `false` | Only tessellate atoms whose `Selection` column is non-zero. |
+| Key | Version | Builds |
+|---|---|---|
+| `voronoi-analysis` | 1.1.1 | Linux, macOS, Windows, browser |
 
-## Output
+## How it works
 
-The plugin writes two parquet files per frame.
+For each atom, the plugin starts from a cube around it, as wide as twice the search cutoff, and clips it with the bisecting plane of every neighbor within the cutoff, keeping the side that contains the atom. What remains is the atom's Voronoi cell. With **Use Particle Radii**, it places each plane by the radical (power) construction, so larger atoms get larger cells. Faces smaller than the area threshold, or with an edge shorter than the edge threshold, aren't counted.
 
-### `{outputBase}_voronoi.parquet`
+From each cell it takes:
 
-Summary statistics and aggregate face-order metrics for the frame.
+- **Atomic volume**: the cell's volume.
+- **Coordination**: the number of counted faces.
+- **Face orders**: the number of edges of each counted face. The counts of 3-, 4-, 5- and 6-edged faces form the Voronoi index ⟨n₃, n₄, n₅, n₆⟩; an atom at the center of an icosahedron has ⟨0, 0, 12, 0⟩.
+- **Cavity radius**: the distance from the atom to the nearest face plane of its cell.
 
-```ts
-interface VoronoiOutput {
-    main_listing: {
-        total_atoms: int;
-        mean_atomic_volume: float;
-        mean_coordination: float;
-        effective_cutoff: float;
-        edge_threshold: float;
-        face_threshold: float;
-        use_radii: boolean;
-        mean_face_order: float;
-        max_face_order_observed: int;
-        polyhedra_mesh_count: int;
-    };
-}
-```
+## Inputs
 
-### `{outputBase}_atoms.parquet`
+- Atom positions and the simulation cell.
+- A `Radius` column, for **Use Particle Radii (Radical Voronoi)**.
+- A `Selection` column, for **Only Selected Atoms**.
 
-Per-atom data written by the AtomisticExporter. Atoms are bucketed by topological coordination number under group names `Coordination_<n>`. No crystal-structure classification is produced, so `structure_id` / `structure_name` are intentionally omitted to avoid clobbering an upstream PTM/CNA stage during the pipeline merge. Each atom entry includes the standard atomistic fields plus:
+## Arguments
 
-```ts
-interface VoronoiAtomFields {
-    coordination: int;
-    atomic_volume: float;
-    cavity_radius: float;
-    face_indices: float[];
-}
-```
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Cutoff Radius** `cutoff` | number | `0` | ≥ 0, step 0.1 | How far to look for neighbors that can bound a cell. `0` estimates it from the density: four times the radius of a sphere with the volume per atom, and at least 2.5. If the cutoff is too small, cells stay bounded by the starting cube, whose faces don't count as neighbors. |
+| **Edge Threshold** `edgeThreshold` | number | `0` | ≥ 0, step 0.01 | Faces with an edge shorter than this aren't counted as neighbors. |
+| **Face Area Threshold** `faceThreshold` | number | `0` | ≥ 0, step 0.01 | Faces with a smaller area than this aren't counted as neighbors. |
+| **Use Particle Radii (Radical Voronoi)** `useRadii` | boolean | `false` | | Use the radical (power) tessellation, weighted by the `Radius` column. |
+| **Only Selected Atoms** `onlySelected` | boolean | `false` | | Analyze only the atoms whose `Selection` column is non-zero. |
 
-`cavity_radius` is the largest empty sphere centred on the atom that fits inside its cell, and `face_indices` is the sorted vector of face orders (3, 4, 5, …) of the cell's valid Voronoi faces. Surfaced in VOLT as the **Voronoi Model** exposure and exported as a `.glb` scene.
+## Outputs
 
-## See Also
+| Exposure | What you get |
+|---|---|
+| **Voronoi Analysis** | A listing with the frame's totals: atoms, mean atomic volume, mean coordination, the effective cutoff, the thresholds, whether radii were used, the mean face order, the largest face order seen and the number of cells. |
+| **Voronoi Model** | A listing, and a 3D model of the atoms grouped by coordination (`Coordination_12`, …). |
 
-- [Coordination Analysis](/docs/plugins/coordination-analysis) — neighbor counts within a fixed cutoff and the radial distribution function
-- [Wigner-Seitz Defect Analysis](/docs/plugins/wigner-seitz-defect-analysis) — cell-based occupancy for vacancy and interstitial detection
-- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — local crystal structure classification
+The workflow declares the per-atom properties `coordination` (Coordination number), `atomic_volume` (Atomic volume), `cavity_radius` (Cavity radius) and `face_indices` (Face indices (Voronoi index vector)). `face_indices` is the sorted list of face orders of the cell, for example `[4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6, 6, 6]` for a BCC cell; count its entries to get the Voronoi index. The per-atom table also has `max_face_order`.
+
+## Notes
+
+- Small faces from thermal noise inflate the coordination number. A small **Face Area Threshold** or **Edge Threshold** removes them.
+
+## Reference
+
+J. L. Finney, "Random packings and the structure of simple liquids. I. The geometry of random close packing", *Proc. R. Soc. Lond. A* **319**, 479 (1970).

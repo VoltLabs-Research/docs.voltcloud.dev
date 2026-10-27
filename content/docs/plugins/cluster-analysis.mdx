@@ -1,85 +1,45 @@
 ---
 title: Cluster Analysis
-description: Find connected particle clusters using a distance cutoff.
+description: Group atoms into clusters of atoms connected by neighbor bonds within a cutoff, and measure each cluster's size, center and radius of gyration.
 ---
 
-## Parameters
+Cluster Analysis splits the atoms into connected clusters: two atoms belong to the same cluster when a chain of neighbor bonds, each shorter than the cutoff, links them. Use it to find precipitates, nanoparticles, voids filled by other species, fragments after fracture, or the largest connected network in a sample.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `cutoff` | `float` | `3.2` | Cutoff radius used to define connectivity. |
-| `sort_by_size` | `bool` | `true` | Sort clusters by size in descending order. |
-| `unwrap` | `bool` | `false` | Unwrap particle coordinates inside each cluster. |
-| `centers_of_mass` | `bool` | `false` | Compute cluster centers with uniform weights. |
-| `radius_of_gyration` | `bool` | `false` | Compute radii and tensors of gyration with uniform weights. |
+| Key | Version | Builds |
+|---|---|---|
+| `cluster-analysis` | 2.1.1 | Linux, macOS, Windows, browser |
 
-## Output
+## How it works
 
-### `{outputBase}_cluster_analysis.parquet`
+The plugin finds every pair of atoms closer than the cutoff, across periodic boundaries, and labels the connected components of that neighbor graph. Clusters are numbered from 1. Optionally it unwraps each cluster's coordinates across the periodic boundaries so it is spatially contiguous, then computes each cluster's center (equal weights per atom) and its gyration tensor and radius of gyration.
 
-```ts
-type Vec3 = [float, float, float];
-type GyrationTensor = [float, float, float, float, float, float];
+## Inputs
 
-interface Cluster {
-    cluster_id: int;
-    size: int;
-    center?: Vec3;
-    radius_of_gyration?: float;
-    gyration_tensor?: GyrationTensor;
-}
+- Atom positions and the simulation cell. Every atom in the frame takes part.
 
-interface ClusterAnalysisOutput {
-    main_listing: {
-        total_atoms: int;
-        clusters: int;
-        largest_cluster_size: int;
-        has_zero_weight_cluster: boolean;
-    };
-    sub_listings: {
-        clusters: Cluster[];
-    };
-}
-```
+## Arguments
 
-### `{outputBase}_atoms.parquet`
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Cutoff** `cutoff` | number | `3.2` | ≥ 0, step 0.1 | Largest distance at which two atoms are connected, in the frame's length units. |
+| **Sort By Size** `sort_by_size` | boolean | `true` | | Number clusters by size, largest first. |
+| **Unwrap** `unwrap` | boolean | `false` | | Write each atom's unwrapped position inside its cluster. |
+| **Centers Of Mass** `centers_of_mass` | boolean | `false` | | Compute each cluster's center. |
+| **Radius Of Gyration** `radius_of_gyration` | boolean | `false` | | Compute each cluster's radius of gyration and gyration tensor. |
 
-Per-atom data in the canonical AtomisticExporter format consumed by the VOLT viewer. Atoms are grouped into named buckets: `Cluster_<n>` for clustered atoms, `Unclustered` for unassigned atoms.
+<Callout type="warn">
+Turning **Sort By Size** off has no effect in version 2.1.1. VOLT passes a boolean argument to this plugin only when it is on, and the program sorts unless told otherwise, so clusters are always sorted by size.
+</Callout>
 
-```ts
-type Vec3 = [float, float, float];
+## Outputs
 
-interface AtomEntry {
-    id: int;
-    pos: Vec3;
-    structure_id: int;
-    structure_name: string;
-    cluster_id: int;
-    pos_unwrapped?: Vec3;   // present only when `unwrap` is true
-}
+| Exposure | What you get |
+|---|---|
+| **Cluster Analysis** | A listing with the atom count, the number of clusters, the largest cluster's size and whether a zero-weight cluster exists, and a `clusters` sub-listing: `cluster_id`, `size`, and when computed `center`, `radius_of_gyration` and `gyration_tensor` (six components). |
+| **Cluster Model** | A listing, and a 3D model of the atoms grouped by cluster (`Cluster_1`, `Cluster_2`, …). |
 
-interface AtomsOutput {
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-    };
-    sub_listings: {
-        structures: Array<{
-            structure_id: int;
-            structure_name: string;
-            atom_count: int;
-        }>;
-    };
-    export: {
-        AtomisticExporter: {
-            [bucketName: string]: AtomEntry[];
-        };
-    };
-}
-```
+The per-atom table has `cluster_id`, and `pos_unwrapped` when **Unwrap** is on.
 
-This file also feeds the `cluster-model-export` node in the workflow DAG, which produces a GLB 3D model via the AtomisticExporter.
+## Reference
 
-## See Also
-
-- [Coordination Analysis](/docs/plugins/coordination-analysis) — local neighbor counts and RDF
+Distance-based cluster analysis is connected-component labeling of the cutoff neighbor graph, and has no single primary reference.
