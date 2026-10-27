@@ -1,49 +1,57 @@
 ---
 title: Grain Segmentation
-description: Segment polycrystalline regions by grouping atoms with compatible orientations.
+description: Split a polycrystal into grains by merging neighboring atoms with similar lattice orientations from polyhedral template matching.
 ---
 
-## Parameters
+Grain Segmentation divides a polycrystalline sample into grains. It identifies each atom's structure and lattice orientation with polyhedral template matching, then merges neighboring crystalline atoms into grains when their orientations are close. Use it to count and size grains, to get each grain's orientation, to follow grain growth over time, and to give [ILDA](/docs/plugins/ilda) the two grains of an interface.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `rmsd` | `float` | `0.1` | RMSD threshold for PTM structure identification. |
-| `minGrainAtomCount` | `int` | `100` | Minimum number of atoms required to keep a grain. |
-| `adoptOrphanAtoms` | `bool` | `true` | Exposed in the interface, but the current implementation does not visibly perform a dedicated orphan-adoption phase. |
-| `handleCoherentInterfaces` | `bool` | `true` | Handle coherent interfaces between compatible structures. |
-| `outputBonds` | `bool` | `false` | Exposed parameter; bond output is not currently surfaced as a documented result file. |
+| Key | Version | Builds |
+|---|---|---|
+| `grain-segmentation` | 2.1.0 | Linux, macOS, Windows, browser |
 
-## Output
+## How it works
 
-### `{outputBase}_grains.parquet`
+1. **PTM.** The plugin runs polyhedral template matching on every atom to get its structure and orientation. Atoms above the RMSD cutoff are `OTHER`.
+2. **Graph.** Neighboring crystalline atoms are joined by bonds weighted by the disorientation angle between their lattices.
+3. **Merging.** Bonds are merged in order of increasing disorientation, building a hierarchy of clusters. **Merge Algorithm** decides where to stop:
+   - **Graph Clustering (Automatic)** stops at a merging threshold it suggests from the data.
+   - **Graph Clustering (Manual)** and **Minimum Spanning Tree** stop at **Merging Threshold**.
+4. **Clean-up.** Clusters with fewer atoms than **Min Grain Atom Count**, and `OTHER` atoms, get grain 0. Grains are renumbered from 1 by size, largest first. With **Adopt Orphan Atoms**, the atoms left in grain 0 join the grain of their neighbors.
 
-```ts
-type Vec3 = [float, float, float];
-type Quaternion = [float, float, float, float];
+## Inputs
 
-interface Grain {
-    id: int;
-    size: int;
-    orientation: Quaternion;
-    pos: Vec3;
-}
+- Atom positions and the simulation cell. No earlier stage is needed: the plugin runs PTM itself.
 
-interface GrainSegmentationOutput {
-    main_listing: {
-        total_grains: int;
-        merging_threshold: float;
-    };
-    sub_listings: {
-        grains: Grain[];
-    };
-}
-```
+## Arguments
 
-### `{outputBase}_atoms.parquet`
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **RMSD** `rmsd` | number | `0.1` | ≥ 0, step 0.01 | RMSD cutoff for the PTM step. |
+| **Min Grain Atom Count** `minGrainAtomCount` | number | `100` | ≥ 1, step 1 | Smallest number of atoms a grain can have; smaller clusters are dissolved. |
+| **Adopt Orphan Atoms** `adoptOrphanAtoms` | select | `true` | `true` (True), `false` (False) | Assign the atoms that end up in no grain (boundaries, dissolved clusters) to a neighboring grain. |
+| **Handle Coherent Interfaces** `handleCoherentInterfaces` | select | `true` | `true` (True), `false` (False) | Treat coherent interfaces between compatible structures, such as an HCP stacking fault inside an FCC grain, as part of the grain instead of a boundary. |
+| **Merge Algorithm** `mergeAlgorithm` | select | `GraphClusteringAutomatic` | `GraphClusteringAutomatic` (Graph Clustering (Automatic)), `GraphClusteringManual` (Graph Clustering (Manual)), `MinimumSpanningTree` (Minimum Spanning Tree) | How clusters are merged; see above. |
+| **Merging Threshold** `mergingThreshold` | number | `0` | ≥ 0, step 0.01 | Where merging stops, for the manual and minimum spanning tree algorithms. The automatic algorithm ignores it. |
+| **Output Bonds** `outputBonds` | boolean | `false` | | Passed to the grain engine, but in version 2.1.0 nothing reads it and no output contains bonds. |
 
-Atoms grouped by identified structure family for downstream visualization.
+## Outputs
 
-## See Also
+| Exposure | What you get |
+|---|---|
+| **Grain Segmentation** | A listing with the number of grains and the merging threshold the automatic algorithm suggested, and a `grains` sub-listing: grain `id`, `size` in atoms, `structure_type` and `structure_name`, `orientation` (quaternion `x, y, z, w`) and `pos` (the grain's center). Also shared with later stages as `grains`. |
+| **Grain Model** | A listing with the atom, structure and clustered-atom counts, and a 3D model of the atoms grouped by structure. Also shared with later stages as `grain_atoms`. |
 
-- [OpenDXA](/docs/plugins/open-dxa) — dislocation-network reconstruction in crystalline systems
-- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — the PTM structure identification this plugin builds on
+The per-atom table has `structure_id`, `structure_name`, `grain_id` (0 for no grain), `orientation`, `ptm_valid` and, where PTM matched, `rmsd`.
+
+## Feeds
+
+- [ILDA](/docs/plugins/ilda) reads the `grains` and `grain_atoms` files it shares.
+
+## Notes
+
+- Run the automatic algorithm first and read the suggested threshold in the **Grain Segmentation** listing. To split or join more grains, switch to **Graph Clustering (Manual)** and set **Merging Threshold** around that value.
+- The 3D model groups atoms by structure. To see the grains, add a **Color Coding** stage after this one and color by `grain_id`.
+
+## Reference
+
+Orientations come from PTM: P. M. Larsen, S. Schmidt, J. Schiøtz, "Robust structural identification via polyhedral template matching", *Modelling Simul. Mater. Sci. Eng.* **24**, 055007 (2016).

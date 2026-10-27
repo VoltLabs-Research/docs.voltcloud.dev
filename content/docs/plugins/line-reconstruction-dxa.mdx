@@ -1,133 +1,57 @@
 ---
 title: Line Reconstruction DXA
-description: Reconstruct dislocation lines via DXA from an upstream cluster package and DXA-style geometric parameters.
+description: An experimental dislocation extraction that reconstructs dislocation lines from the facets of a Delaunay tessellation whose lattice vectors don't close.
 ---
 
-Reconstructs the dislocation network with the Dislocation eXtraction Algorithm (DXA) from upstream per-atom structure-identification artifacts (an annotated dump plus cluster tables). If cluster tables aren't supplied, the Python wrapper runs Polyhedral Template Matching inline to generate them.
+Line Reconstruction DXA is an experimental alternative to [OpenDXA](/docs/plugins/opendxa). It works on the same input, the crystal clusters of a structure identification stage, but reconstructs dislocation lines directly from the tessellation instead of sweeping Burgers circuits along a defect surface. Use it to cross-check OpenDXA or when you only need the lines.
 
-## Parameters
+| Key | Version | Builds |
+|---|---|---|
+| `line-reconstruction-dxa` | 2.2.0 | Linux, macOS, Windows, browser |
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `crystalStructure` | `select` | `FCC` | Reference crystal structure. Options: `FCC`, `BCC`, `HCP`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. |
-| `crystalPathSteps` | `number` | `4` | Maximum crystal-path steps used for edge vectors (min `1`, step `1`). |
-| `alphaScale` | `number` | `3.5` | Alpha threshold scale relative to neighbor distance (min `0`, step `0.1`). |
-| `smoothingIterations` | `number` | `0` | Taubin smoothing iterations applied to the reconstructed lines (min `0`, step `1`). |
-| `linePointInterval` | `number` | `1.2` | Line coarsening interval (min `0`, step `0.1`). |
+## How it works
 
-The binary also accepts `--tessellationGhostLayerScale` (default `3.5`) and `--threads`, neither exposed as a UI form input. The annotated dump, `--clusters-table`, and `--clusters-transitions` are required inputs wired in from the upstream structure-identification step.
+1. The plugin builds a Delaunay tessellation of the atoms and keeps the tetrahedra that pass an alpha-shape test, which removes the large, empty tetrahedra outside surfaces and inside voids.
+2. It gives each tessellation edge an ideal lattice vector by following a path of crystal bonds between its two atoms, at most **Crystal Path Steps** long, through the crystal clusters. Edges it can't resolve are completed from their neighbors.
+3. A triangular facet whose three edge vectors don't sum to zero is threaded by a dislocation, and the sum is its Burgers vector. The plugin joins these facets into segments and stitches the segments into lines, open or closed.
+4. In FCC it also sorts the lines into perfect, Shockley, Frank, stair-rod and Hirth dislocations (in the log), and the lines are smoothed and coarsened.
 
-## Output
+## Inputs
 
-### `{outputBase}_dislocations.parquet`
+- An earlier stage of [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) or [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) in the same pipeline, with the same crystal. Its shared `clusters_table`, `clusters_transitions` and `neighbor_lattice` fill in this plugin's hidden arguments.
 
-Primary result surfaced in the UI ("Dislocation Lines"), exported to GLB via `LineExporter`. A VOLT **line entity table** (one row per reconstructed, PBC-clipped line): fixed columns `id` and `points`; every other column is a per-line property that VOLT discovers, queries and styles generically.
+## Arguments
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | uint64 | Line entity id. |
-| `points` | list&lt;list&lt;double&gt;&gt; | Polyline vertices, each `[x, y, z]`. |
-| `length` | double | Line length. |
-| `num_points` | int64 | Vertex count. |
-| `magnitude` | double | Length of the local Burgers vector. |
-| `burgers_vector_local` | list&lt;double&gt; | Burgers vector in the cluster lattice frame. |
-| `burgers_vector_global` | list&lt;double&gt; | Burgers vector in the spatial frame. |
-| `crystal_structure` | string | Structure name of the owning cluster. |
-| `burgers_family` | string | Burgers family (classified via opendxa). |
-| `burgers_family_label` | string | Display label. |
-| `cluster_id` | int64 | Owning cluster id. |
-| `is_closed` | int64 | 1 when the reconstructed line is a closed loop. |
-| `dislocation_type_id` | int64 | Internal reconstruction type id. |
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Crystal Structure** `crystalStructure` | select | `FCC` | `FCC`, `BCC`, `HCP`, `CUBIC_DIAMOND` (Cubic Diamond), `HEX_DIAMOND` (Hexagonal Diamond) | The reference crystal. Match the structure identification stage. |
+| **Crystal Path Steps** `crystalPathSteps` | number | `4` | ≥ 1, step 1 | Longest path of crystal bonds used to give an edge its lattice vector. |
+| **Alpha Scale** `alphaScale` | number | `3.5` | ≥ 0, step 0.1 | Alpha-shape threshold for keeping a tetrahedron, as a multiple of the neighbor distance. |
+| **Smoothing Iterations** `smoothingIterations` | number | `0` | ≥ 0, step 1 | Taubin smoothing passes applied to the lines. |
+| **Line Point Interval** `linePointInterval` | number | `1.2` | ≥ 0, step 0.1 | Spacing of the points kept along each line. |
 
-### `{outputBase}_dislocation_segments.parquet`
+These arguments are filled in from the earlier stage and don't appear in the form:
 
-Individual raw segments (PBC-clipped chunks) in the same line entity table format, with a
-`stage` property marking the reconstruction stage instead of `is_closed` /
-`dislocation_type_id`. Not exposed in the UI by default.
+| Argument | Type | Shared by |
+|---|---|---|
+| **Clusters Table** `clusters-table` | string | Polyhedral Template Matching, Adaptive Common Neighbor Analysis (as `clusters_table`) |
+| **Clusters Transitions** `clusters-transitions` | string | Same (as `clusters_transitions`) |
+| **Neighbor Lattice** `neighbor_lattice` | string | Same |
 
-### `{outputBase}_unassigned_edges.parquet`
+The workflow also lists Pattern Structure Matching as a source, but version 2.1.0 of that plugin shares only `neighbor_lattice`.
 
-Tessellation edges that could not be assigned to a dislocation line.
+## Outputs
 
-```ts
-interface UnassignedEdge {
-    edge_id: int;
-    position1: Vec3;
-    position2: Vec3;
-    atoms: [int, int];
-    stage: int;
-}
+| Exposure | What you get |
+|---|---|
+| **Dislocation Lines** | A listing, and 3D lines colored by Burgers family. |
 
-interface UnassignedEdgesOutput {
-    main_listing: {
-        unassigned_edges: int;
-    };
-    sub_listings: {
-        unassigned_edges: UnassignedEdge[];
-    };
-}
-```
+Each line carries the properties the workflow declares: `burgers_family`, `burgers_family_label`, `crystal_structure`, `length` (Line length), `magnitude` (Burgers magnitude), `cluster_id` and `is_closed` (Closed loop).
 
-### `{outputBase}_interface_mesh.parquet`
+## Notes
 
-The interface mesh separating good and bad crystal regions, as unwrapped vertices and facets.
+- This plugin is experimental: it has no defect mesh, charts or network statistics. Use OpenDXA for those.
 
-```ts
-interface MeshPoint {
-    index: int;
-    position: Vec3;
-}
+## Reference
 
-interface MeshFacet {
-    vertices: int[];
-    region: int;
-}
-
-interface InterfaceMeshOutput {
-    main_listing: {
-        total_nodes: int;
-        total_facets: int;
-    };
-    sub_listings: {
-        points: MeshPoint[];
-        facets: MeshFacet[];
-    };
-}
-```
-
-### `{outputBase}_simulation_cell.parquet`
-
-Geometry of the simulation cell for the analyzed frame.
-
-```ts
-interface SimulationCellOutput {
-    main_listing: {
-        simulation_cells: int;
-        volume: float;
-        is_2d: bool;
-        effective_dimensions: int;
-        periodic_dimensions: int;
-    };
-    sub_listings: {
-        simulation_cell: Array<{
-            volume: float;
-            is_2d: bool;
-            effective_dimensions: int;
-            a_x: float; a_y: float; a_z: float;
-            b_x: float; b_y: float; b_z: float;
-            c_x: float; c_y: float; c_z: float;
-            a_length: float;
-            b_length: float;
-            c_length: float;
-            pbc_x: bool;
-            pbc_y: bool;
-            pbc_z: bool;
-        }>;
-    };
-}
-```
-
-## See Also
-
-- [OpenDXA](/docs/plugins/open-dxa) — full dislocation-network reconstruction in crystalline systems
-- [Grain Segmentation](/docs/plugins/grain-segmentation) — segment polycrystalline regions by atom orientation
+The plugin's own method has no separate publication. For the dislocation extraction algorithm it builds on, see A. Stukowski, K. Albe, "Extracting dislocations and non-dislocation crystal defects from atomistic simulation data", *Modelling Simul. Mater. Sci. Eng.* **18**, 085001 (2010).

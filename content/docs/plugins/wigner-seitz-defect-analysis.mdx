@@ -1,60 +1,59 @@
 ---
 title: Wigner-Seitz Defect Analysis
-description: Identify vacancies, interstitials and antisites by comparing the current configuration against a reference lattice using Wigner-Seitz cells.
+description: Count vacancies, interstitials and antisites by assigning every atom to the nearest site of a reference lattice.
 ---
 
-## Parameters
+Wigner-Seitz analysis finds point defects by comparing the current frame with a perfect reference lattice. Every atom is assigned to the reference site it is closest to, that is, to the site whose Wigner-Seitz cell contains it. A site with no atom is a vacancy, a site with more than one atom holds interstitials, and in an alloy a site occupied by an atom of the wrong type is an antisite. Use it to count Frenkel pairs after radiation damage cascades and to follow defect recombination, in crystals where the atoms stay near their sites.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `reference` | `frame` | — | Reference frame defining the lattice sites. Required; its atom count generally differs from the current frame, which is how vacancies and interstitials are detected. |
-| `affineMapping` | `select` | `off` | Affine mapping applied before site assignment. Options: `off`, `toReference` (map to reference cell), `toCurrent` (map to current cell). |
-| `eliminateCellDeformation` | `boolean` | `false` | Eliminate cell deformation before site assignment. |
-| `minimumImageConvention` | `boolean` | `true` | Use the minimum image convention for site assignment. |
+| Key | Version | Builds |
+|---|---|---|
+| `wigner-seitz-defect-analysis` | 1.1.1 | Linux, macOS, Windows, browser |
 
-## Output
+## How it works
 
-The plugin writes two parquet files per frame.
+The plugin reads the reference frame's atoms as the lattice sites. For each atom of the current frame it finds the nearest site, optionally after mapping both configurations to a common cell, and counts the atoms on each site:
 
-### `{outputBase}_wigner_seitz.parquet`
+| Site occupancy | Role |
+|---|---|
+| 0 | `Vacancy` |
+| 1, same type as the site | `Occupied` |
+| 1, different type | `Antisite` |
+| 2 or more | `Interstitial` (each extra atom counts as one interstitial) |
 
-Per-site summary for the frame. `main_listing` holds the defect tallies; `per-site-properties` lists every reference site with its occupancy.
+The number of atoms doesn't need to match between the two frames.
 
-```ts
-interface WignerSeitzSite {
-    site_index: int;
-    site_id: int;
-    pos: [float, float, float];
-    occupancy: int;
-}
+## Inputs
 
-interface WignerSeitzOutput {
-    main_listing: {
-        vacancy_count: int;
-        interstitial_count: int;
-        antisite_count: int;
-        occupied_count: int;
-        total_sites: int;
-        total_current_atoms: int;
-    };
-    "per-site-properties": WignerSeitzSite[];
-}
-```
+- A reference frame that defines the lattice sites, usually the first frame of the trajectory before the defects form.
+- Atom types in both frames, for antisites.
 
-### `{outputBase}_atoms.parquet`
+## Arguments
 
-Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. The rows are a synthetic frame built from the reference sites (plus one extra record per excess occupant), so vacancies — which have no current atom — are still rendered. Atoms are bucketed by defect role under group names `Vacancy`, `Occupied`, `Antisite`, and `Interstitial`. Each atom entry includes the standard atomistic fields plus:
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Reference Frame** `reference` | frame | (none) | A timestep of the trajectory | Required. The frame whose atom positions are the lattice sites. The stage fails without it. |
+| **Affine Mapping** `affineMapping` | select | `off` | `off` (Off), `toReference` (Map to Reference Cell), `toCurrent` (Map to Current Cell) | Map the positions to a common cell before assigning sites, so a homogeneously deformed cell doesn't create false defects. |
+| **Eliminate Cell Deformation** `eliminateCellDeformation` | boolean | `false` | | Remove the cell's deformation before assigning sites. |
+| **Minimum Image Convention** `minimumImageConvention` | boolean | `true` | | Measure atom–site distances across periodic boundaries. |
 
-```ts
-interface WignerSeitzAtomFields {
-    occupancy: int;
-}
-```
+<Callout type="warn">
+Turning off **Minimum Image Convention** has no effect in version 1.1.1. VOLT passes a boolean argument to this plugin only when it is on, and the program uses the minimum image convention unless told otherwise.
+</Callout>
 
-Surfaced in VOLT as the **Wigner-Seitz Model** exposure and exported as a `.glb` scene.
+## Outputs
 
-## See Also
+| Exposure | What you get |
+|---|---|
+| **Wigner-Seitz Sites** | A listing with the vacancy, interstitial, antisite and occupied counts, the number of sites and the number of atoms in the current frame. |
+| **Wigner-Seitz Model** | A listing, and a 3D model with one point per reference site, grouped into `Vacancy`, `Occupied`, `Antisite` and `Interstitial`, plus one `Interstitial` point for every extra atom on a site. Singly occupied sites are drawn at their atom's position, the others at the site. |
 
-- [Displacements Analysis](/docs/plugins/displacements-analysis) — per-atom displacement vectors against a reference frame
-- [Atomic Strain](/docs/plugins/atomic-strain) — deformation measures relative to a reference configuration
-- [Voronoi Analysis](/docs/plugins/voronoi-analysis) — atomic volumes and cavities as an alternative defect signature
+The workflow declares the per-atom property `occupancy` (Site occupancy). The table also has `site_index`, `site_identifier` (the reference atom's identifier) and `site_type` (the reference atom's type). Its rows are the sites and extra atoms of the model, not the atoms of the frame.
+
+## Notes
+
+- The method assumes atoms stay close to lattice sites. In amorphous or molten regions the counts don't describe point defects.
+- To count defects created during a run, pick the first frame as the reference and run the stage on the later frames.
+
+## Reference
+
+K. Nordlund, M. Ghaly, R. S. Averback, M. Caturla, T. Diaz de la Rubia, J. Tarus, "Defect production in collision cascades in elemental semiconductors and fcc metals", *Phys. Rev. B* **57**, 7556 (1998).
