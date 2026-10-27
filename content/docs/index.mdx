@@ -1,0 +1,39 @@
+---
+title: Introduction
+description: VOLT is a collaborative workspace for visualizing and analyzing particle-based simulations.
+---
+
+VOLT takes the trajectories your molecular dynamics simulations write, renders them in an interactive 3D canvas, and runs state-of-the-art analysis algorithms on them: structure identification, dislocation extraction, strain, defects, clustering and more. Results come back as tables, charts and 3D overlays on the same scene, and the whole team sees them as they arrive.
+
+<Screenshot name="canvas" alt="A trajectory open in the VOLT canvas, with the pipeline panel on the right and the timeline at the bottom" />
+
+## What you can do
+
+- **Upload and organize trajectories.** Drop LAMMPS dumps and other supported files, sort them into folders, and share them publicly. See [Trajectories](/docs/guides/trajectories).
+- **Inspect frames in 3D.** Scrub through timesteps, color atoms by any property, slice the structure and select atoms by expression. See [Canvas](/docs/guides/canvas).
+- **Run analyses as pipelines.** Chain plugins and modifications, run them over the frames you choose, and extend a finished run without recomputing it. See [Pipelines & analyses](/docs/guides/pipelines).
+- **Install algorithms from the registry.** Every analysis is a plugin. Browse the [plugin catalog](/docs/plugins), install from the marketplace, or [write your own](/docs/develop/plugins).
+- **Go further in Python.** Notebooks come with the `voltsdk` client already signed in to your workspace. See [Notebooks](/docs/guides/notebooks).
+- **Ask VOLT AI.** The assistant reads your trajectories and results, runs pipelines and drives the canvas for you. See [VOLT AI](/docs/guides/volt-ai).
+- **Work as a team.** Members, roles, live presence in the canvas, whiteboards and shared compute. See [Teams](/docs/guides/teams).
+
+## Run it your way
+
+The same VOLT runs in three places. Pick the one that fits; you can move later.
+
+<Cards>
+  <Card title="In your browser" href="/docs/run/browser" description="Nothing to install. The server, a compute cluster and the analyses run in the tab, compiled to WebAssembly." />
+  <Card title="On your desktop" href="/docs/run/desktop" description="The desktop app ships the whole stack and runs it on your machine, with no Docker or database to set up." />
+  <Card title="On your server" href="/docs/run/self-hosting" description="Deploy VOLT once for your group, then enroll the workstations, cloud instances and HPC nodes that will compute." />
+</Cards>
+
+## How it fits together
+
+A VOLT deployment has three parts. The **client** is the web app you work in. The **server** keeps accounts, teams, permissions and the catalog of your data, and relays live updates. **Clusters** are the machines that hold the trajectories and results and run the analyses. Simulation data stays on your clusters; the server coordinates. [Architecture](/docs/architecture) explains each part in depth.
+
+## Next steps
+
+<Cards>
+  <Card title="Quickstart" href="/docs/quickstart" description="Open a trajectory and run your first analysis in a few minutes." />
+  <Card title="Core concepts" href="/docs/concepts" description="Teams, clusters, trajectories, pipelines, analyses and exposures, and how they relate." />
+</Cards>
