@@ -1,82 +1,39 @@
 ---
 title: Ackland-Jones Analysis
-description: Classify FCC, HCP, BCC and ICO crystal structures with adaptive nearest-neighbor bond-angle analysis — no cutoff parameter required.
+description: Classify FCC, HCP, BCC and icosahedral atoms from the distribution of bond angles to their nearest neighbors, with no cutoff to set.
 ---
 
-Ackland-Jones Analysis assigns each atom a structure type (`FCC`, `HCP`,
-`BCC`, `ICO`, or `OTHER`) from the bond-angle distribution of its nearest
-neighbors (Ackland & Jones, PRB 2006). The neighbor shell is determined
-adaptively from the local mean squared distance, so classification is fully
-parameter-free.
+Ackland-Jones analysis classifies each atom from the angles between the bonds to its nearest neighbors. It needs no cutoff and no parameters, which makes it a quick first look at a metal's crystal structure, including icosahedral order in liquids and glasses.
 
-## Parameters
+| Key | Version | Builds |
+|---|---|---|
+| `ackland-jones` | 1.1.1 | Linux, macOS, Windows, browser |
 
-This plugin takes no parameters — structure classification is adaptive and
-parameter-free. Just point it at a trajectory.
+## How it works
 
-## Output
+For each atom the plugin takes its 14 nearest neighbors and sets a local length scale r₀² from the mean squared distance of the six closest. The neighbors whose squared distance is under 1.45 r₀² form the shell. It sorts the cosines of all bond angles in the shell into eight bins, and compares the bin counts with those of ideal FCC, HCP, BCC and icosahedral environments. The closest match wins; an atom with angles in the last bin, or no clear match, is `OTHER`.
 
-The plugin writes two parquet files per frame.
+## Inputs
 
-### `{outputBase}_atoms.parquet`
+- Atom positions and the simulation cell.
 
-Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D
-rendering. Atoms are grouped into buckets keyed by structure name (`FCC`,
-`HCP`, `BCC`, `ICO`, `OTHER`).
+## Arguments
 
-```ts
-interface Atom {
-    id: int;
-    pos: [float, float, float];
-    structure_id: int;
-    structure_name: string;       // "FCC" | "HCP" | "BCC" | "ICO" | "OTHER"
-    cluster_id: int;
-    structure_type: int;          // 0 OTHER | 1 FCC | 2 HCP | 3 BCC | 4 ICO
-}
+This plugin has no arguments.
 
-interface AtomsOutput {
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-    };
-    sub_listings: {
-        structures: Array<{
-            structure_id: int;
-            structure_name: string;
-            atom_count: int;
-        }>;
-    };
-    export: {
-        AtomisticExporter: {
-            [bucketName: string]: Atom[];
-        };
-    };
-}
-```
+## Outputs
 
-Surfaced in VOLT as the **Ackland-Jones Structure** exposure and exported as a
-`.glb` scene.
+| Exposure | What you get |
+|---|---|
+| **Ackland-Jones Structure** | A listing, and a 3D model of the atoms colored by structure: `OTHER`, `FCC`, `HCP`, `BCC`, `ICO`. |
+| **Ackland-Jones Summary** | The frame's totals: atoms, and atoms per structure. Stored with the analysis. No listing. |
 
-### `{outputBase}_ackland_jones.parquet`
+The workflow declares one per-atom property, `structure_type` (Structure Type), with the values `0` OTHER, `1` FCC, `2` HCP, `3` BCC, `4` ICO.
 
-Per-frame summary of the structure-type counts (listing-only — no per-atom
-sub-listing).
+## Notes
 
-```ts
-interface AcklandJonesSummary {
-    main_listing: {
-        total_atoms: int;
-        OTHER: int;
-        FCC: int;
-        HCP: int;
-        BCC: int;
-        ICO: int;
-    };
-}
-```
+- Ackland-Jones doesn't produce the cluster tables OpenDXA needs. For dislocation analysis, use [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) or [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis).
 
-## See Also
+## Reference
 
-- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — CNA-based structure classifier that also emits DXA cluster-graph artifacts
-- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — robust structure classifier that additionally handles simple-cubic and icosahedral environments
-- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — continuous per-atom disorder measure for the same defect-identification workflows
+G. J. Ackland, A. P. Jones, "Applications of local crystal structure measures in experiment and simulation", *Phys. Rev. B* **73**, 054104 (2006).

@@ -1,104 +1,60 @@
 ---
 title: Adaptive Common Neighbor Analysis
-description: Classify atoms by local crystal environment with ACNA/CNA and emit the cluster-graph artifacts consumed by OpenDXA.
+description: Classify atoms of a chosen crystal family with adaptive common neighbor analysis and share the crystal clusters OpenDXA reads.
 ---
 
-Adaptive Common Neighbor Analysis (ACNA/CNA) assigns each atom a structure type
-(`FCC`, `HCP`, `BCC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`, or `OTHER`) from its local
-coordination environment, then builds the reconstructed cluster graph that
-DXA-compatible tools (OpenDXA, LineReconstructionDXA, ElasticStrain) consume.
+Adaptive Common Neighbor Analysis (a-CNA) classifies each atom from the bonding topology of its nearest neighbors, using a cutoff that adapts to each atom's own neighbor distances. Use it as a fast structure identification stage for a known crystal, and as an alternative to [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) in front of dislocation analysis.
 
-## Parameters
+| Key | Version | Builds |
+|---|---|---|
+| `adaptive-common-neighbor-analysis` | 2.1.1 | Linux, macOS, Windows, browser |
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `crystal_structure` | `select` | `FCC` | Reference lattice for classification. Options: `BCC`, `FCC`, `HCP`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. (Simple cubic `SC` is not supported — use Polyhedral Template Matching instead.) |
-| `dissolve_small_clusters` | `boolean` | `false` | Mark atoms in small clusters as `OTHER` after clustering. |
+## How it works
 
-## Output
+For each atom, the plugin takes the nearest neighbors the chosen crystal calls for (12 for FCC and HCP, 14 for BCC, 4 + 12 for diamond) and sets a local cutoff from their distances. For every neighbor bond it counts the common neighbors, the bonds among them and the longest chain of those bonds. The set of these signatures identifies the structure: 12 × (4,2,1) is FCC, 6 × (4,2,1) + 6 × (4,2,2) is HCP, 8 × (6,6,6) + 6 × (4,4,4) is BCC. Diamond uses the same idea on the second-neighbor shell.
 
-### `{outputBase}_cna_analysis.parquet`
+The plugin only looks for the structures of the crystal family you choose:
 
-Compact analysis summary. The cluster-graph tables are written as separate
-`.table` files; this result records their paths, not their contents.
+| Crystal Structure | Structures it can assign |
+|---|---|
+| `FCC`, `HCP` | FCC, HCP |
+| `BCC` | BCC |
+| `CUBIC_DIAMOND`, `HEX_DIAMOND` | Cubic diamond, hexagonal diamond, and the first and second neighbor shells of diamond atoms |
 
-```ts
-interface CnaAnalysisOutput {
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-    };
-    sub_listings: {};
-    "per-atom-properties": [];
-    input_dump: string;                  // path to the annotated LAMMPS dump
-    clusters_table: string;              // path to {outputBase}_clusters.table
-    cluster_transitions_table: string;   // path to {outputBase}_cluster_transitions.table
-    is_failed: boolean;
-}
-```
+Every other atom is `OTHER`. After classification it groups crystalline atoms into crystal clusters and writes the cluster graph dislocation analysis needs.
 
-### `{outputBase}_atoms.parquet`
+## Inputs
 
-Per-atom structure identification written by the shared `AtomisticExporter`
-serializer. Atoms are grouped by structure name for 3D rendering, plus a flat
-per-atom array for downstream consumers.
+- Atom positions and the simulation cell. No cutoff is needed.
 
-```ts
-type Vec3 = [float, float, float];
+## Arguments
 
-interface AtomisticAtom {
-    id: int;
-    pos: Vec3;
-    structure_id: int;
-    structure_name: string;       // "FCC" | "HCP" | "BCC" | "CUBIC_DIAMOND" | "HEX_DIAMOND" | "OTHER" | ...
-    cluster_id: int;
-    topology_name?: string;       // present only when the atom's cluster has a named topology
-}
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Crystal Structure** `crystal_structure` | select | `FCC` | `BCC`, `FCC`, `HCP`, `CUBIC_DIAMOND`, `HEX_DIAMOND` | The crystal of your material. It sets the neighbor count, the structures searched for (see the table above) and the reference lattice of the crystal clusters. |
+| **Dissolve Small Clusters** `dissolve_small_clusters` | boolean | `false` | | After clustering, mark atoms that belong to small crystal clusters as `OTHER`. |
 
-interface PerAtomProperty {
-    id: int;
-    structure_id: int;
-    structure_name: string;
-    cluster_id: int;
-    topology_name?: string;
-}
+## Outputs
 
-interface AtomsOutput {
-    export: {
-        AtomisticExporter: {
-            // keyed by structure_name; each value is the group's atoms
-            [structureName: string]: AtomisticAtom[];
-        };
-        ChartExporter: {
-            structure_counts: {
-                structure_name: string[];
-                atom_count: int[];
-            };
-        };
-    };
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-        clustered_atoms: int;
-        unclustered_atoms: int;
-    };
-    sub_listings: {
-        structures: {
-            structure_id: int;
-            structure_name: string;
-            atom_count: int;
-        }[];
-    };
-    "per-atom-properties": PerAtomProperty[];
-}
-```
+| Exposure | What you get |
+|---|---|
+| **Structure Identification** | A listing, and a 3D model of the atoms colored by structure type. |
+| **CNA Analysis** | The frame's totals, stored with the analysis. No listing. |
+| **Structure Counts Chart** | A bar chart of atoms per structure. |
+| **Clusters Table**, **Clusters Transitions**, **Neighbor Lattice** | Files shared with later stages as `clusters_table`, `clusters_transitions` and `neighbor_lattice`. No listing. |
 
-The entrypoint also emits three plain-text artifacts alongside the parquet
-files: `{outputBase}_annotated.dump` (structure-annotated LAMMPS dump),
-`{outputBase}_clusters.table`, and `{outputBase}_cluster_transitions.table` —
-the cluster graph required by OpenDXA and related tools.
+The workflow declares the per-atom properties `structure_type` (Structure Type) and `coordination` (Coordination number).
 
-## See Also
+## Feeds
 
-- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — alternative structure classifier that also supports simple-cubic and icosahedral environments
-- [Coordination Analysis](/docs/plugins/coordination-analysis) — per-atom coordination numbers from the same neighbor-finding primitives
+- [OpenDXA](/docs/plugins/opendxa), [Elastic Strain](/docs/plugins/elastic-strain) and [Line Reconstruction DXA](/docs/plugins/line-reconstruction-dxa) read the cluster tables and neighbor lattice it shares. Put it before them in the same pipeline.
+- Later stages read the `structure_type` column of the annotated frame it writes.
+
+## Notes
+
+- Choose **HCP** or **FCC** to see stacking faults and twin boundaries in an FCC metal: both settings search FCC and HCP, and the faulted planes come out as HCP.
+- It never assigns ICO. For icosahedral order in metallic glasses or clusters, use [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) or [Ackland-Jones Analysis](/docs/plugins/ackland-jones).
+
+## Reference
+
+A. Stukowski, "Structure identification methods for atomistic simulations of crystalline materials", *Modelling Simul. Mater. Sci. Eng.* **20**, 045021 (2012). Common neighbor analysis: J. D. Honeycutt, H. C. Andersen, *J. Phys. Chem.* **91**, 4950 (1987).

@@ -1,108 +1,56 @@
 ---
 title: Polyhedral Template Matching
-description: Classify atoms by local crystal structure with PTM and export per-atom orientation plus the cluster graph consumed by OpenDXA.
+description: Classify each atom's local crystal structure, measure its lattice orientation and share the crystal clusters that OpenDXA and Elastic Strain read.
 ---
 
-Polyhedral Template Matching (PTM) identifies each atom's local crystal structure by matching its neighbor shell against reference templates. It also recovers per-atom orientation, RMSD, interatomic distance and deformation gradient, and emits the reconstructed cluster graph consumed by DXA-compatible tools (OpenDXA, LineReconstructionDXA, ElasticStrain).
+Polyhedral Template Matching (PTM) identifies the local crystal structure around each atom by comparing its nearest neighbors with ideal templates (FCC, HCP, BCC, ICO, SC, and with a diamond crystal also cubic and hexagonal diamond). Besides the structure, it gives each atom a lattice orientation and its RMSD from the best template. Use it as the first stage before dislocation analysis, elastic strain or any study of grains and orientations. It is more robust to thermal noise and strain than common neighbor analysis.
 
-## Parameters
+| Key | Version | Builds |
+|---|---|---|
+| `polyhedral-template-matching` | 2.4.2 | Linux, macOS, Windows, browser |
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `crystal_structure` | `select` | `FCC` | Reference lattice to match against. One of `BCC`, `FCC`, `HCP`, `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`. |
-| `rmsd` | `float` | `0.1` | RMSD threshold for PTM. Atoms whose best match exceeds this value are classified as `OTHER`. Minimum `0`, step `0.01`. |
-| `dissolve_small_clusters` | `bool` | `false` | Mark atoms in small clusters as `OTHER` after the clustering pass. |
+## How it works
 
-## Output
+For each atom, PTM takes the convex hull of its nearest neighbors and checks its topology against each template's. When the topology matches, it finds the rotation and scale that best superimpose the template on the neighbors and computes the root-mean-square deviation (RMSD) of the fit. The atom gets the structure with the lowest RMSD, provided that RMSD is under the cutoff; otherwise it is `OTHER`. The fit also yields the atom's orientation (a quaternion) and its interatomic distance.
 
-### `{outputBase}_ptm_analysis.parquet`
+After classification, the plugin groups neighboring crystalline atoms into crystal clusters and writes the cluster graph that dislocation analysis needs.
 
-Summary record for the frame. `sub_listings` is emitted as an empty object and `per-atom-properties` as an empty array; the per-atom data lives in `{outputBase}_atoms.parquet`. The `input_dump`, `clusters_table` and `cluster_transitions_table` fields are filesystem paths to the artifacts written alongside this record.
+## Inputs
 
-```ts
-interface PtmAnalysisOutput {
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-        rmsd: float;
-    };
-    sub_listings: {};
-    "per-atom-properties": [];
-    input_dump: string;
-    clusters_table: string;
-    cluster_transitions_table: string;
-}
-```
+- Atom positions and the simulation cell. No cutoff is needed.
+- Atom types, only for **Identify Ordering Types**.
 
-### `{outputBase}_atoms.parquet`
+## Arguments
 
-Per-atom structure identification in the canonical `AtomisticExporter` shape, with PTM-specific fields attached to each atom. Atoms are grouped by structure name under `export.AtomisticExporter`, and the `export.ChartExporter.structure_counts` block backs the structure-counts bar chart.
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Crystal Structure** `crystal_structure` | select | `FCC` | `BCC`, `FCC`, `HCP`, `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND` | The crystal of your material. It sets which templates PTM tries: SC, FCC, HCP, ICO and BCC for the first four, plus cubic and hexagonal diamond for the two diamond options. It is also the reference lattice of the crystal clusters shared with later stages. |
+| **RMSD** `rmsd` | number | `0.1` | ≥ 0, step 0.01 | RMSD cutoff. Atoms whose best match has a larger RMSD become `OTHER`. Raise it for hot or strongly strained samples. `0` is a real cutoff, not "no cutoff": it rejects almost every atom. |
+| **Dissolve Small Clusters** `dissolve_small_clusters` | boolean | `false` | | After clustering, mark atoms that belong to small crystal clusters as `OTHER`. |
+| **Identify Ordering Types** `identify_ordering` | boolean | `false` | | Also identify the chemical ordering of each crystalline atom from the atom types: `PURE`, `L10`, `L12_A`, `L12_B`, `B2`, `ZINCBLENDE_WURTZITE`, `BORON_NITRIDE`, or `NONE`. Needs a type column in the frame; without one the plugin logs a warning and skips it. |
 
-```ts
-type Vec3 = [float, float, float];
-type Quaternion = [float, float, float, float]; // [x, y, z, w]
-type Mat3 = [
-    float, float, float,
-    float, float, float,
-    float, float, float
-]; // row-major 3x3
+## Outputs
 
-interface PtmAtom {
-    id: int;
-    pos: Vec3;
-    structure_id: int;
-    structure_name: string;
-    cluster_id: int;
-    // PTM per-atom fields
-    ptm_valid: bool;
-    // present only when ptm_valid === true:
-    rmsd?: float;
-    orientation?: Quaternion;
-    interatomic_distance?: float;
-    scaling?: float;
-    deformation_gradient?: Mat3;
-    ordering_type?: int;
-    correspondences?: int;
-    template_index?: int;
-}
+| Exposure | What you get |
+|---|---|
+| **Structure Identification** | A listing, and a 3D model of the atoms colored by structure type. |
+| **PTM Analysis** | A listing of the frame's totals (atoms, structures found, the RMSD cutoff, and how many atoms the cutoff discarded with the smallest and median discarded RMSD), with `structure_counts` and, when ordering is on, `ordering_counts` sub-listings. Its tables **Structure analysis results** (count and fraction per structure) and **Chemical ordering results** appear under **Results** in the canvas. |
+| **Structure Counts Chart** | A bar chart of atoms per structure. |
+| **Clusters Table**, **Clusters Transitions**, **Neighbor Lattice** | Files shared with later stages as `clusters_table`, `clusters_transitions` and `neighbor_lattice`. No listing. |
+| **Per Atom Properties** | The per-atom table, stored with the analysis. No listing. |
 
-interface StructureGroup {
-    structure_id: int;
-    structure_name: string;
-    atom_count: int;
-}
+The per-atom table has `structure_id` and `structure_name` for every atom. Atoms that matched a template also have `rmsd`, `orientation` (quaternion `x, y, z, w`), `interatomic_distance` and `correspondences`, plus `ordering_type` when ordering is on.
 
-interface AtomsOutput {
-    export: {
-        AtomisticExporter: Record<string, PtmAtom[]>; // keyed by structure_name
-        ChartExporter: {
-            structure_counts: {
-                structure_name: string[];
-                atom_count: int[];
-            };
-        };
-    };
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-        clustered_atoms: int;
-        unclustered_atoms: int;
-    };
-    sub_listings: {
-        structures: StructureGroup[];
-    };
-    "per-atom-properties": Array<{
-        id: int;
-        structure_id: int;
-        structure_name: string;
-        cluster_id: int;
-    }>;
-}
-```
+## Feeds
 
-Beyond the parquet files, the entrypoint emits plain-text artifacts: `{outputBase}_annotated.dump` (per-atom structure-annotated LAMMPS dump) and the cluster graph tables `{outputBase}_clusters.table` and `{outputBase}_cluster_transitions.table`, which are required inputs for OpenDXA and other DXA-compatible plugins.
+- [OpenDXA](/docs/plugins/opendxa), [Elastic Strain](/docs/plugins/elastic-strain) and [Line Reconstruction DXA](/docs/plugins/line-reconstruction-dxa) read the cluster tables and neighbor lattice it shares. Put PTM before them in the same pipeline and set the same crystal structure in both.
+- Any later stage reads its `structure_type` column from the annotated frame it writes.
 
-## See Also
+## Notes
 
-- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — alternative per-atom structure classification
-- [Grain Segmentation](/docs/plugins/grain-segmentation) — builds on PTM orientations to group atoms into grains
+- PTM finds each atom's neighbors itself, so there is no cutoff to tune; the RMSD cutoff is the main control.
+- For grain maps, [Grain Segmentation](/docs/plugins/grain-segmentation) runs PTM itself; you don't need a PTM stage before it.
+
+## Reference
+
+P. M. Larsen, S. Schmidt, J. Schiøtz, "Robust structural identification via polyhedral template matching", *Modelling Simul. Mater. Sci. Eng.* **24**, 055007 (2016).

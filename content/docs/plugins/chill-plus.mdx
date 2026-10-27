@@ -1,79 +1,52 @@
 ---
 title: Chill+ Ice & Hydrate Classifier
-description: Classify hexagonal ice, cubic ice, interfacial ice, and hydrate phases using Chill+ bond-order correlation.
+description: Classify water molecules as hexagonal ice, cubic ice, interfacial ice, clathrate hydrate, interfacial hydrate or liquid with the CHILL+ algorithm.
 ---
 
-## Parameters
+CHILL+ tells ice and clathrate hydrates apart from liquid water using the correlation of local bond-orientational order between neighboring molecules. Use it to follow ice nucleation and growth, stacking disorder (cubic versus hexagonal ice) and hydrate formation in water simulations.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `cutoff` | `float` | `3.5` | O-O neighbor cutoff in angstroms used to build the bond network. Range `2.0`–`10.0`. |
+| Key | Version | Builds |
+|---|---|---|
+| `chill-plus` | 1.1.1 | Linux, macOS, Windows, browser |
 
-## Output
+## How it works
 
-The plugin writes two parquet files per frame.
+Every particle in the frame is treated as a water molecule. For each one, the plugin computes the complex bond-order vector q₃ₘ (m = −3…3) from the spherical harmonics of the bonds to the neighbors within the cutoff. For each bond it then takes the normalized correlation c(i,j) of the two molecules' q₃ vectors:
 
-### `{outputBase}_atoms.parquet`
+- **Staggered** bond: c(i,j) < −0.8
+- **Eclipsed** bond: −0.35 < c(i,j) < 0.25
 
-Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are grouped into buckets by their Chill+ classification (`HEXAGONAL_ICE`, `CUBIC_ICE`, `INTERFACIAL_ICE`, `HYDRATE`, `INTERFACIAL_HYDRATE`, `OTHER`). Each atom carries a `structure_type` code identifying its phase.
+A molecule with exactly four neighbors is classified from its bond counts:
 
-```ts
-interface Atom {
-    id: int;
-    pos: [float, float, float];
-    structure_id: int;
-    structure_name: string;
-    cluster_id: int;
-    // 0 OTHER, 1 HEXAGONAL_ICE, 2 CUBIC_ICE,
-    // 3 INTERFACIAL_ICE, 4 HYDRATE, 5 INTERFACIAL_HYDRATE
-    structure_type: int64;
-}
+| Bonds | Structure |
+|---|---|
+| 4 eclipsed | `HYDRATE` |
+| 3 eclipsed | `INTERFACIAL_HYDRATE` |
+| 4 staggered | `CUBIC_ICE` |
+| 3 staggered and 1 eclipsed | `HEXAGONAL_ICE` |
+| 3 staggered and no eclipsed, or 2 staggered | `INTERFACIAL_ICE` |
 
-interface AtomsOutput {
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-    };
-    sub_listings: {
-        structures: Array<{
-            structure_id: int;
-            structure_name: string;
-            atom_count: int;
-        }>;
-    };
-    export: {
-        AtomisticExporter: {
-            [bucketName: string]: Atom[];
-        };
-    };
-}
-```
+Everything else, including any molecule without exactly four neighbors, is `OTHER` (liquid).
 
-Surfaced in VOLT as the **Chill+ Structure** exposure and exported as a `.glb` scene.
+## Inputs
 
-### `{outputBase}_chill_plus.parquet`
+- Positions of one particle per water molecule: the oxygen atoms, or the sites of a coarse-grained model such as mW. The plugin doesn't filter by type, so a frame that also holds hydrogens or guest molecules gives wrong neighbor counts.
 
-Frame-level summary of the classification. Reports the atom count for each Chill+ phase alongside the cutoff used.
+## Arguments
 
-```ts
-interface ChillPlusSummaryOutput {
-    main_listing: {
-        total_atoms: int;
-        cutoff: float;
-        OTHER: int;
-        HEXAGONAL_ICE: int;
-        CUBIC_ICE: int;
-        INTERFACIAL_ICE: int;
-        HYDRATE: int;
-        INTERFACIAL_HYDRATE: int;
-    };
-}
-```
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **O-O Cutoff (Å)** `cutoff` | number | `3.5` | 2 to 10, step 0.1 | Neighbor cutoff between water molecules. 3.5 Å sits in the first minimum of the O–O radial distribution function of water. |
 
-Surfaced in VOLT as the **Chill+ Summary** exposure (listing-only; no 3D or chart artifact).
+## Outputs
 
-## See Also
+| Exposure | What you get |
+|---|---|
+| **Chill+ Structure** | A listing, and a 3D model of the molecules colored by structure. |
+| **Chill+ Summary** | The frame's totals: atoms, the cutoff, and molecules per structure. Stored with the analysis. No listing. |
 
-- [Identify Diamond](/docs/plugins/identify-diamond) — classifies tetrahedral diamond/ice-like networks
-- [Steinhardt Order Parameters](/docs/plugins/steinhardt-order-parameters) — the bond-order parameters Chill+ builds on
-- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — local crystal structure labels
+The workflow declares one per-atom property, `structure_type` (Structure Type), with the values `0` OTHER, `1` HEXAGONAL_ICE, `2` CUBIC_ICE, `3` INTERFACIAL_ICE, `4` HYDRATE, `5` INTERFACIAL_HYDRATE.
+
+## Reference
+
+A. H. Nguyen, V. Molinero, "Identification of clathrate hydrates, hexagonal ice, cubic ice, and liquid water in simulations: the CHILL+ algorithm", *J. Phys. Chem. B* **119**, 9369 (2015).

@@ -1,59 +1,49 @@
 ---
 title: Identify Diamond Structure
-description: Identify cubic and hexagonal diamond cores and their neighbor shells using 2nd-nearest-neighbor shell CNA.
+description: Find cubic and hexagonal diamond atoms with a second-neighbor common neighbor analysis, and label the atoms next to them.
 ---
 
-## Parameters
+Identify Diamond Structure finds atoms in cubic diamond and hexagonal diamond (lonsdaleite) environments, the structures of Si, Ge and C. It also labels the first and second neighbors of those atoms, so atoms at surfaces, stacking faults and dislocation cores show up as next to diamond instead of plain `OTHER`. Methods built for close-packed metals, such as Ackland-Jones, see a diamond crystal as `OTHER`.
 
-This plugin takes no configurable parameters. It runs a fixed 4-nearest-neighbor diamond classifier over each frame.
+| Key | Version | Builds |
+|---|---|---|
+| `identify-diamond` | 1.1.1 | Linux, macOS, Windows, browser |
 
-## Output
+## How it works
 
-The plugin writes two parquet files per frame.
+For each atom, the plugin takes its 4 nearest neighbors and, through them, the 12 second neighbors. In a perfect diamond lattice those 12 atoms form an FCC (cubic diamond) or HCP (hexagonal diamond) shell, so the plugin runs common neighbor analysis on them: 12 × (4,2,1) is cubic diamond, 6 × (4,2,1) + 6 × (4,2,2) is hexagonal diamond. It then marks the unclassified nearest neighbors of diamond atoms as first-neighbor atoms, and the unclassified neighbors of those as second-neighbor atoms.
 
-### `{outputBase}_atoms.parquet`
+## Inputs
 
-Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are bucketed by their diamond structure name (e.g. `CUBIC_DIAMOND`, `HEX_DIAMOND`, `OTHER`).
+- Atom positions and the simulation cell.
 
-```ts
-interface Atom {
-    id: int;
-    pos: [float, float, float];
-    structure_id: int;
-    structure_name: string;
-    cluster_id: int;
-    // 0=OTHER, 5=CUBIC_DIAMOND, 6=HEX_DIAMOND,
-    // 9=CUBIC_DIAMOND_FIRST_NEIGH, 10=CUBIC_DIAMOND_SECOND_NEIGH,
-    // 11=HEX_DIAMOND_FIRST_NEIGH, 12=HEX_DIAMOND_SECOND_NEIGH
-    structure_type: int64;
-}
-```
+## Arguments
 
-Surfaced in VOLT as the **Diamond Structure** exposure and exported as a `.glb` scene.
+This plugin has no arguments.
 
-### `{outputBase}_identify_diamond.parquet`
+## Outputs
 
-Frame-level summary counts (listing-only; no exported artifact).
+| Exposure | What you get |
+|---|---|
+| **Diamond Structure** | A listing, and a 3D model of the atoms colored by structure. |
+| **Diamond Summary** | The frame's totals: atoms, and atoms per structure. Stored with the analysis. No listing. |
 
-```ts
-interface IdentifyDiamondOutput {
-    main_listing: {
-        total_atoms: int;
-        OTHER: int;
-        CUBIC_DIAMOND: int;
-        CUBIC_DIAMOND_FIRST_NEIGH: int;
-        CUBIC_DIAMOND_SECOND_NEIGH: int;
-        HEX_DIAMOND: int;
-        HEX_DIAMOND_FIRST_NEIGH: int;
-        HEX_DIAMOND_SECOND_NEIGH: int;
-    };
-}
-```
+The workflow declares one per-atom property, `structure_type` (Structure Type):
 
-Surfaced in VOLT as the **Diamond Summary** exposure.
+| Value | Structure |
+|---|---|
+| `0` | `OTHER` |
+| `5` | `CUBIC_DIAMOND` |
+| `6` | `HEX_DIAMOND` |
+| `9` | `CUBIC_DIAMOND_FIRST_NEIGH` |
+| `10` | `CUBIC_DIAMOND_SECOND_NEIGH` |
+| `11` | `HEX_DIAMOND_FIRST_NEIGH` |
+| `12` | `HEX_DIAMOND_SECOND_NEIGH` |
 
-## See Also
+## Notes
 
-- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — CNA-based local structure classification
-- [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) — robust structure identification under thermal noise
-- [CHILL+](/docs/plugins/chill-plus) — identifies ice-like and tetrahedral structures
+- For dislocation analysis in a diamond crystal, run [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) or [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) with **Crystal Structure** set to cubic diamond: they share the cluster tables OpenDXA needs, this plugin doesn't.
+
+## Reference
+
+E. Maras, O. Trushin, A. Stukowski, T. Ala-Nissila, H. Jónsson, "Global transition path search for dislocation formation in Ge on Si(001)", *Comput. Phys. Commun.* **205**, 13 (2016).
