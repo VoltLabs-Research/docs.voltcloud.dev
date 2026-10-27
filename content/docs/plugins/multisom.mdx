@@ -1,75 +1,73 @@
 ---
 title: MultiSOM
-description: Unsupervised structural identification that clusters atoms with a multilayer Self-Organizing Map over features from selected feature plugins.
+description: Identify structures without labels by clustering atoms with a multilayer self-organizing map trained on per-atom features from other plugins.
 ---
 
-## Parameters
+MultiSOM groups atoms into structural classes without being told what the classes are. It trains a self-organizing map (SOM) on per-atom features, such as the coordination number, the centrosymmetry parameter or Steinhardt order parameters, and splits the atoms into clusters, then splits each cluster again in further layers. Use it when no template method fits your system, for example in complex alloys, amorphous–crystalline mixtures or unknown phases, and inspect the resulting clusters against the features.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `feature_plugins` | `pluginReference` | — | Feature plugins whose per-atom outputs train the map. Choose from `coordination-analysis`, `centrosymmetry-parameter`, `steinhardt-order-parameters`. Multiple selection. |
-| `layers` | `list` | 2 layers | SOM layers. Each layer has `label`, `features` (a subset of the selected feature plugins' properties), `scaling` (`normal`/`standard`/`robust`), `f` (training fraction, `1`), `sigma` (neighborhood width, `0.5`), `eta` (learning rate, `0.5`), `N` (output neurons / sub-clusters, `5`), `batched` (`true`), and `batch_size` (`100`). |
-| `training` | `string` | `reference` | `reference` trains on the first selected frame and relabels the rest for stable cluster IDs across the trajectory; `per_frame` retrains each frame. |
-| `mapping` | `string` | `linear` | Cluster ID mapping scheme. Options: `linear`, `godel`, `default`. |
-| `seed` | `int` | `1982` | Random seed for reproducible training. |
+| Key | Version | Builds |
+|---|---|---|
+| `multisom` | 1.1.0 | Linux, macOS, Windows |
 
-## Output
+MultiSOM is a Python plugin with no browser build, so it can't be installed on a machine that runs in the browser or the desktop app. The machine running it creates a virtual environment and installs its requirements (`numpy`, `pandas`, `pyarrow`) the first time.
 
-The plugin writes two parquet files per frame.
+<Callout type="warn">
+As published, MultiSOM 1.1.0 can't complete a run in VOLT. Its workflow passes the script only the output folder and the form's options, while the script also expects the frame path as its first argument and the feature tables in a `--features` argument, which nothing in the workflow sets. The stage fails before training.
+</Callout>
 
-### `{outputBase}_multisom.parquet`
+## How it works
 
-Summary statistics for the frame, stored as a single JSON `payload` column.
+1. **Features.** The feature plugins you pick run inside the MultiSOM stage, each in its own folder, and their per-atom tables supply the feature columns.
+2. **Layers.** The first layer scales its features, trains a SOM with **N** output neurons on them and assigns every atom to its best-matching neuron, which splits the atoms into up to N clusters. Each later layer splits every cluster of the previous layer again, with its own features and settings.
+3. **Cluster IDs.** **Cluster ID Mapping** combines the per-layer assignments into one `cluster_id` per atom, and the IDs are renumbered densely.
+4. **Frames.** With **Reference frame** training, the first frame of the run trains the map and the other frames are labeled with it, so a cluster ID means the same thing in every frame. With **Per frame**, each frame trains its own map.
 
-```ts
-interface MultiSomOutput {
-    main_listing: {
-        total_atoms: int;
-        num_clusters: int;
-        num_layers: int;
-        features: string[];
-    };
-    sub_listings: {
-        clusters: Array<{
-            cluster_id: int;
-            count: int;
-        }>;
-    };
-}
-```
+## Inputs
 
-### `{outputBase}_atoms.parquet`
+- At least one feature plugin installed and published in your team: Coordination Analysis, Centrosymmetry Parameter or Steinhardt Order Parameters. You choose them in this stage's form; no separate stages are needed.
 
-Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are grouped into `Cluster_<id>` buckets, one per SOM cluster. Each atom carries the identity fields plus one float column per SOM layer (`layer_1`, `layer_2`, …) holding that layer's group assignment.
+## Arguments
 
-```ts
-interface Atom {
-    atom_index: int;
-    id: int;
-    x: float;
-    y: float;
-    z: float;
-    bucket: string;
-    structure_id: int;
-    structure_name: string;
-    cluster_id: int;
-    // one column per SOM layer, e.g. layer_1, layer_2
-    [layer: string]: float;
-}
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Feature Plugins** `feature_plugins` | pluginReference | (none) | One or more of `coordination-analysis`, `centrosymmetry-parameter`, `steinhardt-order-parameters` | Required. The plugins that compute the features. You can set each one's own arguments here. |
+| **SOM Layers** `layers` | list | Two layers, see below | Items with the fields below | The layers of the map, in order. |
+| **Training Mode** `training` | select | `reference` | `reference` (Reference frame (stable cluster IDs)), `per_frame` (Per frame (retrain each frame)) | Train once on the first frame, or on every frame. |
+| **Cluster ID Mapping** `mapping` | select | `linear` | `linear` (Linear), `godel` (Godel), `default` (Default) | How per-layer assignments become one ID. `godel` encodes each atom's path through the layers with prime numbers; `default` keeps the plain per-layer numbers without ancestry. |
+| **Random Seed** `seed` | number | `1982` | ≥ 0, step 1 | Random seed, for reproducible clusters. |
 
-interface AtomsOutput {
-    export: {
-        AtomisticExporter: {
-            [bucketName: string]: Atom[];
-        };
-    };
-}
-```
+Each item of **SOM Layers** has these fields:
 
-Surfaced in VOLT as the **MultiSOM Model** exposure and exported as a `.glb` scene.
+| Field | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Label** `label` | string | `Layer` | | Name of the layer in the form. |
+| **Features** `features` | select, multiple | (none) | Per-atom properties of the selected feature plugins, such as `coordination`, `csp`, `q_6` | The features this layer trains on. |
+| **Scaling** `scaling` | select | `normal` | `normal` (Normal (min-max)), `standard` (Standard (z-score)), `robust` (Robust (median/IQR)) | How each feature is scaled before training. |
+| **Training fraction (f)** `f` | number | `1` | 0.01 to 1, step 0.05 | Fraction of the atoms, sampled at random, used to train the layer. |
+| **Sigma (neighborhood width)** `sigma` | number | `0.5` | ≥ 0.01, step 0.1 | Initial width of the SOM neighborhood function. |
+| **Eta (learning rate)** `eta` | number | `0.5` | ≥ 0.01, step 0.1 | Initial learning rate. |
+| **N (output neurons / sub-clusters)** `N` | number | `5` | ≥ 2, step 1 | Number of output neurons, the most clusters the layer can split a group into. |
+| **Batched training** `batched` | boolean | `true` | | Train in batches. |
+| **Batch size** `batch_size` | number | `100` | ≥ 1, step 1 | Atoms per batch. Shown when **Batched training** is on. |
 
-## See Also
+The default layers are:
 
-- [Kmeans Clustering](/docs/plugins/kmeans-clustering) — alternative unsupervised per-atom clustering
-- [Coordination Analysis](/docs/plugins/coordination-analysis) — feature provider for the map
-- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — feature provider for the map
+| Layer | Features | Scaling | f | Sigma | Eta | N | Batched | Batch size |
+|---|---|---|---|---|---|---|---|---|
+| Layer 1 | `coordination`, `csp` | normal | 1 | 0.5 | 0.5 | 5 | yes | 100 |
+| Layer 2 | `csp` | robust | 1 | 0.7 | 1.0 | 2 | yes | 100 |
+
+They expect Coordination Analysis and Centrosymmetry Parameter as feature plugins.
+
+## Outputs
+
+| Exposure | What you get |
+|---|---|
+| **MultiSOM** | A listing with the number of atoms, clusters and layers and the features used, and a `clusters` sub-listing with each cluster's atom count. |
+| **MultiSOM Model** | A listing, and a 3D model of the atoms grouped by cluster (`Cluster_0`, `Cluster_1`, …). |
+
+The per-atom table has `cluster_id` (also as `structure_id`) and one column per layer with the atom's assignment in that layer.
+
+## Reference
+
+T. Kohonen, "Self-organized formation of topologically correct feature maps", *Biol. Cybern.* **43**, 59 (1982). The multilayer SOM code is by Franco Aquistapace (2021, Apache-2.0).

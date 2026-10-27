@@ -1,92 +1,46 @@
 ---
 title: K-means Clustering
-description: Identify crystal structure and grain boundaries by K-means clustering over per-atom von Mises stress, potential energy, and atomic volume.
+description: Separate crystalline atoms from grain-boundary atoms in a nanocrystalline metal by K-means clustering of per-atom von Mises stress, potential energy and atomic volume.
 ---
 
-## Parameters
+K-means Clustering classifies atoms with per-atom physical quantities instead of their geometry. Following Amigo (2020), it clusters the atoms by von Mises stress, potential energy and atomic volume, which differ clearly between crystal interiors and grain boundaries. The cluster with the lowest stress is labeled FCC and the others grain boundary. Use it on nanocrystalline FCC metals when you already write these quantities from your simulation, and as a cutoff-free comparison with geometric methods.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `n_clusters` | `int` | `2` | Number of K-means clusters (minimum 2). With the default of 2 the atoms split into FCC vs. grain-boundary populations. |
-| `n_init` | `int` | `50` | Number of K-means initializations; the best inertia run is kept. |
-| `seed` | `int` | `36` | Random seed for reproducible cluster assignments. |
-| `col_svm` | `string` | `Svm` | Per-atom column holding the von Mises stress feature. |
-| `col_epot` | `string` | `Epot` | Per-atom column holding the potential energy feature. |
-| `col_vol` | `string` | `Vol` | Per-atom column holding the atomic volume feature. |
+| Key | Version | Builds |
+|---|---|---|
+| `kmeans-clustering` | 1.1.0 | Linux, macOS, Windows |
 
-## Output
+K-means Clustering is a Python plugin with no browser build, so it can't be installed on a machine that runs in the browser or the desktop app. The machine running it creates a virtual environment and installs its requirements (`numpy`, `pandas`, `pyarrow`, `scikit-learn`) the first time.
 
-The plugin writes two parquet files per frame.
+## How it works
 
-### `{outputBase}_kmeans.parquet`
+1. The plugin reads the three feature columns from the frame and scales each one to the range 0–10 (min-max scaling).
+2. It runs K-means with k-means++ initialization (Elkan's algorithm, up to 200 iterations), repeated **K-means initializations** times, and keeps the best run.
+3. The cluster whose centroid has the lowest von Mises stress is labeled `FCC`. With two clusters the other one is `Grain Boundary`; with more they are `Grain Boundary 1`, `Grain Boundary 2`, and so on.
 
-Per-cluster summary statistics for the frame.
+## Inputs
 
-```ts
-interface KmeansClusterStats {
-    cluster_id: int;
-    label: string;
-    count: int;
-    percentage: float;
-    svm_min: float;
-    svm_max: float;
-    svm_mean: float;
-}
+The frame must have the columns `id`, `x`, `y`, `z` and the three feature columns, under the names you set. These usually come from your LAMMPS dump, for example the von Mises stress computed from `compute stress/atom`, the potential energy from `compute pe/atom` and the atomic volume from `compute voronoi/atom`. A missing column fails the stage with `Columns [...] not found in dump`, which lists the columns available.
 
-interface KmeansOutput {
-    main_listing: {
-        total_atoms: int;
-        num_clusters: int;
-        feature_column: string;
-    };
-    sub_listings: {
-        clusters: KmeansClusterStats[];
-    };
-}
-```
+## Arguments
 
-Surfaced in VOLT as the **K-means Clustering** exposure (listing-only, no exported artifact).
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Number of clusters** `n_clusters` | number | `2` | ≥ 2, step 1 | Number of clusters. `2` separates crystal from grain boundary. |
+| **K-means initializations** `n_init` | number | `50` | ≥ 1, step 1 | How many times K-means runs from different starting centroids; the run with the lowest inertia is kept. |
+| **Random seed** `seed` | number | `36` | ≥ 0, step 1 | Seed of the centroid initialization, for reproducible clusters. |
+| **Von Mises stress column** `col_svm` | string | `Svm` | A column name of the frame | Column with the per-atom von Mises stress. It also decides which cluster is `FCC`. |
+| **Potential energy column** `col_epot` | string | `Epot` | A column name of the frame | Column with the per-atom potential energy. |
+| **Atomic volume column** `col_vol` | string | `Vol` | A column name of the frame | Column with the per-atom volume. |
 
-### `{outputBase}_atoms.parquet`
+## Outputs
 
-Per-atom data in AtomisticExporter format, consumed by the VOLT viewer for 3D rendering. Atoms are grouped into buckets by their cluster label.
+| Exposure | What you get |
+|---|---|
+| **K-means Clustering** | A listing with the number of atoms and clusters and the stress column used, and a `clusters` sub-listing: `cluster_id`, `label`, `count`, `percentage`, and the minimum, maximum and mean von Mises stress of the cluster. |
+| **K-means Model** | A listing, and a 3D model of the atoms grouped by label (`FCC`, `Grain Boundary`, …). |
 
-```ts
-interface Atom {
-    id: int;
-    pos: [float, float, float];
-    structure_id: int;
-    structure_name: string;
-    cluster_id: int;
-    Svm: float;
-    Epot: float;
-    Vol: float;
-}
+The workflow declares the per-atom properties `cluster_id` (Cluster ID), `Svm` (Von Mises stress), `Epot` (Potential energy) and `Vol` (Atomic volume). If you rename the columns, the table carries your names instead.
 
-interface AtomsOutput {
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-    };
-    sub_listings: {
-        structures: Array<{
-            structure_id: int;
-            structure_name: string;
-            atom_count: int;
-        }>;
-    };
-    export: {
-        AtomisticExporter: {
-            [bucketName: string]: Atom[];
-        };
-    };
-}
-```
+## Reference
 
-The `Svm`, `Epot`, and `Vol` fields carry the names given by `col_svm`, `col_epot`, and `col_vol`. Surfaced in VOLT as the **K-means Model** exposure and exported as a `.glb` scene.
-
-## See Also
-
-- [MultiSOM](/docs/plugins/multisom) — unsupervised per-atom clustering with self-organizing maps
-- [Grain Segmentation](/docs/plugins/grain-segmentation) — partition the structure into grains and grain boundaries
-- [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) — geometric FCC/HCP/BCC structure classification
+N. Amigo, "Crystalline structure and grain boundary identification in nanocrystalline aluminum using K-means clustering" (2020), submitted to *Modelling Simul. Mater. Sci. Eng.*
