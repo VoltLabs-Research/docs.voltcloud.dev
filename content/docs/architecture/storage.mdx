@@ -1,0 +1,159 @@
+---
+title: Data & storage
+description: Where VOLT keeps every kind of data, from the server's tables to the daemon's object store, Parquet tables, compressed dumps and models, and the browser's OPFS.
+---
+
+VOLT splits data by weight. The server keeps metadata, small enough for a relational database. Everything derived from simulation data (dumps, GLB models, preview rasters, Parquet tables, logs, whiteboard state) lives in the object store of a cluster, on the machine whose daemon owns it. Each trajectory records its storage cluster (`storageClusterId`), and analyses write their artifacts to that same cluster, whichever cluster computed them.
+
+## Overview
+
+| Data | Where | Format |
+|---|---|---|
+| Accounts, teams, roles, sessions, secret keys | Server database | Tables |
+| Trajectory, frame, analysis, pipeline run, plugin records | Server database | Tables |
+| Notebook content | Server database (`scripting_notebooks.content`) | JSON |
+| Avatars | `SERVER_DATA_DIR/user-files/volt-avatars` | Files with `.meta.json` sidecars |
+| Uploaded files while staged | Daemon object store, `volt-dumps/trajectory-staging/` | As uploaded |
+| Frame dumps | `volt-dumps` | zstd-compressed dump per timestep |
+| Frame and analysis models | `volt-models` | zstd-compressed GLB |
+| Preview rasters | `volt-rasterizer` | PNG |
+| Per-atom trajectory table | `volt-trajectories` | Parquet |
+| Plugin exposures, charts, binaries, warm images | `volt-plugins` | Parquet, tables, archives |
+| Analysis logs | `volt-analysis-logs` | JSON per frame |
+| Whiteboard state and assets | `volt-whiteboards` | JSON and files |
+| Job queues, daemon state, analysis listing rows | Daemon database | Tables |
+
+## Server database
+
+Postgres on a server, SQLite in the browser and desktop runtimes (see [Database](/docs/architecture/server#database)). The tables, from `src/core/bootstrap/entities.ts`:
+
+| Area | Tables |
+|---|---|
+| Accounts | `users`, `sessions` |
+| Teams | `teams`, `team_roles`, `team_members`, `team_invitations`, `secret_keys`, `secret_key_usage_logs`, `team_ai_integrations` |
+| Clusters | `team_clusters`, `cluster_metric_samples`, `cluster_transfer_jobs`, `storage_placements` |
+| Trajectories | `trajectories`, `trajectory_frames`, `trajectory_upload_sessions`, `trajectory_clone_jobs`, `trajectory_scene_artifacts`, `simulation_cells`, `catalog_folders` |
+| Plugins and analyses | `plugins`, `pipeline_runs`, `analyses`, `analysis_provenances` |
+| Collaboration | `whiteboards`, `scripting_notebooks`, `notifications`, `daily_activities`, `ai_chat_conversations`, `ai_chat_messages` |
+| Runtime state | `key_value_entries`, `key_value_set_members`, `domain_event_spool` |
+| Deployment | `deployment_settings` |
+
+`team_clusters` holds each cluster's credentials (encrypted), status, role, queue settings and last reported host capabilities. `storage_placements` records which cluster holds what, and `cluster_transfer_jobs` the moves between clusters. `cluster_metric_samples` keeps 24 hours of heartbeat metrics.
+
+## Server data directory
+
+`SERVER_DATA_DIR` (`/var/lib/volt-server` in the containers) holds the files the server serves itself, which today are avatars:
+
+- `user-files/<bucket>/<key>`, plus `<key>.meta.json` with the content type. `USER_FILES_ROOT` moves `user-files` elsewhere.
+- They are served at `/api/files/<bucket>/<key>`, with absolute URLs built from `SERVER_ENDPOINT`.
+
+Temporary files go to `storage/temp` under the server's working directory and are cleaned up by the temp storage lifecycle.
+
+## Daemon database
+
+The daemon's database is separate from the server's. On a self-hosted stack it is the Postgres database `volt-cluster` (the daemon creates it when missing); with no `DATABASE_URL` it is SQLite at `$DAEMON_DATA_DIR/daemon.sqlite`, in WAL mode. Its schema is synchronized on every start.
+
+| Table | Contents |
+|---|---|
+| `queue_jobs` | Every queue's jobs: state, attempts, lease, backoff, payload |
+| `daemon_state_entries`, `daemon_state_list_items` | Short-lived state with TTLs, such as the claim that makes one worker build a trajectory's Parquet table |
+| `plugin_listing_rows`, `plugin_sub_listing_rows` | The rows of analysis result listings, which the server pages through with `plugin.listings.list` and `plugin.sub-listings.list` |
+
+## Daemon data directory
+
+`DAEMON_DATA_DIR` (`/var/lib/volt-daemon` in the containers, `~/.volt-daemon/data` otherwise):
+
+<Files>
+  <Folder name="$DAEMON_DATA_DIR" defaultOpen>
+    <Folder name="object-store" defaultOpen>
+      <Folder name="objects" />
+      <Folder name="metadata" />
+    </Folder>
+    <Folder name="analysis-dumps" />
+    <Folder name="analysis-output" />
+    <Folder name="artifact-uploads" />
+    <Folder name="native-processing" />
+    <Folder name="plugin-bin-cache" />
+    <Folder name="plugin-parquet-cache" />
+    <Folder name="trajectory-parquet-cache" />
+    <File name="daemon.sqlite" />
+  </Folder>
+</Files>
+
+| Path | Contents |
+|---|---|
+| `object-store/` | The object store (`OBJECT_STORE_ROOT` moves it). The only directory that must be kept. |
+| `analysis-dumps/`, `analysis-output/` | Dumps downloaded for pipeline jobs, and their per-job working directories |
+| `artifact-uploads/` | Artifacts waiting to be uploaded |
+| `native-processing/` | Temporary directories for parsing, GLB export and rasterization |
+| `plugin-bin-cache/` | Local copies of plugin binaries and their provisioned environments |
+| `plugin-parquet-cache/`, `trajectory-parquet-cache/` | Local copies of Parquet tables that DuckDB reads |
+| `daemon.sqlite` | The daemon database, when it is SQLite |
+
+## The object store
+
+`FilesystemObjectStore` (`src/shared/storage/FilesystemObjectStore.ts`) is a plain directory tree with S3-like semantics: buckets, keys, metadata, listing by prefix, ranged reads and composing parts into one object.
+
+- An object's bytes are at `object-store/objects/<BUCKET_PREFIX><bucket>/<key>`.
+- Its metadata (ETag, content type, content encoding, custom fields) is at `object-store/metadata/<BUCKET_PREFIX><bucket>/<key>.json`.
+- Keys cannot escape their bucket directory.
+- The buckets are created on startup. `BUCKET_PREFIX` is `cluster-` in the compose stack and the web runtime, so the directories are named `cluster-volt-dumps` and so on.
+
+Other machines reach the store only through the daemon's [object gateway](/docs/architecture/cluster-daemon#object-gateway), directly or tunneled.
+
+| Bucket | Keys |
+|---|---|
+| `volt-dumps` | `trajectory-staging/<trajectoryId>/...` (upload parts and staged files); `trajectory-<id>/timestep-<N>.dump.zst` |
+| `volt-models` | `trajectory-<id>/timestep-<N>.glb.zst` (frame models); `trajectory-<id>/analysis-<id>/glb/<N>/...glb.zst` (analysis models, color-coded and particle-filtered models) |
+| `volt-rasterizer` | `trajectory-<id>/previews/timestep-<N>.png`; analysis rasters under `trajectory-<id>/analysis-<id>/` |
+| `volt-trajectories` | `trajectory-<id>/trajectory.parquet`, `trajectory-<id>/elements.json` |
+| `volt-plugins` | `plugins/trajectory-<id>/analysis-<id>/<exposureId>/timestep-<N>.parquet` (exposures; `.lines.parquet` for line exposures), charts and tables under `trajectory-<id>/analysis-<id>/`, `plugin-binaries/registry/<scope>/<version>/<platform>/<file>`, `plugins/warm/<binaryHash>.warm.tar.zst` |
+| `volt-analysis-logs` | `trajectory-<id>/analysis-<id>/frame-<N>.json` |
+| `volt-whiteboards` | `<teamId>/<whiteboardId>/state.json`, `<teamId>/<whiteboardId>/assets/<assetId>` |
+
+Deleting a trajectory removes its `trajectory-<id>/` prefix from `volt-dumps`, `volt-models`, `volt-rasterizer` and `volt-plugins`, and its `plugins/trajectory-<id>/` prefix. Deleting an analysis removes its `analysis-<id>/` prefixes the same way, including its logs.
+
+## Compressed dumps and models
+
+Frame dumps and GLB models are stored zstd-compressed (`.zst`), compressed by the `zstd` program at level 5 with `TRAJECTORY_ZSTD_THREADS` threads (2 by default). Models are stored with `Content-Encoding: zstd`, and the server always streams them compressed: with `Content-Encoding: zstd` when the request's `Accept-Encoding` allows it, so the browser decodes them, and otherwise with `X-Volt-Resource-Encoding: zstd` for the client to decode. Analysis and rasterization jobs decompress a dump or model to a local file before reading it.
+
+## Parquet and DuckDB
+
+Tabular data is Apache Parquet, read in place with DuckDB rather than loaded whole:
+
+- `trajectory.parquet` holds every frame's atoms (`timestep`, `atom_index`, `id`, `type`, `x`, `y`, `z`, plus every per-atom property the dumps carry), written once all of a trajectory's frames are processed. `ParquetTrajectoryFrameStore` queries it for frame reads, atom lookups and statistics.
+- Plugin exposures are one Parquet file per exposure and timestep, which `ParquetPluginPropertyStore` and the exposure readers query for per-atom values, listings, color coding and filters.
+
+The daemon reads them with in-memory DuckDB connections (`@duckdb/node-api`) against local copies in its Parquet caches. Plugins write theirs with the DuckDB built into CoreToolkit, whose memory the daemon caps with `VOLT_DUCKDB_MEMORY_LIMIT_MB` (25% of RAM, between 1 GB and 16 GB, unless set).
+
+## Whiteboards and notebooks
+
+- **Whiteboards.** The `whiteboards` row holds the metadata and `payloadKey`; the board's state is `state.json` in `volt-whiteboards` on a cluster, and uploaded assets sit next to it.
+- **Notebooks.** A notebook's cells are in the server database (`scripting_notebooks.content`). On a server, opening one copies the content into its Jupyter container on a cluster. In the browser runtime, kernels keep their environments and working files in the OPFS directory `volt-notebooks`.
+
+## Docker volumes
+
+The single-host stack (`packages/apps/desktop/stack/compose.yml`, project `volt`):
+
+| Volume | Mounted at | Contents |
+|---|---|---|
+| `volt-postgres-data` | `/var/lib/postgresql/data` in `volt-postgres` | The server's database `volt` and the daemon's database `volt-cluster` |
+| `volt-server-data` | `/var/lib/volt-server` in `volt-server` | `SERVER_DATA_DIR`: avatars |
+| `cluster-daemon-data` | `/var/lib/volt-daemon` in `cluster-daemon` | `DAEMON_DATA_DIR`: the object store and caches |
+
+The install files the server generates for another machine define `postgres-data` (that cluster's `volt-cluster` database) and `daemon-data` (its `DAEMON_DATA_DIR`). Back up the database volumes and the daemon data volumes together: the server's records point at objects in the daemons' stores.
+
+## In the browser and the desktop app
+
+The web runtime keeps everything in the origin private file system (OPFS):
+
+| OPFS entry | Contents |
+|---|---|
+| `volt-local-stack.json` | Bootstrap state (local account, team, cluster and daemon password), the plugin seed state, the generated secrets |
+| `volt-server/` | The server worker's file system, including `/data/server` |
+| `.volt-server-sqlite/` | The server's SQLite database (`/data/server/server.sqlite`), in the `opfs-sahpool` VFS |
+| `volt-daemon/` | The daemon worker's file system, including `/data/daemon` with the object store and caches |
+| `.volt-daemon-sqlite/` | The daemon's SQLite database |
+| `volt-notebooks/` | The notebook kernels' file system: `/home/volt/workspaces/<workspace>` with its `.venv` |
+
+A browser may evict an origin's storage when space runs low, and clearing site data deletes the workspace. The desktop app's origin is its own persistent session (`persist:volt`) under the app's user data. See [Web runtime](/docs/architecture/web-runtime).

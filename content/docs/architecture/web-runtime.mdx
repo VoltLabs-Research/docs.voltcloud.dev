@@ -1,0 +1,156 @@
+---
+title: Web runtime
+description: How @volt/web-runtime runs the unmodified VOLT server, cluster daemon and plugins in browser workers, for the browser tab and the desktop app.
+---
+
+`@volt/web-runtime` (`packages/infra/web-runtime`) runs VOLT's backends in a web page. The server, the cluster daemon with its planes, and the plugins the daemon runs are the same builds a self-hosted machine runs; the runtime gives them a Node platform implemented over browser APIs. That is what lets VOLT work in a browser tab with no server to install, and what the desktop app runs in its window.
+
+The runtime is the **implementation of Node**, not a port of VOLT: nothing in `packages/infra/server` or `packages/infra/cluster` knows it runs in a browser. The only differences a backend sees are the ones a different machine would show: SQLite instead of Postgres (from its environment), no Docker, and a `wasm32` architecture.
+
+## Source layout
+
+| Path | What it is |
+|---|---|
+| `src/platform/` | The Node modules the backends use, reimplemented: `fs`, `http`, `net`, `child_process`, `worker_threads`, `os`, `process`, `crypto`, `zlib`, timers, and the packages `better-sqlite3`, `@duckdb/node-api`, `ws`, `sharp`, `chartjs-node-canvas` |
+| `src/workers/` | `backend.ts`, the entry of a backend worker and of every process a backend spawns; `node-runner.ts`, which runs a CommonJS script from the file system as `node <script>` does; the boot protocol |
+| `src/host/` | The page side: `BackendHost` (starts the workers), `browser-stack.ts` (`startBrowserStack`), `browser-stack-store.ts`, `service-worker-relay.ts`, `notebook-kernels.ts` |
+| `src/service-worker.ts` | The service worker that relays the page's API traffic and isolates the page |
+| `src/python/` | `python3`: Pyodide run as a Node program, `pip`, and the notebook kernel |
+| `scripts/build.mjs` | Bundles each backend's built `dist/` against `src/platform` with esbuild |
+| `scripts/native-addons.mjs` | Compiles native Node addons to WebAssembly |
+| `scripts/vite-plugin.mjs` | The Vite plugin a web client adds |
+| `smoke/` | Pages run in headless Chrome by `scripts/smoke.mjs` |
+
+## Starting a stack
+
+The client starts the stack in `packages/apps/client/src/modules/local-stack/services/boot-local-stack.ts`:
+
+<Steps>
+<Step>
+Check for service workers, Web Locks and the origin private file system (OPFS). Without them the stack cannot run.
+</Step>
+<Step>
+Register the service worker. A page is cross-origin isolated only when the worker served its document, so the first start reloads the page once.
+</Step>
+<Step>
+Take the Web Lock `volt-local-stack`. The stack's workers hold the origin's files open, so only one tab runs it; a second tab is told to use the first.
+</Step>
+<Step>
+Call `startBrowserStack` (`src/host/browser-stack.ts`), which hands `@volt/local-stack`'s `provisionLocalStack` two ways to start backends. The phases are **Start API server**, **Provision workspace** (the local account, team and cluster), and **Start compute daemon** (wait until the daemon connects). The default plugins for the daemon's platform then install in the background, three at a time; one that fails is retried on the next start.
+</Step>
+</Steps>
+
+Each backend is a module worker started by `BackendHost` with the environment Node would give it:
+
+| | Server | Daemon |
+|---|---|---|
+| Worker script | `server.worker.js` | `daemon.worker.js` |
+| Loopback port | 8100 | 18080 |
+| Environment | `localServerEnv(...)`: `DEPLOYMENT_MODE=local`, `DATABASE_URL=sqlite:/data/server/server.sqlite`, `SERVER_DATA_DIR=/data/server`, plus `NOTEBOOK_KERNELS=browser` | `localDaemonEnv(...)`: the provisioned `TEAM_CLUSTER_ID` and password, `DAEMON_DATA_DIR=/data/daemon`, `BUCKET_PREFIX=cluster-`, `OBJECT_GATEWAY_PUBLIC_BASE_URL=http://127.0.0.1:18080`, no `DATABASE_URL` (so SQLite) |
+| OPFS directories | `volt-server`, `.volt-server-sqlite` | `volt-daemon`, `.volt-daemon-sqlite` |
+
+What a stack keeps between starts (the bootstrap state, the plugin seed and the generated secrets) is one JSON file, `volt-local-stack.json`, at the root of OPFS.
+
+## The Node platform
+
+### Loopback network
+
+What is `127.0.0.1` between processes on a machine is, here, `MessagePort`s between workers (`src/platform/loopback.ts`). A worker that listens on a port announces it to its parent, which announces it upward, so every realm (the page, a backend, a process a backend spawned) can route a connection to any port. Connections are of two kinds, `http` and `ws`; `http.createServer().listen()`, `http.request()`, `fetch` and the `ws` server and client APIs run over them, so Express, engine.io and socket.io-client work unchanged. `net` only connects to loopback ports; there is no raw TCP in a browser.
+
+### File system
+
+Each backend gets a synchronous `fs` backed by one OPFS directory (`src/platform/fs/`). Only a dedicated worker can open `FileSystemSyncAccessHandle`s, so every directory has a file system service worker that owns it, keeps the tree and metadata in memory, and answers the backend's calls. The calling worker writes a request into a `SharedArrayBuffer`, wakes the service, and blocks in `Atomics.wait` until the reply is written; large payloads cross in several rounds. Workers a backend starts attach to the same service, so they share its files. The workspace persists between visits.
+
+### Databases
+
+- **SQLite.** `better-sqlite3` is implemented on `@sqlite.org/sqlite-wasm` with the `opfs-sahpool` VFS, which is synchronous inside a worker, so TypeORM keeps `better-sqlite3`'s synchronous calls and transactions.
+- **DuckDB.** `@duckdb/node-api` is implemented on duckdb-wasm's blocking build. Its file I/O goes through the platform's synchronous `fs`, so `read_parquet()` and `COPY ... TO` take the same paths they take on a Node machine.
+
+### Processes
+
+`child_process` runs a Node program in its own worker, attached to the parent's file system and loopback network, with stdio pipes, an IPC channel, exit codes and signals. It can run:
+
+- a program the runtime ships a bundle for: the daemon's planes (`control-plane.js`, `heartbeat-plane.js`, `socket-channel-plane.js`) and its Parquet ingest worker;
+- a script in the file system, run by `node` or by its `#!/usr/bin/env node` line, which is how plugins compiled to WebAssembly for Node run;
+- `python3`, from its executable or a script's `#!` line.
+
+Anything else fails to spawn with `ENOENT`, as a missing binary does. A child's stdin is a ring buffer in shared memory (`src/platform/pipe.ts`), so a program's blocking `fs.readSync(0)` works. `worker_threads` runs a bundled program in a nested worker sharing the realm's file system.
+
+`os` reports a Linux machine with `navigator.hardwareConcurrency` cores and `navigator.deviceMemory` of RAM (4 GiB when the browser does not say), and `process.arch` is `wasm32`. The daemon therefore reports the platform tag `wasm-wasm32`, and plugins install their `wasm-wasm32` bundles.
+
+### Native addons
+
+The daemon's native addons, `@voltstack/lammps-io`, `@voltstack/spatial-assembler` and `@voltstack/headless-rasterizer`, are compiled to WebAssembly by `scripts/native-addons.mjs` from the sources the packages publish, with the compile settings of their own `binding.gyp` as node-gyp reads them on Linux. emnapi provides Node-API, Emscripten's NODERAWFS does file I/O through the platform's `fs`, and pthreads run on `worker_threads`. The result is installed where `node-gyp-build` looks for the addon it replaces, so `require('@voltstack/lammps-io')` loads it. Builds are cached in `node_modules/.cache/native-addons` and redone only when a source changes.
+
+Packages the platform implements itself are not compiled: `better-sqlite3` and `@duckdb/node-api` (above), `sharp` (resize and encode with `OffscreenCanvas`, for avatars and trajectory previews) and `chartjs-node-canvas` (Chart.js on an `OffscreenCanvas`, for chart exports). `zlib`'s zstd only decompresses (fzstd, in JavaScript), which is what the daemon needs for plugin bundles; compressing dumps and models is the `zstd` program's job, as on any machine.
+
+### What is installed on the machine
+
+Besides the backends, `scripts/build.mjs` writes what a machine would have installed (`src/platform/installs.ts`): `@duckdb/duckdb-wasm` in the global Node folder for plugins to load, the daemon's `vendor/` tools (`volt-dump-transform` and `zstd`, `wasm-wasm32` builds), Pyodide and the Python wheels. Each install carries an `install.json` and is written last, so an interrupted install is redone.
+
+## Service worker relay and isolation
+
+The service worker (`src/service-worker.ts`, served at `/volt-service-worker.js`) does two jobs:
+
+- **Relay.** Requests from the page to its own origin under `/api/` and `/socket.io/` are relayed to the server at `http://127.0.0.1:8100`, as are requests to loopback hosts on other origins (absolute URLs the backends hand out). A service worker cannot reach the workers itself, so it relays through the page that runs the stack, over the loopback network. If no page of the origin runs the stack, it answers 503. The client points its API and Socket.IO at its own origin in local-stack mode; socket.io's long-polling requests go through the relay.
+- **Isolation.** Every other same-origin response gets `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: credentialless`. The backends need `SharedArrayBuffer` (file system channel, pipes), which needs a cross-origin isolated page, wherever the client is hosted.
+
+## Python and notebooks
+
+Every machine has `python3` on its `PATH` (`src/python/`): CPython compiled to WebAssembly from the Pyodide release in `package.json` (`pyodide` `314.0.7`), run as Node runs it. It sees the process's files through Emscripten's NODEFS, reads and writes its standard streams, and exits with its code.
+
+- `python3 -m venv DIR` writes a virtual environment; its interpreter is a copy of the `python3` executable, which the runtime runs as the program it is.
+- `python3 -m pip install` installs into the running environment with micropip: Pyodide's builds of packages with native code (NumPy, pandas, pyarrow, scikit-learn, ...) and pure-Python wheels from PyPI. The first install of a package downloads it from Pyodide's CDN.
+- The build packages `packages/sdk/python` as a wheel in `/usr/local/share/python-wheels`, versioned with a digest of its files (for example `3.1.1+afe0a4816516`), and `pip install voltsdk` installs that wheel, so code here uses the SDK of the server it talks to.
+- The daemon provisions Python plugins as it does on any machine: a virtual environment, `pip install -r requirements.txt`, then the plugin script with the host stub.
+
+Python is a guest here: there is no `subprocess` and there are no threads, `requests` reaches the backends through the relay, and the SDK's `SpatialAssembler` is unavailable because `volt-spatial-assembler` has no Pyodide build.
+
+**Notebook kernels** run in the page, not on the daemon. The server runs with `NOTEBOOK_KERNELS=browser`, and the client starts kernels with `src/host/notebook-kernels.ts`. Each kernel is a `python3 -m volt_kernel` process with the notebook's credentials for the server, running cells as IPython does (rich output, matplotlib figures, top-level `await`, `%pip`, `input()`, interrupts). Kernels share a file system of their own (OPFS directory `volt-notebooks`): each workspace has a virtual environment and working directory under `/home/volt/workspaces/<workspace>` that all its notebooks use. The first kernel of a workspace creates the environment and installs `voltsdk`; a kernel that finds a different SDK build than the machine's installs the machine's. See [Notebooks](/docs/guides/notebooks).
+
+## Wasm plugins
+
+A plugin's `wasm-wasm32` build is a Node program compiled with Emscripten: CoreToolkit's `volt_wasm_program` CMake function links with `-sENVIRONMENT=node -sNODERAWFS=1 -sSINGLE_FILE=1` and prepends a `#!/usr/bin/env node` line. The daemon runs it as `bin/<name>` like any executable, and the runtime's `child_process` runs it as a Node program. Its DuckDB calls go through CoreToolkit's `duckdb-host.js` bridge to the `@duckdb/duckdb-wasm` installed on the machine. See [Native libraries](/docs/architecture/libraries#coretoolkit).
+
+## The desktop app
+
+The desktop app (`packages/apps/desktop`) is an Electron window onto the same client build. Its session (`persist:volt`) answers every request to `https://volt.invalid` from the client's `dist`, with the COOP/COEP headers on every response, so the page is isolated from its first load. An `https` origin keeps everything the client builds from its own origin working as on a server, and `.invalid` never resolves. The preload exposes `window.volt`, which puts the client in local-stack mode permanently. The app turns off renderer backgrounding and background timer throttling, since the page hosts the whole stack and must keep running while the window is hidden. The origin's storage lives under the app's user data and is persistent, so nothing evicts the workspace. See [Desktop app](/docs/run/desktop).
+
+## Building
+
+A web client adds the Vite plugin, which serves the built runtime under `/volt-runtime/` and the service worker at the origin's root, and copies both into the build:
+
+```ts
+import voltWebRuntime from '@volt/web-runtime/vite';
+
+export default defineConfig({ plugins: [voltWebRuntime()] });
+```
+
+The runtime bundles the backends' built `dist/`, so they build first. Emscripten 3.1.74 (what CI uses) compiles the native addons:
+
+```bash
+source ~/emsdk/emsdk_env.sh
+pnpm --filter "@volt/web-runtime^..." build
+pnpm --filter @volt/web-runtime build
+```
+
+The daemon's `vendor/` tools come from the `wasm-wasm32` assets of the CoreToolkit release that `cluster-daemon`'s `coreToolkitTools` pins. If that release publishes no `wasm-wasm32` build of a tool, the build prints a warning and goes on without it. To use a local CoreToolkit build, point `VOLT_WASM_TOOLS_DIR` at its install prefix:
+
+```bash
+packages/coretoolkit/scripts/build-wasm-plugin.sh   # no plugin: CoreToolkit's own programs
+VOLT_WASM_TOOLS_DIR=packages/coretoolkit/install-wasm pnpm --filter @volt/web-runtime build
+```
+
+## Smoke tests
+
+Each smoke test runs a page of `smoke/` in headless Chrome (`CHROME_PATH`, `/usr/bin/google-chrome` by default) and fails unless the page reaches its last step:
+
+| Command | What it checks |
+|---|---|
+| `pnpm --filter @volt/web-runtime smoke page` | The Node platform in a worker |
+| `pnpm --filter @volt/web-runtime smoke programs` | Node programs spawned with binary stdio |
+| `pnpm --filter @volt/web-runtime smoke stack` | The whole stack provisioned, as the client does |
+| `pnpm --filter @volt/web-runtime smoke python` | `python3`: venv, pip, stdio and exit codes |
+| `pnpm --filter @volt/web-runtime smoke notebook` | Notebook kernels in the page |
+
+The Python pages download packages from Pyodide's CDN, so they need the network. CI (`verify.yml`) typechecks the runtime and runs the smoke pages.
