@@ -68,11 +68,11 @@ How the container behaves:
 
 - **One container per notebook.** It runs JupyterLab from the cluster's Jupyter image and may use all of the machine's CPUs and memory.
 - **Served through VOLT.** VOLT opens JupyterLab through its server. Each request checks that you are a member of the team with the `scripting:read` permission. The link VOLT opens carries an access token, valid for 7 days by default.
-- **Reused.** Opening the notebook again reuses its container, and starts it if it was stopped. VOLT creates a new container, without the files of the old one, when the cluster's Jupyter image or settings change or when a different member opens the notebook.
+- **Reused.** Opening the notebook again reuses its container, and starts it if it was stopped. VOLT creates a new container, which keeps the notebook but none of the old one's other files, when the cluster's Jupyter image or settings change or when a different member opens the notebook.
 - **Removed** when you delete the notebook, when the notebook moves to another cluster, when its trajectory is deleted, or when its session is stopped through the API or VOLT AI. There is no idle timeout.
 
 <Callout type="warn">
-VOLT keeps its own copy of the notebook and writes it into the container each time you open the notebook. What you save in JupyterLab stays in the container's file and is not copied back to VOLT, so opening the notebook again from VOLT replaces it with VOLT's copy. Download a notebook from JupyterLab to keep the edits you make there, and keep results by writing them through `voltsdk` or downloading them.
+What you save in JupyterLab is kept in the notebook's container. Each time you open the notebook from VOLT, VOLT reads that file and stores it as its own copy, and a container that VOLT recreates starts from it. Edits saved after the last time you opened the notebook stay only in the container, so they are lost if the container is removed before the next open: when you delete the notebook, move it to another cluster, or stop its session. Keep results by writing them through `voltsdk` or downloading them.
 </Callout>
 
 ### The Jupyter image
