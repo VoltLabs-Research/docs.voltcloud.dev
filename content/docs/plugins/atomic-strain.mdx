@@ -1,88 +1,70 @@
 ---
 title: Atomic Strain
-description: Measure local deformation by comparing atomic neighborhoods against a reference configuration.
+description: Compute each atom's local deformation gradient and strain relative to a reference frame, with the von Mises shear strain, the volumetric strain and D²min.
 ---
 
-## Parameters
+Atomic Strain compares each atom's neighborhood in the current frame with the same neighborhood in a reference frame and fits the local deformation that maps one onto the other. It gives a strain tensor per atom, its von Mises shear and volumetric invariants, and D²min, the part of the motion the fit can't explain. Use it to see shear bands in metallic glasses, plastic zones under an indenter or a crack tip, and the onset of plasticity. It works for crystals and amorphous solids alike.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `cutoff` | `float` | `3.0` | Cutoff radius for neighbor search. |
-| `reference` | `frame` | — | Reference frame to compare against. If omitted, the current frame is used, which usually produces near-zero strain. |
-| `eliminate_cell_deformation` | `bool` | `false` | Eliminate cell deformation before the local fit. |
-| `assume_unwrapped` | `bool` | `false` | Assume coordinates are already unwrapped. |
-| `calc_deformation_gradient` | `bool` | `true` | Compute deformation gradient `F`. |
-| `calc_strain_tensors` | `bool` | `true` | Compute strain tensors. |
-| `calc_d2min` | `bool` | `true` | Compute `D2min`, the non-affine residual. |
+| Key | Version | Builds |
+|---|---|---|
+| `atomic-strain` | 2.1.1 | Linux, macOS, Windows, browser |
 
-## Output
+## How it works
 
-### `{outputBase}_atomic_strain.parquet`
+For each atom, the plugin takes the neighbors within the cutoff in the reference frame and their bond vectors there and in the current frame. It finds the deformation gradient **F** that best maps the reference bonds to the current ones by least squares. From **F** it computes:
 
-Summary statistics for the analysis run.
+- The Green-Lagrangian strain tensor **E** = ½(**F**ᵀ**F** − **I**).
+- The von Mises shear strain, the second invariant of **E**: √(E_xy² + E_xz² + E_yz² + [(E_xx − E_yy)² + (E_yy − E_zz)² + (E_xx − E_zz)²] / 6).
+- The volumetric strain, (E_xx + E_yy + E_zz) / 3.
+- D²min, the sum over the neighbors of the squared residual of the fit, |**r** − **F r**₀|²: the non-affine part of the neighbors' displacements.
+- The polar decomposition **F** = **RU** into a rotation **R** and a stretch **U**.
 
-```ts
-interface AtomicStrainOutput {
-    main_listing: {
-        cutoff: float;
-        num_invalid_particles: int;
-        average_shear_strain: float;
-        average_volumetric_strain: float;
-        max_shear_strain: float;
-    };
-    is_failed: boolean;
-}
-```
+An atom with fewer than three neighbors, a degenerate neighborhood, or no counterpart in the reference frame is marked invalid and gets zero strain.
 
-### `{outputBase}_atoms.parquet`
+## Inputs
 
-Per-atom data in the canonical AtomisticExporter format consumed by the VOLT viewer. Atoms are partitioned into `VALID` and `INVALID` buckets.
+- A reference frame of the same trajectory, with the same atoms. Atoms are matched by their identifier.
+- Atom positions and the simulation cell of both frames.
 
-```ts
-type StrainTensor = [float, float, float, float, float, float];
-type DeformationGradient = [float, float, float, float, float, float, float, float, float];
+## Arguments
 
-interface AtomRecord {
-    // Base fields (always present)
-    id: int;
-    pos: [float, float, float];
-    structure_id: int;
-    structure_name: string;
-    cluster_id: int;
-    // Plugin-specific fields
-    shear_strain: float;
-    volumetric_strain: float;
-    invalid: boolean;
-    strain_tensor?: StrainTensor;       // present when calc_strain_tensors is true
-    deformation_gradient?: DeformationGradient; // present when calc_deformation_gradient is true
-    D2min?: float;                      // present when calc_d2min is true (key absent when disabled)
-}
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Reference Frame** `reference` | frame | (none) | A timestep of the trajectory | The undeformed configuration. If you leave it empty, each frame is its own reference and every strain is zero. |
+| **Cutoff** `cutoff` | number | `3` | ≥ 0, step 0.1 | Neighbor cutoff in the reference frame. Include at least the first neighbor shell. |
+| **Eliminate Cell Deformation** `eliminate_cell_deformation` | boolean | `false` | | Remove the homogeneous deformation of the simulation cell, so only local strain remains. |
+| **Assume Unwrapped** `assume_unwrapped` | boolean | `false` | | Treat coordinates as unwrapped and don't apply the minimum image convention to displacements. |
+| **Calc Deformation Gradient** `calc_deformation_gradient` | boolean | `true` | | Write the deformation gradient. |
+| **Calc Strain Tensors** `calc_strain_tensors` | boolean | `true` | | Write the strain tensor. |
+| **Calc D2min** `calc_d2min` | boolean | `true` | | Compute D²min. |
+| **Calc Polar Decomposition (R and U tensors)** `calc_polar_decomp` | boolean | `true` | | Write the rotation and stretch tensors. |
 
-interface AtomsOutput {
-    main_listing: {
-        total_atoms: int;
-        structure_count: int;
-    };
-    sub_listings: {
-        structures: Array<{
-            structure_id: int;
-            structure_name: string;
-            atom_count: int;
-        }>;
-    };
-    export: {
-        AtomisticExporter: {
-            VALID: AtomRecord[];
-            INVALID: AtomRecord[];
-        };
-    };
-}
-```
+<Callout type="warn">
+Turning off the four **Calc** options has no effect in version 2.1.1. VOLT passes a boolean argument to this plugin only when it is on, and the program computes these quantities unless told otherwise.
+</Callout>
 
-The `atoms.parquet` result is also exported to a renderable GLB model via `AtomisticExporter` for 3D viewing in the VOLT client.
+## Outputs
 
-## See Also
+| Exposure | What you get |
+|---|---|
+| **Atomic Strain** | A listing with the cutoff, the number of invalid atoms, and the mean shear, mean volumetric and maximum shear strain. |
+| **Atomic Strain Model** | A listing, and a 3D model of the atoms grouped into `VALID` and `INVALID`. |
 
-- [Elastic Strain](/docs/plugins/elastic-strain) — ideal-lattice elastic strain
-- [Displacements Analysis](/docs/plugins/displacements-analysis) — direct reference-versus-current displacement vectors
-- [Centrosymmetry Parameter](/docs/plugins/centrosymmetry-parameter) — defect-oriented scalar highlighting
+The workflow declares these per-atom properties:
+
+| Property | Label | Type |
+|---|---|---|
+| `shear_strain` | Shear Strain | double |
+| `volumetric_strain` | Volumetric Strain | double |
+| `D2min` | D²min (Nonaffine Displacement) | double |
+| `strain_tensor` | Strain Tensor (6 components) | list of doubles |
+| `deformation_gradient` | Deformation Gradient (3×3) | list of doubles |
+| `rotation_tensor` | Rotation Tensor (3×3) | list of doubles |
+| `stretch_tensor` | Stretch Tensor (3×3) | list of doubles |
+| `invalid` | Invalid Particle | bool |
+
+Color the canvas by `shear_strain` or `D2min` to see where the sample deforms plastically.
+
+## Reference
+
+F. Shimizu, S. Ogata, J. Li, "Theory of shear banding in metallic glasses and molecular dynamics calculations", *Mater. Trans.* **48**, 2923 (2007). D²min: M. L. Falk, J. S. Langer, "Dynamics of viscoplastic deformation in amorphous solids", *Phys. Rev. E* **57**, 7192 (1998).

@@ -1,56 +1,60 @@
 ---
 title: Elastic Strain
-description: Compute crystal-referenced elastic strain by mapping local environments to an ideal lattice.
+description: Compute the elastic lattice strain of each crystalline atom relative to the ideal crystal, without a reference frame.
 ---
 
-<Callout type="info">
-  Requires an upstream structure-identification step: the plugin consumes the cluster tables (`clusters_table` and `clusters_transitions`) produced by the referenced structure-analysis plugin, and fails if those inputs are absent.
+Elastic Strain measures how much the crystal lattice around each atom is stretched, compressed or sheared compared with the ideal, stress-free crystal you describe by its structure and lattice constant. It needs no reference frame, and it ignores the plastic part of the deformation, because dislocation slip leaves the lattice itself unchanged. Use it to map elastic strain fields around dislocations, precipitates and interfaces, and coherency strains in a sample whose undeformed state you don't have.
+
+| Key | Version | Builds |
+|---|---|---|
+| `elastic-strain` | 2.1.0 | Linux, macOS, Windows, browser |
+
+## How it works
+
+The plugin takes the crystal clusters and per-atom neighbor topology from an earlier structure identification stage. For each crystalline atom it maps the ideal lattice vectors of its cluster, scaled by the lattice constant (and c/a for HCP), onto its actual bonds to the neighbors, giving the elastic deformation gradient **F**ₑ. From it, the strain tensor is the Green-Lagrangian **E** = ½(**F**ₑᵀ**F**ₑ − **I**) in the lattice frame, or with **Push Forward** the Euler-Almansi **e** = ½(**I** − **F**ₑ⁻ᵀ**F**ₑ⁻¹) in the spatial frame. The volumetric strain is a third of its trace.
+
+## Inputs
+
+- An earlier stage of [Polyhedral Template Matching](/docs/plugins/polyhedral-template-matching) or [Adaptive Common Neighbor Analysis](/docs/plugins/adaptive-common-neighbor-analysis) in the same pipeline. Its shared `clusters_table`, `clusters_transitions` and `neighbor_lattice` fill in this plugin's hidden arguments.
+- The lattice constant of the stress-free crystal, for example from an energy minimization of your potential.
+
+## Arguments
+
+| Argument | Type | Default | Allowed values | Description |
+|---|---|---|---|---|
+| **Lattice Constant** `lattice_constant` | number | `3.615` | ≥ 0, step 0.01 | The stress-free lattice constant a₀ in the frame's length units. The default is copper's. |
+| **Crystal Structure** `crystal_structure` | select | `FCC` | `FCC`, `BCC`, `HCP` | The crystal whose ideal lattice vectors are used. Match the structure identification stage. |
+| **c/a Ratio** `ca_ratio` | number | `1` | ≥ 0, step 0.01 | The c/a ratio, for HCP. |
+| **Push Forward** `push_forward` | boolean | `false` | | Express the strain in the spatial frame (Euler-Almansi) instead of the lattice frame (Green-Lagrangian). |
+| **Calc Deformation Gradient** `calc_deformation_gradient` | boolean | `true` | | Write the elastic deformation gradient. |
+| **Calc Strain Tensors** `calc_strain_tensors` | boolean | `true` | | Write the strain tensor. |
+
+These arguments are filled in from the earlier stage and don't appear in the form:
+
+| Argument | Type | Shared by |
+|---|---|---|
+| **Clusters Table** `clusters_table` | string | Polyhedral Template Matching, Adaptive Common Neighbor Analysis (and Pattern Structure Matching, which doesn't share it in its current version) |
+| **Clusters Transitions** `clusters_transitions` | string | Same |
+| **Neighbor Lattice** `neighbor_lattice` | string | Same |
+
+<Callout type="warn">
+Turning off **Calc Deformation Gradient** or **Calc Strain Tensors** has no effect in version 2.1.0. VOLT passes a boolean argument to this plugin only when it is on, and the program computes both unless told otherwise.
 </Callout>
 
-## Parameters
+## Outputs
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `structure_analysis_plugin` | `pluginReference` | — | **Required.** Upstream structure-identification algorithm that produces the cluster tables. Accepts `polyhedral-template-matching` or `adaptive-common-neighbor-analysis`. |
-| `lattice_constant` | `float` | `3.615` | Lattice constant a₀. Required by the binary. |
-| `crystal_structure` | `string` | `FCC` | Reference crystal structure. Plugin UI options: `FCC`, `BCC`, `HCP`. (The underlying binary CLI additionally accepts `SC`, `CUBIC_DIAMOND`, `HEX_DIAMOND`.) |
-| `ca_ratio` | `float` | `1.0` | c/a ratio for HCP and hexagonal crystals. |
-| `push_forward` | `bool` | `false` | Push strain to the spatial frame (Euler strain). |
-| `calc_deformation_gradient` | `bool` | `true` | Compute deformation gradient `F`. |
-| `calc_strain_tensors` | `bool` | `true` | Compute strain tensors. |
+| Exposure | What you get |
+|---|---|
+| **Elastic Strain** | A listing with the frame's mean volumetric strain. |
+| **Elastic Strain Model** | A listing with the atom, structure and cluster counts, and a 3D model of the atoms grouped by structure. |
 
-## Output
+The per-atom table has `structure_id`, `structure_name`, `cluster_id`, `volumetric_strain`, `strain_tensor` and `deformation_gradient`.
 
-### `{outputBase}_elastic_strain.parquet`
+## Notes
 
-```ts
-type StrainTensor = [float, float, float, float, float, float];
-type DeformationGradient = [float, float, float, float, float, float, float, float, float];
+- Atoms outside a crystal cluster (cores, surfaces, grain boundaries) and atoms in a cluster of another structure than **Crystal Structure** (for example HCP stacking faults in FCC) get zero strain.
+- A wrong lattice constant shows up as a spurious volumetric strain everywhere. Check it on a strain-free region first.
 
-interface PerAtomProperties {
-    id: int;
-    volumetric_strain: float;
-    strain_tensor?: StrainTensor;
-    deformation_gradient?: DeformationGradient;
-}
+## Reference
 
-interface ElasticStrainOutput {
-    main_listing: {
-        average_volumetric_strain: float;
-    };
-    "per-atom-properties": PerAtomProperties[];
-}
-```
-
-### `{outputBase}_atoms.parquet`
-
-Per-atom atomistic export consumed by the **Elastic Strain Model** exposure and exported as a GLB via `AtomisticExporter`. The envelope contains:
-
-- `main_listing` — aggregate counts: `total_atoms`, `structure_count`, `clustered_atoms`, `unclustered_atoms`.
-- `sub_listings.structures` — array of `{ structure_id, structure_name, atom_count }` for each occupied structure type.
-- `export.AtomisticExporter` — atoms keyed by structure name. Each atom carries `id`, `pos`, `structure_id`, `structure_type`, `structure_name`, `cluster_id`, optional `topology_name`, and the strain quantities (`volumetric_strain`, `strain_tensor`, `deformation_gradient`) when computed.
-
-## See Also
-
-- [Atomic Strain](/docs/plugins/atomic-strain) — reference-frame local deformation analysis
-- [Displacements Analysis](/docs/plugins/displacements-analysis) — direct atom-by-atom displacement comparison
+A. Stukowski, A. Arsenlis, "On the elastic–plastic decomposition of crystal deformation at the atomic scale", *Modelling Simul. Mater. Sci. Eng.* **20**, 035012 (2012).
