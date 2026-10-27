@@ -1,0 +1,170 @@
+---
+title: Native libraries
+description: CoreToolkit, LammpsIO, SpatialAssembler and HeadlessRasterizer, the C++ libraries VOLT's analysis plugins and cluster daemon build on.
+---
+
+The numeric work in VOLT is C++. Four libraries, each in its own repository under VoltLabs-Research, carry it:
+
+| Library | What it does | Used by | Distributed as |
+|---|---|---|---|
+| [CoreToolkit](#coretoolkit) | Foundation of the analysis plugins: frames, cells, neighbor finders, expressions, Parquet output, the plugin CLI; also the `volt-dump-transform` tool | Every compiled plugin; the daemon's pipeline stages | Conan recipe `coretoolkit/2.6.1`, GitHub release assets |
+| [LammpsIO](#lammpsio) | Memory-mapped readers for LAMMPS dumps, data files and extended XYZ | The daemon (ingest, frames, Parquet); CoreToolkit | npm `@voltstack/lammps-io` 2.2.1, Conan `lammpsio/2.1.3` |
+| [SpatialAssembler](#spatialassembler) | GLB builder for atoms, point clouds and meshes | The daemon (frame models, analysis exports, filters); the Python SDK | npm `@voltstack/spatial-assembler` 1.1.1, PyPI `volt-spatial-assembler` 1.0.1 |
+| [HeadlessRasterizer](#headlessrasterizer) | CPU renderer from GLB to PNG | The daemon (preview rasters) | npm `@voltstack/headless-rasterizer` 1.1.1 |
+
+The three npm packages are Node-API addons (`node_api.h`, loaded with `node-gyp-build`). Each publishes prebuilt binaries for `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64` and `win32-x64` (`prebuildify`, in its `release-npm.yml` workflow, when a GitHub release is published), so installing them needs no compiler on those platforms. The daemon depends on them in `packages/infra/cluster/package.json` (`^2.1.0`, `^1.0.0`, `^1.0.0`); the server uses none of them.
+
+In the [web runtime](/docs/architecture/web-runtime#native-addons), VOLT compiles the three addons to WebAssembly itself, from their `binding.gyp`, with Emscripten and emnapi.
+
+## CoreToolkit
+
+`packages/coretoolkit` is a C++23 static library that every compiled VOLT analysis plugin is built on. It handles what each plugin would otherwise repeat: reading LAMMPS frames (through LammpsIO), the simulation cell and periodic boundaries, neighbor search, a per-atom expression engine, writing results as Parquet, and the command-line contract between a plugin and the daemon. It vendors `fast_float`, and builds `mwm_csp` and geogram (Delaunay triangulation) as static libraries next to it.
+
+### Where VOLT uses it
+
+- **Plugins.** The plugin repositories link it through Conan (`coretoolkit/[>=2.5]` in their `conanfile.py`, then `find_package(coretoolkit)`): `ackland-jones`, `adaptive-common-neighbor-analysis`, `atomic-strain`, `chill-plus`, `cluster-analysis`, `coordination-analysis`, `diamond-structure-identifier`, `displacements-analysis`, `elastic-strain`, `generalized-template-matching`, `grain-segmentation`, `ILDA`, `line-reconstruction-dxa`, `opendxa`, `pattern-structure-matcher`, `polyhedral-template-matching`, `reference-crystal-matching`, `structure-identification`, `transformer-phase-identification`, `voronoi-analysis` and `wigner-seitz-defect-analysis`. Python plugins do not use it.
+- **The daemon.** Pipeline `slice` and `expression` stages, and the merge of plugin results into the working dump, run CoreToolkit's `volt-dump-transform`, pinned by `coreToolkitTools` in `packages/infra/cluster/package.json` (see [Vendor tools](/docs/architecture/cluster-daemon#vendor-tools)).
+- **The web runtime.** The `wasm-wasm32` builds of `volt-dump-transform` and `zstd` come from the same release, and plugins built for `wasm-wasm32` use CoreToolkit's wasm toolchain.
+
+### Packaging
+
+The Conan recipe (`conanfile.py`) is `coretoolkit/2.6.1`, a static library:
+
+| | |
+|---|---|
+| Requires | `boost/1.88.0`, `lammpsio/[>=2.1]`, `onetbb/2021.12.0`, `spdlog/1.14.1`, `nlohmann_json/3.11.3`, `duckdb/1.4.3` |
+| Option `baseline_arch` | `off`, `x86-64`, `x86-64-v2`, `x86-64-v3` (default), `x86-64-v4`, `native`. The flags reach consumers through the package's `cpp_info`, since a CMake `PUBLIC` compile option does not cross a Conan package boundary. |
+
+There is no Conan remote: builds `conan export` CoreToolkit and LammpsIO from source checkouts, then build the plugin against them. `scripts/install-plugin.sh` does the same locally for one plugin.
+
+The CMake project (`CMakeLists.txt`) builds the `coretoolkit`, `mwm_csp` and `geogram` static libraries and the `volt-dump-transform` executable, plus `zstd` in wasm builds. Its options are `VOLT_BASELINE_ARCH` (`x86-64-v3`), `VOLT_ENABLE_NATIVE_OPTIMIZATIONS` (off; `-march=native`, not portable) and `VOLT_ENABLE_PARALLEL_DELAUNAY` (on, forced off for wasm). It installs `cmake/VoltPlugin.cmake`, which gives plugins `volt_add_plugin`, `volt_wasm_program` and `volt_pin_tbbmalloc`.
+
+### CI and releases
+
+| Workflow | Trigger | What it produces |
+|---|---|---|
+| `build-tools.yml` | `v*` tags, manual | `volt-dump-transform-<platform>.tar.gz` and `.sha256` for `linux-x86_64`, `darwin-arm64`, `windows-x86_64`, and the `wasm-wasm32` bundles of `volt-dump-transform` and `zstd` (Emscripten 3.1.74), attached to the GitHub release |
+| `build-plugin-binary.yml` | Called by plugin repositories | Builds the calling plugin against a fresh CoreToolkit and LammpsIO checkout on Linux, macOS, Windows (`windows-2022`) and wasm; bundles `<key>-<version>-<os>-<arch>.tar.zst` with a `.sha256`; on a tag, publishes a GitHub release and runs `vpm publish` to the registry |
+| `clone-and-build.yml` | Manual | Builds the algorithms with `scripts/install.sh` and keeps them as a workflow artifact |
+
+See [Writing plugins](/docs/develop/plugins) and [VPM](/docs/develop/vpm) for the plugin side.
+
+### API highlights
+
+| Header | What it gives a plugin |
+|---|---|
+| `volt/plugin/plugin_main.h` | `pluginMain`, `pluginMainMultiFrame`, and the `VOLT_PLUGIN_MAIN` / `VOLT_PLUGIN_MAIN_MULTIFRAME` macros, which parse options, load frames and run the plugin. Built-in flags: `--describe` (print the option table as JSON), `--help`, `--threads`, `--numa auto\|off`, and for multi-frame plugins `--reference` and `--frames`. |
+| `volt/plugin/plugin_entry.h` | `VOLT_SERVICE_PLUGIN(id, desc, ServiceType, bindingsVar)`, a plugin from a service class and its option bindings |
+| `volt/plugin/option_binding.h`, `option_reader.h`, `output_serializer.h` | Declaring options, reading them, writing outputs |
+| `volt/core/` | `LammpsParser`, `FrameAdapter`, `SimulationCell`, `ParticleProperty`, `ProgressReporter` (`progress.h`), the runtime budget (`runtime_budget.h`, which reads `VOLT_DUCKDB_MEMORY_LIMIT_MB`) |
+| `volt/analysis/` | `CutoffNeighborFinder`, `NearestNeighborFinder`, the expression engine (`expression.hpp`) |
+| `volt/utilities/` | Parquet writers for atoms, bonds, lines and meshes (`parquet_atom_writer.h`, `parquet_bond_writer.h`, `parquet_line_writer.h`, `parquet_mesh_writer.h`), DuckDB Parquet helpers, JSON utilities |
+
+`volt-dump-transform` rewrites a dump in one of three ways, and exits with code 2 on bad usage:
+
+```bash
+volt-dump-transform <input.dump> <output.dump> --slice <nx>,<ny>,<nz>,<distance>,<reverse>
+volt-dump-transform <input.dump> <output.dump> --select "<expression>"
+volt-dump-transform <input.dump> <output.dump> --merge <props.parquet>
+```
+
+### WebAssembly builds
+
+`scripts/build-wasm-plugin.sh` configures `cmake/wasm/CMakeLists.txt` with `emcmake`; run without a plugin, it builds CoreToolkit's own programs into `install-wasm/`. `volt_wasm_program` links a target as a single-file Node program (`-sENVIRONMENT=node -sNODERAWFS=1 -sSINGLE_FILE=1`, up to 4 GB of memory) with a `#!/usr/bin/env node` line, which is why the daemon can run it as an ordinary executable in the web runtime. DuckDB calls go through `compat/wasm/duckdb-host.js` to the `@duckdb/duckdb-wasm` package installed on the machine.
+
+## LammpsIO
+
+`packages/LammpsIO` reads atomistic trajectory files. It memory-maps the file, detects its format, indexes its frames by byte range, and reads a frame into typed arrays. The text dump reader goes multi-threaded from 50,000 atoms. The same sources build the npm addon and the Conan static library.
+
+| Format id | Files |
+|---|---|
+| `lammps-dump` | LAMMPS text dumps |
+| `lammps-dump-binary` | LAMMPS binary dumps |
+| `lammps-dump-yaml` | LAMMPS YAML dumps |
+| `lammps-data` | LAMMPS data files |
+| `extxyz` | Extended XYZ |
+
+### Where VOLT uses it
+
+- `TrajectoryParserFactory.ts`: `scanFrames` and `readHeader` when `trajectory.ingest` splits uploads into frames.
+- `TrajectoryFrameProcessingWorker.ts`: `readFrame` on the uploaded dump before building the frame's GLB.
+- `parquet-ingest-worker.cjs`: `readFrame` with ids and every property, to write `trajectory.parquet`.
+- CoreToolkit, through Conan (`lammpsio/[>=2.1]`, linked as `lammpsio::lammpsio`).
+
+### Packaging
+
+| Channel | Name and version |
+|---|---|
+| npm | `@voltstack/lammps-io` 2.2.1 (gyp target `lammps_io`, `NAPI_VERSION=8`) |
+| Conan | `lammpsio/2.1.3`, static library |
+| CMake | `project(lammpsio VERSION 2.1.0)`, target `lammpsio`; `LAMMPSIO_BUILD_TESTS` adds `lammpsio_smoke` |
+
+### JavaScript API
+
+```ts
+import { detectFormat, scanFrames, readHeader, readFrame } from '@voltstack/lammps-io';
+
+detectFormat(path)            // 'lammps-dump' | ... | null
+scanFrames(path)              // { format, frames: [{ index, byteOffset, byteLength, timestep, natoms }] }
+readHeader(path, { frame })   // { format, timestep, natoms, boxBounds, cellVectors, cellOrigin, pbc, headers, ... }
+readFrame(path, { includeIds, properties, frame, maxThreads })
+// { positions: Float32Array, types: Uint16Array, ids?: Uint32Array,
+//   properties, propertyDtypes ('i32' | 'f32'), metadata, min, max, ... }
+```
+
+`properties: ['*']` reads every per-atom column; each property comes back as an `Int32Array` or a `Float32Array`, as `propertyDtypes` says. The C++ API (`include/lammpsio/reader_registry.hpp`) has the same `scanFrames`, `readHeader` and `readFrame`, with `*Buffer` variants for data already in memory.
+
+## SpatialAssembler
+
+`packages/SpatialAssembler` writes GLB (binary glTF) files. Atom clouds are sorted along a Morton curve with a multi-threaded radix sort and colored by atom type, with an AVX2/BMI2 fast path where the CPU has it. It also builds colored point clouds and indexed meshes with PBR materials, maps scalar values to colors, and smooths meshes.
+
+### Where VOLT uses it
+
+- `TrajectoryFrameProcessingWorker.ts` and `GlbExporter.ts`: `generateGLBToFile` for every frame's model.
+- `FilterEvaluator.ts`: `applyPropertyColors`, `generatePointCloudGLB` and `generateGLB` for color-coded and particle-filtered models.
+- The plugin exporters: `generatePointCloudGLB` for atom exposures (`atomistic-exporter.ts`), `taubinSmooth` and `generateMeshGLB` for meshes (`mesh-exporter.ts`), and `generateMeshGLB` for line tubes (`line-exporter.ts`).
+- The Python SDK: `voltsdk.spatial` imports `volt_spatial_assembler` (`volt-spatial-assembler>=1.0.0`, not on Pyodide).
+
+### Packaging
+
+| Channel | Name and version |
+|---|---|
+| npm | `@voltstack/spatial-assembler` 1.1.1 (gyp target `spatial_assembler`, `-O3 -ffast-math`) |
+| PyPI | `volt-spatial-assembler` 1.0.1, built with pybind11 and cibuildwheel for CPython 3.10 to 3.13 (`pypi-workflow.yml`) |
+
+### API
+
+| Function | Result |
+|---|---|
+| `generateGLB(positions: Float32Array, types: Uint16Array, min, max)` | GLB `Buffer` of atoms colored by type |
+| `generateGLBToFile(positions, types, min, max, path)` | `true` when the file was written |
+| `generatePointCloudGLB(positions, colors, min, max)` | GLB of a point cloud with RGB or RGBA colors |
+| `generateMeshGLB(positions, normals, indices, hasColors, colors, bounds, material)` | GLB of an indexed mesh |
+| `applyPropertyColors(values, min, max, gradient)` | Per-point colors from scalar values |
+| `taubinSmooth(positions, indices: Uint32Array, iterations)` | Smoothed positions (λ 0.5, μ −0.52) |
+
+Gradient codes: 0 Viridis, 1 Plasma, 2 BlueRed, 3 Grayscale, 4 Magma, 5 Inferno, 6 Cividis, 7 RdBu, 8 Coolwarm, 9 Jet. The Python module has `atom_glb`, `point_cloud_glb` and `mesh_glb`.
+
+## HeadlessRasterizer
+
+`packages/HeadlessRasterizer` renders a GLB to an RGBA PNG on the CPU, with no GPU or display. It memory-maps the GLB (`mmap`, or `MapViewOfFile` on Windows), draws point clouds as round splats, uses up to 16 threads, and writes the PNG with stb_image_write. VOLT uses it for the preview image of every frame.
+
+### Where VOLT uses it
+
+`Rasterizer.ts`, run by `TrajectoryRasterWorker`, decompresses a frame's `.glb.zst` and calls `rasterize` at azimuth 45°, elevation 25°, with `{ fov: 45, distScale: 1, zUp: true }`, then stores the PNG in the `volt-rasterizer` bucket.
+
+### Packaging and API
+
+npm `@voltstack/headless-rasterizer` 1.1.1 (gyp target `headless_rasterizer`).
+
+```ts
+import headlessRasterizer from '@voltstack/headless-rasterizer';
+
+const ok: boolean = headlessRasterizer.rasterize(
+    glbPath, pngPath, width, height,
+    azimuthDeg, elevationDeg,
+    { fov: 60, distScale: 1, zUp: true }
+);
+```
+
+All seven arguments are required; with fewer, `rasterize` returns `false`. The options shown are the library's defaults.
