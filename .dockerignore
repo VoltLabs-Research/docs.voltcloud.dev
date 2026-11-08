@@ -1,0 +1,9 @@
+node_modules
+.next
+.source
+.git
+.claude
+.repowise
+.vscode
+*.tsbuildinfo
+npm-debug.log*

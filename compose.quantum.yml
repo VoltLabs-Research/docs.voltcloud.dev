@@ -1,0 +1,9 @@
+# docs.voltcloud.dev, run by Quantum as a stack sourced from this repository and
+# rebuilt on each push to main through the GitHub webhook Quantum registers.
+services:
+  docs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000"
